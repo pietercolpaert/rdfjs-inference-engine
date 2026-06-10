@@ -1,0 +1,31 @@
+# Project RDF Message payloads into the current reasoning scope and add
+# application-specific stream interpretation rules.
+
+@prefix :     <https://example.org/transit#> .
+@prefix eymsg:<https://eyereasoner.github.io/eyeling/vocab/message#> .
+@prefix log:  <http://www.w3.org/2000/10/swap/log#> .
+
+# Eyeling exposes RDF Message Logs as an eymsg: replay view. Each non-empty
+# message has a payload graph. This rule makes the current message payload facts
+# visible to the OWL 2 RL ruleset.
+{
+  ?Envelope a eymsg:MessageEnvelope ;
+    eymsg:payloadKind eymsg:nonEmpty ;
+    eymsg:payloadGraph ?Payload .
+  ?Payload log:nameOf ?PayloadContext .
+  ?PayloadContext log:includes { ?s ?p ?o } .
+} => {
+  ?s ?p ?o .
+} .
+
+# Application-specific message interpretation: a VehicleObservation says the
+# observed vehicle was seen at the reported stop and should be classified as an
+# ObservedVehicle. OWL 2 RL then propagates superclass/domain/range entailments.
+{
+  ?event a :VehicleObservation ;
+    :observedVehicle ?vehicle ;
+    :observedAt ?stop .
+} => {
+  ?vehicle a :ObservedVehicle ;
+    :seenAt ?stop .
+} .

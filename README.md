@@ -1,417 +1,303 @@
-# OWL 2 RL reasoning over RDF Message streams with Eyeling
+# OWL 2 RL stream enrichment with Eyeling and N3
 
-This repository shows how to use Eyeling as a lightweight OWL 2 RL enrichment engine for RDF Message streams.
+This repository demonstrates a pattern for doing **OWL 2 RL materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling) and Notation3 rules.
 
 The core idea is:
 
-1. load an OWL 2 RL ruleset as static background knowledge;
-2. load domain ontologies and application-specific N3 rules as additional background knowledge;
-3. process each incoming RDF Message as an atomic unit of RDF data;
-4. emit the new triples that can be derived from that message and the background knowledge.
+1. keep an OWL 2 RL ruleset as static background knowledge;
+2. load your domain ontology as background knowledge;
+3. load project-specific N3 rules that interpret each incoming RDF Message;
+4. process an RDF Message Log one message at a time;
+5. emit the triples that can be derived for each message.
 
-This makes it possible to add semantic enrichment to streaming RDF pipelines while keeping the reasoning rules inspectable and version-controlled.
+This is useful when a service receives RDF Messages, enriches them immediately, and stores or publishes the materialized triples so downstream systems can query ordinary RDF without running OWL reasoning themselves.
 
-## Files
-
-Suggested repository layout:
+## Repository layout
 
 ```text
 .
 ├── README.md
 ├── rules/
-│   ├── owl2rl-eyeling-possible.n3
-│   └── stream-interpretation.n3
+│   ├── owl2rl-eyeling.n3       # OWL 2 RL/RDF materialization rules for Eyeling
+│   ├── stream-enrichment.n3    # Message projection + application-specific rules
+│   └── example-output.n3       # log:query output filter for the example
 ├── ontologies/
-│   └── domain.n3
+│   └── transit.n3              # Small demo ontology
 ├── examples/
-│   ├── message-001.n3
-│   └── message-001.expected.n3
-└── test/
-    └── ...
+│   ├── input/
+│   │   └── messages.trig       # RDF Message Log example
+│   └── expected-output.nt      # Expected command-line output
+└── scripts/
+    └── run-example.sh
 ```
 
-The important file is:
+## Requirements
 
-```text
-rules/owl2rl-eyeling-possible.n3
-```
+Use the latest Eyeling version that includes the datatype builtins added after issue `eyereasoner/eyeling#18`.
 
-It contains the OWL 2 RL/RDF rules that are currently expressible with Eyeling's documented built-ins. This file should be treated as static background knowledge: applications do not normally modify it. Instead, add project-specific rules in separate files such as `rules/stream-interpretation.n3`.
-
-## Reasoning model
-
-For each RDF Message, the reasoner receives the union of:
-
-```text
-OWL 2 RL rules
-+ domain ontology
-+ stream interpretation rules
-+ current RDF Message
-```
-
-Eyeling then derives the triples that follow from that combined input.
-
-A typical command-line invocation looks like this:
+The example can be run without installing Eyeling globally:
 
 ```bash
-npx eyeling \
-  rules/owl2rl-eyeling-possible.n3 \
-  ontologies/domain.n3 \
-  rules/stream-interpretation.n3 \
-  examples/message-001.n3
+npx --yes eyeling --version
 ```
 
-By default, Eyeling prints newly derived triples rather than simply echoing the original input facts. This is useful for stream enrichment: the downstream consumer receives the inferred triples that the message makes available.
+Eyeling requires Node.js. The upstream package currently documents Node.js `>=18`.
 
-## Background OWL 2 RL rules
+## How it works
 
-The OWL 2 RL ruleset is loaded as ordinary N3 background knowledge. It contains rules for common OWL/RDFS entailments, including:
+### 1. OWL 2 RL rules as background knowledge
 
-* `rdfs:subClassOf`
-* `owl:equivalentClass`
-* `rdfs:subPropertyOf`
-* `owl:equivalentProperty`
-* `rdfs:domain`
-* `rdfs:range`
-* `owl:inverseOf`
-* `owl:SymmetricProperty`
-* `owl:TransitiveProperty`
-* `owl:FunctionalProperty`
-* `owl:InverseFunctionalProperty`
-* `owl:sameAs`
-* `owl:differentFrom`
-* selected class-expression support such as intersections, unions, value restrictions, and cardinality rules where expressible
-* recursive property-chain support
-* inconsistency reporting through `owlrl:Inconsistency` resources
+The file:
 
-The ruleset intentionally does not try to implement all of OWL 2 DL. OWL 2 RL is the rule-oriented OWL profile. The goal here is scalable stream enrichment, not full DL satisfiability checking.
+```text
+rules/owl2rl-eyeling.n3
+```
 
-## Current datatype status
+contains an N3 implementation-oriented OWL 2 RL/RDF ruleset for Eyeling. It includes rules for common OWL/RDFS entailments, including:
 
-The current Eyeling-compatible ruleset contains partial datatype support.
+- `rdfs:subClassOf`
+- `owl:equivalentClass`
+- `rdfs:subPropertyOf`
+- `owl:equivalentProperty`
+- `rdfs:domain`
+- `rdfs:range`
+- inverse, symmetric, transitive, functional, and inverse-functional properties
+- `owl:sameAs` / `owl:differentFrom`
+- selected class expressions such as `owl:intersectionOf`, `owl:unionOf`, `owl:oneOf`, `owl:someValuesFrom`, `owl:allValuesFrom`, `owl:hasValue`, and cardinality rules
+- property chains via recursive helper rules
+- datatype rules using Eyeling's `dt:` builtins
+- inconsistency diagnostics as `owlrl:Inconsistency` resources
 
-Numeric value equality and inequality are handled where Eyeling's numeric math built-ins can compare literals, for example through `math:equalTo` and `math:notEqualTo`.
+The ruleset is meant to be loaded as background knowledge. In normal projects, do not edit it for application logic. Add application-specific rules in separate files.
 
-Full OWL 2 RL datatype reasoning is not yet implemented because it requires built-ins for:
+### 2. Domain ontology as background knowledge
 
-* extracting a literal's datatype IRI;
-* extracting a literal's lexical form;
-* checking whether a literal is valid for a datatype;
-* comparing literals by XSD value-space equality;
-* comparing literals by XSD value-space inequality;
-* canonicalizing literals.
+The example ontology is:
 
-Until those built-ins exist, the following are intentionally incomplete:
+```text
+ontologies/transit.n3
+```
 
-* boolean value equality, such as `"true"^^xsd:boolean` versus `"1"^^xsd:boolean`;
-* date/time value equality across time zones;
-* invalid lexical form detection;
-* string-derived datatype value-space reasoning;
-* binary and URI datatype value-space reasoning.
-
-In practice, this is still useful for many RDF stream enrichment cases, but applications that depend on complete OWL 2 RL datatype semantics should treat this as a known limitation.
-
-## Domain ontology example
-
-The domain ontology should be loaded as background knowledge.
-
-Example `ontologies/domain.n3`:
+It defines a tiny transit model:
 
 ```n3
-@prefix :     <https://example.org/demo#> .
-@prefix owl:  <http://www.w3.org/2002/07/owl#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-
-:Vehicle a owl:Class .
-:Bus rdfs:subClassOf :Vehicle .
 :ElectricBus rdfs:subClassOf :Bus .
-
-:operatedBy rdfs:domain :Vehicle .
-:operatedBy rdfs:range :Operator .
-
-:hasPart a owl:TransitiveProperty .
+:Bus rdfs:subClassOf :Vehicle .
+:ObservedVehicle rdfs:subClassOf :Vehicle .
+:operatedBy rdfs:domain :Vehicle ;
+  rdfs:range :Operator .
+:seatCount rdfs:range xsd:integer .
+:reportedAt rdfs:range xsd:dateTime .
 ```
 
-Given an incoming message such as:
+When a message says that `:bus-42 a :ElectricBus`, OWL 2 RL derives that `:bus-42 a :Bus` and `:bus-42 a :Vehicle`. When a message says that `:bus-42 :operatedBy :operator-7`, OWL 2 RL derives that `:operator-7 a :Operator`.
 
-```n3
-@prefix : <https://example.org/demo#> .
+### 3. RDF Messages are projected into the reasoning scope
 
-:bus-42 a :ElectricBus .
-:bus-42 :operatedBy :operator-7 .
+Eyeling supports RDF Message Logs under RDF compatibility mode. A log starts with:
+
+```trig
+VERSION "1.2-messages"
 ```
 
-Eyeling can derive triples such as:
+and uses `MESSAGE` delimiters between messages.
 
-```n3
-@prefix : <https://example.org/demo#> .
+Eyeling exposes those parser-level message boundaries through the `eymsg:` replay vocabulary. The project-specific rule file:
 
-:bus-42 a :Bus .
-:bus-42 a :Vehicle .
-:operator-7 a :Operator .
+```text
+rules/stream-enrichment.n3
 ```
 
-## Stream interpretation rules
-
-Application-specific stream rules should live outside the OWL 2 RL ruleset.
-
-Example `rules/stream-interpretation.n3`:
+contains this bridge rule:
 
 ```n3
-@prefix :      <https://example.org/demo#> .
-@prefix event: <https://example.org/event#> .
-
-# Interpret a vehicle observation event as a statement that the observed asset
-# was seen at the reported stop.
 {
-  ?event a event:VehicleObservation .
-  ?event event:vehicle ?vehicle .
-  ?event event:stop ?stop .
-}
-=>
-{
-  ?vehicle :seenAt ?stop .
-} .
-
-# Add a higher-level classification for vehicles that are observed in service.
-{
-  ?event a event:VehicleObservation .
-  ?event event:vehicle ?vehicle .
-}
-=>
-{
-  ?vehicle a :ObservedVehicle .
-} .
-```
-
-Given a message:
-
-```n3
-@prefix :      <https://example.org/demo#> .
-@prefix event: <https://example.org/event#> .
-
-:event-123 a event:VehicleObservation ;
-  event:vehicle :bus-42 ;
-  event:stop :stop-9 .
-```
-
-The stream rules can derive:
-
-```n3
-@prefix : <https://example.org/demo#> .
-
-:bus-42 :seenAt :stop-9 .
-:bus-42 a :ObservedVehicle .
-```
-
-The OWL 2 RL background rules can then continue from those derived triples. For example, if `:ObservedVehicle rdfs:subClassOf :Vehicle`, then `:bus-42 a :Vehicle` is also derivable.
-
-## RDF Message envelope pattern
-
-Some pipelines pass each message directly to the reasoner as RDF triples. In that case, no envelope rule is needed.
-
-Other pipelines represent each message as an N3 quoted formula. In that case, add a small bridge rule that projects the message payload into the reasoning scope.
-
-Example message envelope:
-
-```n3
-@prefix msg: <https://w3id.org/rdf-message#> .
-@prefix :    <https://example.org/demo#> .
-
-:message-001 a msg:Message ;
-  msg:payload {
-    :bus-42 a :ElectricBus .
-    :bus-42 :operatedBy :operator-7 .
-  } .
-```
-
-Example bridge rule:
-
-```n3
-@prefix msg: <https://w3id.org/rdf-message#> .
-@prefix log: <http://www.w3.org/2000/10/swap/log#> .
-
-{
-  ?message msg:payload ?payload .
-  ?payload log:includes { ?s ?p ?o } .
-}
-=>
-{
+  ?Envelope a eymsg:MessageEnvelope ;
+    eymsg:payloadKind eymsg:nonEmpty ;
+    eymsg:payloadGraph ?Payload .
+  ?Payload log:nameOf ?PayloadContext .
+  ?PayloadContext log:includes { ?s ?p ?o } .
+} => {
   ?s ?p ?o .
 } .
 ```
 
-Use this pattern only when messages are represented as quoted formulae. If the message triples are already passed as normal input, projecting them again is unnecessary.
+That rule says: for the current non-empty RDF Message, take each payload triple and make it available to the ordinary N3/OWL 2 RL reasoning scope.
 
-## Producing only new triples
+### 4. Application rules interpret the message
 
-There are two common modes.
+The same file contains an application rule:
 
-### Stateless per-message enrichment
-
-Each message is reasoned over independently with the same background knowledge:
-
-```text
-background + message-001 -> derived triples for message-001
-background + message-002 -> derived triples for message-002
-background + message-003 -> derived triples for message-003
+```n3
+{
+  ?event a :VehicleObservation ;
+    :observedVehicle ?vehicle ;
+    :observedAt ?stop .
+} => {
+  ?vehicle a :ObservedVehicle ;
+    :seenAt ?stop .
+} .
 ```
 
-This is simple and works well when each message is self-contained.
+So a message-level observation event becomes normal RDF facts about the observed vehicle. The OWL 2 RL rules can then derive superclass, domain, range, equality, datatype, and other consequences.
 
-If the stream consumer must avoid re-emitting the same inferred triple twice, keep a set of emitted triples outside the reasoner and suppress duplicates there.
+## Run the example
 
-### Stateful enrichment
+From the repository root:
 
-The application maintains a materialized state graph:
-
-```text
-state-000 + message-001 -> closure-001
-state-001 + message-002 -> closure-002
-state-002 + message-003 -> closure-003
+```bash
+npx --yes eyeling --rdf --stream-messages \
+  rules/owl2rl-eyeling.n3 \
+  ontologies/transit.n3 \
+  rules/stream-enrichment.n3 \
+  rules/example-output.n3 \
+  examples/input/messages.trig
 ```
 
-After each message, update the state with the accepted derived triples. This allows later messages to build on facts derived from earlier messages.
+or:
 
-This repository should keep that state-management policy outside the OWL 2 RL ruleset. The ruleset says what follows logically; the stream processor decides what to remember, expire, deduplicate, or publish.
+```bash
+./scripts/run-example.sh
+```
 
-## Inconsistency reporting
+Expected output:
 
-The ruleset does not derive logical `false`. Instead, inconsistency rules produce explicit diagnostic resources of type:
+```ntriples
+<https://example.org/transit#bus-42> a <https://example.org/transit#Bus> .
+<https://example.org/transit#bus-42> a <https://example.org/transit#Vehicle> .
+<https://example.org/transit#bus-42> <https://example.org/transit#operatedBy> <https://example.org/transit#operator-7> .
+<https://example.org/transit#operator-7> a <https://example.org/transit#Operator> .
+<https://example.org/transit#bus-42> a <https://example.org/transit#Vehicle> .
+<https://example.org/transit#bus-42> a <https://example.org/transit#ObservedVehicle> .
+<https://example.org/transit#bus-42> <https://example.org/transit#seenAt> <https://example.org/transit#stop-12> .
+```
+
+The duplicate `:bus-42 a :Vehicle` is expected in this command because `--stream-messages` processes messages one at a time. Message 1 derives `:Vehicle` through `:ElectricBus -> :Bus -> :Vehicle`; message 2 derives it again through `:ObservedVehicle -> :Vehicle`.
+
+To check the example mechanically:
+
+```bash
+./scripts/run-example.sh > /tmp/owl2rl-example-output.nt
+diff -u examples/expected-output.nt /tmp/owl2rl-example-output.nt
+```
+
+## Why `rules/example-output.n3` exists
+
+Eyeling normally prints newly derived triples. With a full OWL 2 RL ruleset, that can include many schema-level consequences such as reflexive equality, subclass closure, helper triples, datatype meta-triples, and inconsistency diagnostics.
+
+The file:
+
+```text
+rules/example-output.n3
+```
+
+uses `log:query` to keep the example output focused on the application-level materialization. In a production project, you have three common options:
+
+1. emit all newly derived triples and filter downstream;
+2. add project-specific `log:query` rules for the triples you want to publish;
+3. call Eyeling from JavaScript and filter the closure programmatically.
+
+## Using this pattern in a project
+
+A typical ingest-time architecture looks like this:
+
+```text
+RDF Message stream
+  -> Eyeling with OWL 2 RL rules + ontology + stream rules
+  -> derived triples
+  -> deduplication / validation / persistence
+  -> SPARQL endpoint, event bus, cache, or materialized RDF store
+```
+
+Recommended project structure:
+
+```text
+rules/
+  owl2rl-eyeling.n3          # keep vendored and versioned
+  stream-enrichment.n3       # your message interpretation rules
+  output.n3                  # optional log:query output selection
+ontologies/
+  domain.n3                  # your domain ontology
+examples/
+  input/*.trig               # RDF Message Logs
+  expected-output/*.nt       # regression-test fixtures
+```
+
+For server use, keep the OWL 2 RL ruleset and domain ontology stable and append one incoming message or message window at a time. For high-throughput pipelines, deduplicate emitted triples outside the reasoner before storing or republishing them.
+
+## Datatype reasoning
+
+The current ruleset uses Eyeling's `dt:` builtins:
+
+```n3
+@prefix dt: <https://eyereasoner.github.io/eyeling/datatype#> .
+```
+
+These allow the ruleset to express OWL 2 RL datatype rules declaratively:
+
+- `dt:datatype`
+- `dt:lexicalForm`
+- `dt:language`
+- `dt:validForDatatype`
+- `dt:invalidForDatatype`
+- `dt:sameValueAs`
+- `dt:differentValueFrom`
+- `dt:canonicalLiteral`
+
+That means cases such as these can now be handled by builtins rather than ad-hoc numeric-only rules:
+
+```n3
+"01"^^xsd:integer dt:sameValueAs "1.0"^^xsd:decimal .
+"true"^^xsd:boolean dt:sameValueAs "1"^^xsd:boolean .
+"2026-06-10T12:00:00Z"^^xsd:dateTime dt:sameValueAs "2026-06-10T14:00:00+02:00"^^xsd:dateTime .
+```
+
+The ruleset also emits optional `owlrl:canonicalLiteral` helper triples. These are not OWL 2 RL entailments; they are useful for diagnostics and can be ignored or removed if unwanted.
+
+## Inconsistency handling
+
+The ruleset does not derive bare `false` for every OWL 2 RL inconsistency. Instead, it emits explicit diagnostic resources:
+
+```n3
+?err a owlrl:Inconsistency .
+```
+
+This is intentional for streaming systems. A single bad message can be logged, quarantined, or routed to a validation queue without stopping the entire stream processor.
+
+If you want fail-fast behavior, add a project rule such as:
 
 ```n3
 @prefix owlrl: <https://w3id.org/owlrl-n3#> .
 
-owlrl:Inconsistency
+{ ?err a owlrl:Inconsistency . } => { false } .
 ```
 
-This is deliberate. In a stream, one inconsistent message should usually be reportable without making the whole pipeline unusable.
+Eyeling exits with a non-zero inference-fuse code when `false` is derived.
 
-A downstream processor can route these inconsistency reports to logs, metrics, alerts, quarantine queues, or validation feedback.
+## Remaining limitations
 
-## Querying selected output
+The datatype gap has been addressed by current Eyeling `dt:` builtins, but there are still practical and semantic boundaries:
 
-Eyeling supports `log:query` as an output-selection directive. Add a query when you want to restrict output to a specific shape.
+1. **OWL 2 RL, not OWL 2 DL**  
+   This is a rule-materialization approach for the OWL 2 RL profile. It does not implement OWL 2 DL tableau reasoning, arbitrary class satisfiability checking, or full non-Horn disjunctive search.
 
-For example, to output only derived vehicle observations:
+2. **Materialization can grow quickly**  
+   `owl:sameAs`, transitive properties, subclass closure, and property chains can produce many triples. Use output filters and external deduplication in production.
 
-```n3
-@prefix :    <https://example.org/demo#> .
-@prefix log: <http://www.w3.org/2000/10/swap/log#> .
+3. **RDF Message state is an application policy**  
+   `--stream-messages` processes messages one at a time. If later messages should build on facts from earlier messages, maintain an external state graph and feed that state back into Eyeling.
 
-{
-  ?vehicle :seenAt ?stop .
-}
-log:query
-{
-  ?vehicle :seenAt ?stop .
-} .
-```
+4. **Literal subjects may appear in datatype meta-triples**  
+   OWL 2 RL datatype rules can produce generalized triples such as a literal having `rdf:type xsd:integer`. Eyeling can print them, but some RDF 1.1 stores may reject literal subjects. Use `log:query` filters if your sink requires ordinary RDF 1.1 triples only.
 
-For general enrichment, it is usually better to let Eyeling emit all derived triples and filter in the application layer.
-
-## JavaScript integration sketch
-
-A stream processor can keep the rules and ontology loaded as strings and append one RDF Message at a time.
-
-```js
-const fs = require('node:fs');
-const { reason } = require('eyeling');
-
-const background = [
-  fs.readFileSync('rules/owl2rl-eyeling-possible.n3', 'utf8'),
-  fs.readFileSync('ontologies/domain.n3', 'utf8'),
-  fs.readFileSync('rules/stream-interpretation.n3', 'utf8'),
-].join('\n\n');
-
-function enrichMessage(messageN3) {
-  return reason({ proof: false }, `${background}\n\n${messageN3}`);
-}
-
-async function onMessage(messageN3) {
-  const inferredN3 = enrichMessage(messageN3);
-
-  // Application policy:
-  // - parse inferredN3;
-  // - remove duplicates already emitted;
-  // - handle owlrl:Inconsistency reports;
-  // - publish accepted new triples.
-  return inferredN3;
-}
-```
-
-For high-throughput systems, use Eyeling's streaming or RDF-JS APIs instead of repeatedly concatenating strings. The reasoning setup remains the same: static background knowledge plus one message or one window of messages.
-
-## Testing examples
-
-Each example should include:
-
-1. background ontology;
-2. stream interpretation rules, if needed;
-3. one input message;
-4. expected inferred triples.
-
-Example command:
-
-```bash
-npx eyeling \
-  rules/owl2rl-eyeling-possible.n3 \
-  ontologies/domain.n3 \
-  rules/stream-interpretation.n3 \
-  examples/message-001.n3 \
-  > /tmp/message-001.actual.n3
-```
-
-Then compare `/tmp/message-001.actual.n3` with `examples/message-001.expected.n3` using the repository's preferred RDF-aware comparison method.
-
-Avoid byte-level comparison when blank nodes or generated Skolem IRIs are involved.
-
-## Operational guidance
-
-Use this setup when:
-
-* RDF Messages are relatively small;
-* the background ontology is mostly stable;
-* inferred triples need to be generated at message time;
-* explainable rule-based behavior is preferred over black-box enrichment;
-* OWL 2 RL expressivity is sufficient.
-
-Be careful when:
-
-* message windows are large;
-* transitive properties can create large closures;
-* `owl:sameAs` can create many equivalent terms;
-* property chains are long or recursive;
-* the application depends on complete XSD datatype semantics.
-
-## Known limitations
-
-This ruleset is an OWL 2 RL implementation for what is currently practical in Eyeling N3. It is not a complete OWL 2 DL reasoner.
-
-Known limitations include:
-
-* incomplete XSD datatype reasoning (https://github.com/eyereasoner/eyeling/issues/18);
-* no general OWL 2 DL tableau reasoning;
-* no closed-world validation semantics;
-* possible large materializations for transitive properties, property chains, and equality;
-* stream state and duplicate suppression are handled by the application, not by the OWL 2 RL ruleset.
-
-## Future work
-
-Possible next steps:
-
-* add Eyeling datatype built-ins for full OWL 2 RL datatype support;
-* add a test corpus based on the OWL 2 RL rule tables;
-* add examples for RDF Message Logs;
-* add benchmark scenarios for stateless, stateful, and windowed stream reasoning;
-* add output filters for common enrichment patterns;
-* document recommended handling of `owlrl:Inconsistency` diagnostics.
+5. **This ruleset should still be tested against your data**  
+   The file is implementation-oriented and should be treated as a vendored ruleset with regression tests. Do not assume that every edge case of every OWL 2 RL rule has been certified for your production data shape.
 
 ## References
 
-* OWL 2 RL profile: https://www.w3.org/TR/owl2-profiles/
-* OWL 2 RL rules in RIF: https://www.w3.org/TR/rif-owl-rl/
-* Notation3 Community Group specification: https://w3c-cg.github.io/N3/spec/
-* Eyeling repository: https://github.com/eyereasoner/eyeling
-* Eyeling built-ins catalog: https://github.com/eyereasoner/eyeling/blob/main/eyeling-builtins.ttl
-
+- Eyeling repository: https://github.com/eyereasoner/eyeling
+- Eyeling builtins catalog: https://github.com/eyereasoner/eyeling/blob/main/eyeling-builtins.ttl
+- Eyeling issue for datatype builtins: https://github.com/eyereasoner/eyeling/issues/18
+- OWL 2 RL profile: https://www.w3.org/TR/owl2-profiles/
+- OWL 2 RL/RIF rules: https://www.w3.org/TR/rif-owl-rl/
+- Notation3 Community Group specification: https://w3c-cg.github.io/N3/spec/

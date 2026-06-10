@@ -1,22 +1,18 @@
 # OWL 2 RL/RDF rules in Notation3 (N3) for Eyeling
 # -----------------------------------------------------------------------------
 # This file is an implementation-oriented OWL 2 RL/RDF ruleset targeting
-# Eyeling's currently documented builtins.
+# current Eyeling, including the dt: datatype builtins added after issue #18.
 #
 # Scope:
 #   * Implements the OWL 2 RL rule core that is expressible in Eyeling N3.
 #   * Uses log:skolem to create stable helper nodes for internal n-ary facts.
 #   * Implements property-chain reasoning in N3 using recursive chain helpers.
-#   * Includes partial datatype support using Eyeling numeric math builtins.
-#   * Does NOT implement complete XSD lexical/value-space reasoning because
-#     Eyeling currently lacks literal datatype extraction, lexical validation,
-#     and general value-space comparison builtins.
+#   * Includes OWL 2 RL datatype rules using Eyeling's dt: value-space builtins.
 #
 # Important caveats:
-#   * Numeric dt-eq/dt-diff are best-effort and rely on math:equalTo and
-#     math:notEqualTo over terms already present in the graph.
-#   * Boolean, dateTime, binary, anyURI, string-derived datatype value equality,
-#     invalid lexical forms, and datatype restrictions need additional builtins.
+#   * This is an OWL 2 RL materialization ruleset, not an OWL 2 DL tableau reasoner.
+#   * Some OWL 2 RL features require RDF list/property-chain helper rules and can be
+#     expensive on large graphs.
 #   * Inconsistency rules derive owlrl:Inconsistency resources instead of false.
 
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -25,8 +21,9 @@
 @prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
 @prefix log:   <http://www.w3.org/2000/10/swap/log#> .
 @prefix math:  <http://www.w3.org/2000/10/swap/math#> .
+@prefix dt:    <https://eyereasoner.github.io/eyeling/datatype#> .
 @prefix list:  <http://www.w3.org/2000/10/swap/list#> .
-@prefix owlrl: <https://w3id.org/owlrl-n3#> .
+@prefix owlrl: <https://example.org/owlrl-n3#> .
 
 #################################################################
 # 0. Vocabulary used by this ruleset
@@ -45,6 +42,7 @@ owlrl:pathChain a rdf:Property .
 owlrl:pathSubject a rdf:Property .
 owlrl:pathObject a rdf:Property .
 owlrl:term a rdf:Property .
+owlrl:canonicalLiteral a rdf:Property .
 owlrl:rule a rdf:Property .
 owlrl:term1 a rdf:Property .
 owlrl:term2 a rdf:Property .
@@ -663,42 +661,68 @@ owl:Nothing rdf:type owl:Class .
           owlrl:term4 ?z . } .
 
 #################################################################
-# 8. Datatype support available in current Eyeling
+# 8. Datatype support for current Eyeling dt: builtins
 #################################################################
 
-# Eyeling currently has numeric comparison builtins but not general XSD
-# value-space inspection.  We therefore collect graph terms and implement
-# only numeric dt-eq/dt-diff.  This covers many practical cardinality and
-# equality cases, but it is not complete OWL 2 RL datatype reasoning.
+# Eyeling now exposes XSD value-space datatype builtins in:
+#   https://eyereasoner.github.io/eyeling/datatype#
+#
+# These rules implement the OWL 2 RL datatype rule shape declaratively:
+#   * dt-type2: valid literals are instances of their datatype.
+#   * dt-not-type: explicit datatype membership with invalid lexical/value form
+#     is reported as an inconsistency.
+#   * dt-eq: distinct literal terms denoting the same datatype value are sameAs.
+#   * dt-diff: literal terms denoting different comparable datatype values are
+#     differentFrom.
+#   * canonicalization is exposed as an optional enrichment triple.
+#
+# To avoid comparing every term in the rule vocabulary, this ruleset indexes only
+# literal objects occurring in the active data/closure. RDF literals normally occur
+# in object position. The helper node makes it possible to refer to literals
+# without using them as internal triple subjects.
 
-# Term collection from triples.  The helper node avoids needing literals as
-# subjects for the internal index.
-{ ?s ?p ?o .
-  (owlrl:term ?s) log:skolem ?sn .
-  (owlrl:term ?p) log:skolem ?pn .
-  (owlrl:term ?o) log:skolem ?on . }
-=> { ?sn owlrl:term ?s .
-     ?pn owlrl:term ?p .
-     ?on owlrl:term ?o . } .
+{ ?s ?p ?lt .
+  ?lt dt:datatype ?datatype .
+  (owlrl:literal ?lt) log:skolem ?litNode . }
+=> { ?litNode owlrl:term ?lt . } .
 
-# Numeric dt-eq: if two present terms are numerically equal according to
-# Eyeling math:equalTo, relate them with owl:sameAs.
+# dt-type2
+{ ?litNode owlrl:term ?lt .
+  ?lt dt:datatype ?datatype .
+  ?lt dt:validForDatatype ?datatype . }
+=> { ?lt rdf:type ?datatype . } .
+
+# dt-not-type
+{ ?litNode owlrl:term ?lt .
+  ?lt rdf:type ?datatype .
+  ?lt dt:invalidForDatatype ?datatype .
+  (owlrl:dt-not-type ?lt ?datatype) log:skolem ?err . }
+=> { ?err a owlrl:Inconsistency ;
+          owlrl:rule owlrl:dt-not-type ;
+          owlrl:term1 ?lt ;
+          owlrl:term2 ?datatype . } .
+
+# dt-eq. The log:notEqualTo guard avoids deriving reflexive literal equality for
+# the exact same RDF term while still allowing value equality for different
+# lexical/datatype forms.
 { ?n1 owlrl:term ?lt1 .
   ?n2 owlrl:term ?lt2 .
-  ?lt1 math:equalTo ?lt2 . }
+  ?lt1 log:notEqualTo ?lt2 .
+  ?lt1 dt:sameValueAs ?lt2 . }
 => { ?lt1 owl:sameAs ?lt2 . } .
 
-# Numeric dt-diff: if two present terms are numerically different according to
-# Eyeling math:notEqualTo, relate them with owl:differentFrom.
+# dt-diff
 { ?n1 owlrl:term ?lt1 .
   ?n2 owlrl:term ?lt2 .
-  ?lt1 math:notEqualTo ?lt2 . }
+  ?lt1 dt:differentValueFrom ?lt2 . }
 => { ?lt1 owl:differentFrom ?lt2 . } .
 
-# Note: full OWL 2 RL dt-type2/dt-not-type for all required datatypes needs
-# builtins for literal datatype extraction, lexical validation, and value-space
-# comparison.  Those rules are intentionally not included here to avoid claiming
-# completeness that current Eyeling cannot provide.
+# Optional canonical literal enrichment. This is not an OWL 2 RL entailment rule,
+# but it is useful in streaming pipelines for diagnostics and normalization.
+# Downstream projects may ignore or remove owlrl:canonicalLiteral triples.
+{ ?litNode owlrl:term ?lt .
+  ?lt dt:canonicalLiteral ?canonical . }
+=> { ?litNode owlrl:canonicalLiteral ?canonical . } .
 
 #################################################################
 # 9. Schema vocabulary rules (scm-*)
