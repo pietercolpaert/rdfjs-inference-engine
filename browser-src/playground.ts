@@ -481,7 +481,7 @@ function createMessageWriter(api) {
     end(callback) {
       callback?.(null, '');
     },
-  }, { prefixes: outputPrefixes(), rdfMessages: true, format: 'N-Quads' });
+  }, { prefixes: outputPrefixes(), rdfMessages: true });
 }
 
 function endWriter(writer) {
