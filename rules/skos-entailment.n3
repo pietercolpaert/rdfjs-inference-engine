@@ -1,0 +1,313 @@
+# SKOS Core entailment rules in Notation3 (N3) for Eyeling
+# -----------------------------------------------------------------------------
+# Implements materialization rules for the normative entailment-relevant parts of
+# W3C SKOS Simple Knowledge Organization System Reference sections 3-10.
+#
+# Scope:
+#   * SKOS Core only: http://www.w3.org/2004/02/skos/core#
+#   * Covers class/property dependencies from S1-S8, S10-S12, S15-S26,
+#     S28-S36, and S38-S45 where they produce positive entailments.
+#   * Includes RDF-list traversal only for skos:memberList -> skos:member.
+#
+# Deliberately out of scope:
+#   * SKOS-XL (Appendix B / skosxl: vocabulary).
+#   * Integrity constraints and validation checks: S9, S13, S14, S27, S37, S46,
+#     SHACL/qSKOS-style quality checks, warnings, and best-practice diagnostics.
+#   * Non-entailments called out by the Reference, e.g. skos:broader is not
+#     transitive, skos:closeMatch is not transitive, and semantic relations do
+#     not imply membership in a shared concept scheme.
+#
+# Notes:
+#   * The executable rules below are intentionally direct SKOS Core rules rather
+#     than a general-purpose RDFS/OWL reasoner. This keeps the profile usable on
+#     its own and avoids surprising entailments for non-SKOS vocabulary.
+#   * S12 states a plain-literal range for SKOS lexical labels. RDF 1.1 systems
+#     commonly avoid materializing literal-subject type triples, so this profile
+#     records the schema fact but does not emit generalized triples such as
+#     "label"@en rdf:type rdf:PlainLiteral.
+#   * S32 states that skos:member has a union range of skos:Concept or
+#     skos:Collection. The profile records the schema pattern, but does not guess
+#     which branch of the union holds for a member value.
+
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
+@prefix skosn3: <https://example.org/skos-entailment-n3#> .
+
+#################################################################
+# 0. SKOS Core vocabulary facts from sections 3-10
+#################################################################
+
+# S1, S2, S28
+skos:Concept a owl:Class .
+skos:ConceptScheme a owl:Class .
+skos:Collection a owl:Class .
+skos:OrderedCollection a owl:Class .
+
+# S3, S18, S30, S38
+skos:inScheme a owl:ObjectProperty .
+skos:hasTopConcept a owl:ObjectProperty .
+skos:topConceptOf a owl:ObjectProperty .
+skos:semanticRelation a owl:ObjectProperty .
+skos:broader a owl:ObjectProperty .
+skos:narrower a owl:ObjectProperty .
+skos:related a owl:ObjectProperty .
+skos:broaderTransitive a owl:ObjectProperty .
+skos:narrowerTransitive a owl:ObjectProperty .
+skos:member a owl:ObjectProperty .
+skos:memberList a owl:ObjectProperty .
+skos:mappingRelation a owl:ObjectProperty .
+skos:closeMatch a owl:ObjectProperty .
+skos:exactMatch a owl:ObjectProperty .
+skos:broadMatch a owl:ObjectProperty .
+skos:narrowMatch a owl:ObjectProperty .
+skos:relatedMatch a owl:ObjectProperty .
+
+# S10, S16
+skos:prefLabel a owl:AnnotationProperty .
+skos:altLabel a owl:AnnotationProperty .
+skos:hiddenLabel a owl:AnnotationProperty .
+skos:note a owl:AnnotationProperty .
+skos:changeNote a owl:AnnotationProperty .
+skos:definition a owl:AnnotationProperty .
+skos:editorialNote a owl:AnnotationProperty .
+skos:example a owl:AnnotationProperty .
+skos:historyNote a owl:AnnotationProperty .
+skos:scopeNote a owl:AnnotationProperty .
+
+# S15
+skos:notation a owl:DatatypeProperty .
+
+# S4-S8
+skos:inScheme rdfs:range skos:ConceptScheme .
+skos:hasTopConcept rdfs:domain skos:ConceptScheme ;
+  rdfs:range skos:Concept .
+skos:topConceptOf rdfs:subPropertyOf skos:inScheme ;
+  owl:inverseOf skos:hasTopConcept .
+
+# S11-S12
+skos:prefLabel rdfs:subPropertyOf rdfs:label ;
+  rdfs:range rdf:PlainLiteral .
+skos:altLabel rdfs:subPropertyOf rdfs:label ;
+  rdfs:range rdf:PlainLiteral .
+skos:hiddenLabel rdfs:subPropertyOf rdfs:label ;
+  rdfs:range rdf:PlainLiteral .
+
+# S17
+skos:changeNote rdfs:subPropertyOf skos:note .
+skos:definition rdfs:subPropertyOf skos:note .
+skos:editorialNote rdfs:subPropertyOf skos:note .
+skos:example rdfs:subPropertyOf skos:note .
+skos:historyNote rdfs:subPropertyOf skos:note .
+skos:scopeNote rdfs:subPropertyOf skos:note .
+
+# S19-S26
+skos:semanticRelation rdfs:domain skos:Concept ;
+  rdfs:range skos:Concept .
+skos:broaderTransitive rdfs:subPropertyOf skos:semanticRelation ;
+  a owl:TransitiveProperty ;
+  owl:inverseOf skos:narrowerTransitive .
+skos:narrowerTransitive rdfs:subPropertyOf skos:semanticRelation ;
+  a owl:TransitiveProperty .
+skos:related rdfs:subPropertyOf skos:semanticRelation ;
+  a owl:SymmetricProperty .
+skos:broader rdfs:subPropertyOf skos:broaderTransitive ;
+  owl:inverseOf skos:narrower .
+skos:narrower rdfs:subPropertyOf skos:narrowerTransitive .
+
+# S29-S36
+skos:OrderedCollection rdfs:subClassOf skos:Collection .
+skos:member rdfs:domain skos:Collection .
+skos:memberList rdfs:domain skos:OrderedCollection ;
+  rdfs:range rdf:List ;
+  a owl:FunctionalProperty .
+
+# S39-S45
+skos:mappingRelation rdfs:subPropertyOf skos:semanticRelation .
+skos:closeMatch rdfs:subPropertyOf skos:mappingRelation ;
+  a owl:SymmetricProperty .
+skos:exactMatch rdfs:subPropertyOf skos:closeMatch ;
+  a owl:SymmetricProperty, owl:TransitiveProperty .
+skos:broadMatch rdfs:subPropertyOf skos:mappingRelation, skos:broader ;
+  owl:inverseOf skos:narrowMatch .
+skos:narrowMatch rdfs:subPropertyOf skos:mappingRelation, skos:narrower .
+skos:relatedMatch rdfs:subPropertyOf skos:mappingRelation, skos:related ;
+  a owl:SymmetricProperty .
+
+#################################################################
+# 1. Concept schemes (S4-S8)
+#################################################################
+
+{ ?resource skos:inScheme ?scheme . }
+=> { ?scheme a skos:ConceptScheme . } .
+
+{ ?scheme skos:hasTopConcept ?concept . }
+=> { ?scheme a skos:ConceptScheme .
+     ?concept a skos:Concept .
+     ?concept skos:topConceptOf ?scheme . } .
+
+{ ?concept skos:topConceptOf ?scheme . }
+=> { ?concept skos:inScheme ?scheme .
+     ?scheme skos:hasTopConcept ?concept . } .
+
+#################################################################
+# 2. Lexical labels, notations, and documentation properties
+#################################################################
+
+# S11: SKOS lexical label properties are sub-properties of rdfs:label.
+{ ?resource skos:prefLabel ?label . }
+=> { ?resource rdfs:label ?label . } .
+
+{ ?resource skos:altLabel ?label . }
+=> { ?resource rdfs:label ?label . } .
+
+{ ?resource skos:hiddenLabel ?label . }
+=> { ?resource rdfs:label ?label . } .
+
+# S17: specific note properties are sub-properties of skos:note.
+{ ?resource skos:changeNote ?note . }
+=> { ?resource skos:note ?note . } .
+
+{ ?resource skos:definition ?note . }
+=> { ?resource skos:note ?note . } .
+
+{ ?resource skos:editorialNote ?note . }
+=> { ?resource skos:note ?note . } .
+
+{ ?resource skos:example ?note . }
+=> { ?resource skos:note ?note . } .
+
+{ ?resource skos:historyNote ?note . }
+=> { ?resource skos:note ?note . } .
+
+{ ?resource skos:scopeNote ?note . }
+=> { ?resource skos:note ?note . } .
+
+#################################################################
+# 3. Semantic relations (S19-S26)
+#################################################################
+
+# S21-S22: property hierarchy.
+{ ?concept skos:broader ?broader . }
+=> { ?concept skos:broaderTransitive ?broader . } .
+
+{ ?concept skos:narrower ?narrower . }
+=> { ?concept skos:narrowerTransitive ?narrower . } .
+
+{ ?subject skos:broaderTransitive ?object . }
+=> { ?subject skos:semanticRelation ?object . } .
+
+{ ?subject skos:narrowerTransitive ?object . }
+=> { ?subject skos:semanticRelation ?object . } .
+
+{ ?subject skos:related ?object . }
+=> { ?subject skos:semanticRelation ?object . } .
+
+# S19-S20: domain/range of skos:semanticRelation.
+{ ?subject skos:semanticRelation ?object . }
+=> { ?subject a skos:Concept .
+     ?object a skos:Concept . } .
+
+# S23: skos:related is symmetric.
+{ ?left skos:related ?right . }
+=> { ?right skos:related ?left . } .
+
+# S24: transitive broader/narrower closures.
+{ ?left skos:broaderTransitive ?middle .
+  ?middle skos:broaderTransitive ?right . }
+=> { ?left skos:broaderTransitive ?right . } .
+
+{ ?left skos:narrowerTransitive ?middle .
+  ?middle skos:narrowerTransitive ?right . }
+=> { ?left skos:narrowerTransitive ?right . } .
+
+# S25-S26: inverse hierarchy properties.
+{ ?narrower skos:broader ?broader . }
+=> { ?broader skos:narrower ?narrower . } .
+
+{ ?broader skos:narrower ?narrower . }
+=> { ?narrower skos:broader ?broader . } .
+
+{ ?narrower skos:broaderTransitive ?broader . }
+=> { ?broader skos:narrowerTransitive ?narrower . } .
+
+{ ?broader skos:narrowerTransitive ?narrower . }
+=> { ?narrower skos:broaderTransitive ?broader . } .
+
+#################################################################
+# 4. Concept collections (S29-S36)
+#################################################################
+
+# S29: ordered collections are collections.
+{ ?collection a skos:OrderedCollection . }
+=> { ?collection a skos:Collection . } .
+
+# S31: domain of skos:member.
+{ ?collection skos:member ?member . }
+=> { ?collection a skos:Collection . } .
+
+# S33-S34: domain/range of skos:memberList.
+{ ?collection skos:memberList ?list . }
+=> { ?collection a skos:OrderedCollection .
+     ?list a rdf:List .
+     ?list skosn3:memberListFor ?collection . } .
+
+# S36: every RDF list item in skos:memberList is also a skos:member.
+{ ?list skosn3:memberListFor ?collection .
+  ?list rdf:first ?member . }
+=> { ?collection skos:member ?member . } .
+
+{ ?list skosn3:memberListFor ?collection .
+  ?list rdf:rest ?tail .
+  ?tail rdf:first ?member . }
+=> { ?tail skosn3:memberListFor ?collection . } .
+
+#################################################################
+# 5. Mapping properties (S39-S45)
+#################################################################
+
+# S39-S42: mapping-property hierarchy.
+{ ?left skos:mappingRelation ?right . }
+=> { ?left skos:semanticRelation ?right . } .
+
+{ ?left skos:closeMatch ?right . }
+=> { ?left skos:mappingRelation ?right . } .
+
+{ ?left skos:exactMatch ?right . }
+=> { ?left skos:closeMatch ?right . } .
+
+{ ?left skos:broadMatch ?right . }
+=> { ?left skos:mappingRelation ?right .
+     ?left skos:broader ?right . } .
+
+{ ?left skos:narrowMatch ?right . }
+=> { ?left skos:mappingRelation ?right .
+     ?left skos:narrower ?right . } .
+
+{ ?left skos:relatedMatch ?right . }
+=> { ?left skos:mappingRelation ?right .
+     ?left skos:related ?right . } .
+
+# S43: skos:broadMatch/skos:narrowMatch inverse.
+{ ?narrower skos:broadMatch ?broader . }
+=> { ?broader skos:narrowMatch ?narrower . } .
+
+{ ?broader skos:narrowMatch ?narrower . }
+=> { ?narrower skos:broadMatch ?broader . } .
+
+# S44: relatedMatch, closeMatch, and exactMatch are symmetric.
+{ ?left skos:relatedMatch ?right . }
+=> { ?right skos:relatedMatch ?left . } .
+
+{ ?left skos:closeMatch ?right . }
+=> { ?right skos:closeMatch ?left . } .
+
+{ ?left skos:exactMatch ?right . }
+=> { ?right skos:exactMatch ?left . } .
+
+# S45: skos:exactMatch is transitive. Combined with symmetry and S42 this also
+# entails the reflexive exactMatch/closeMatch cycle noted in section 10.6.6.
+{ ?left skos:exactMatch ?middle .
+  ?middle skos:exactMatch ?right . }
+=> { ?left skos:exactMatch ?right . } .

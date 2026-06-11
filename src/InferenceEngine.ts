@@ -70,6 +70,7 @@ export class InferenceEngine {
     const closure = reasonStream({ n3: profileN3, quads: vocabularyQuads as RdfJsQuad[] }, {
       rdfjs: true,
       dataFactory: this.dataFactory as any,
+      skipUnsupportedRdfJs: true,
     });
 
     const runtimeCompiler = options.runtimeCompiler ?? this.runtimeCompiler;
@@ -98,6 +99,7 @@ export class InferenceEngine {
     reasonStream({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
       rdfjs: true,
       dataFactory: this.dataFactory as any,
+      skipUnsupportedRdfJs: true,
       onDerived: (item) => {
         if (item.quad) {
           addDerived(derived, seen, item.quad as Quad);

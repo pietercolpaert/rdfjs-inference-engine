@@ -1,0 +1,9 @@
+# RDF Messages input for the transit example.
+
+VERSION "1.2-messages"
+PREFIX : <https://example.org/transit#>
+
+:bus-42 a :ElectricBus .
+
+MESSAGE
+:bus-43 :operatedBy :operator-8 .

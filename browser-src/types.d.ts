@@ -3,6 +3,17 @@ declare module 'bundled-rules' {
   export const bundledRules: string;
 }
 
+declare module 'bundled-examples' {
+  export const bundledExamples: Array<{
+    id: string;
+    label: string;
+    backgroundFile: string;
+    dataFile: string;
+    background: string;
+    data: string;
+  }>;
+}
+
 declare module '*.n3' {
   const source: string;
   export default source;

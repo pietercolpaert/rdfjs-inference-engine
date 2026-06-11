@@ -1,0 +1,6 @@
+# SKOS Core example background.
+
+@prefix : <https://example.org/subjects#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+:scheme a skos:ConceptScheme .

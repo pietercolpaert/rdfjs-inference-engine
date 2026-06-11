@@ -17,7 +17,7 @@
   "files": [
     "dist/src/",
     "browser/",
-    "rules/owl2rl-eyeling.n3",
+    "rules/*.n3",
     "index.html",
     "README.md"
   ],
@@ -32,16 +32,24 @@
     "hooks:install": "node scripts/install-hooks.cjs",
     "prepare": "node scripts/install-hooks.cjs",
     "example": "npm run example:transit-fleet",
-    "example:transit-fleet": "npm run build --silent && node dist/examples/src/run-transit-fleet-example.js",
-    "example:shipment-logistics": "npm run build --silent && node dist/examples/src/run-shipment-logistics-example.js",
+    "example:transit-fleet": "npm run build --silent && node dist/examples/transit-fleet/run.js",
+    "example:shipment-logistics": "npm run build --silent && node dist/examples/shipment-logistics/run.js",
+    "example:skos-taxonomy": "npm run build --silent && node dist/examples/skos-taxonomy/run.js",
+    "example:owl-skos-catalog": "npm run build --silent && node dist/examples/owl-skos-catalog/run.js",
+    "example:transit-messages": "npm run build --silent && node dist/examples/transit-messages/run.js",
     "test:transit-fleet": "npm run example:transit-fleet --silent > /tmp/owl2rl-transit-fleet-output.n3 && diff -u examples/transit-fleet/expected-output.n3 /tmp/owl2rl-transit-fleet-output.n3",
     "test:shipment-logistics": "npm run example:shipment-logistics --silent > /tmp/owl2rl-shipment-logistics-output.n3 && diff -u examples/shipment-logistics/expected-selected-output.n3 /tmp/owl2rl-shipment-logistics-output.n3",
-    "test:examples": "npm run test:transit-fleet && npm run test:shipment-logistics",
+    "test:skos-taxonomy": "npm run example:skos-taxonomy --silent > /tmp/skos-taxonomy-output.n3 && diff -u examples/skos-taxonomy/expected-selected-output.n3 /tmp/skos-taxonomy-output.n3",
+    "test:owl-skos-catalog": "npm run example:owl-skos-catalog --silent > /tmp/owl-skos-catalog-output.n3 && diff -u examples/owl-skos-catalog/expected-selected-output.n3 /tmp/owl-skos-catalog-output.n3",
+    "test:transit-messages": "npm run example:transit-messages --silent > /tmp/transit-messages-output.nq && diff -u examples/transit-messages/expected-output.messages.nq /tmp/transit-messages-output.nq",
+    "test:examples": "npm run test:transit-fleet && npm run test:shipment-logistics && npm run test:skos-taxonomy && npm run test:owl-skos-catalog && npm run test:transit-messages",
+    "test:skos": "npm run build --silent && node dist/tests/run-skos-entailment.js",
     "test:owl:mobibench": "npm run build --silent && node dist/tests/run-mobibench-owl2rl.js",
     "test:owl:official": "npm run build --silent && node dist/tests/run-official-owl2rl.js",
+    "test:owl": "npm run test:owl:mobibench && npm run test:owl:official",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run test:owl:mobibench && npm run test:owl:official"
+    "test": "npm run test:skos && npm run test:owl"
   },
   "repository": {
     "type": "git",

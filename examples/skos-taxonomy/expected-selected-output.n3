@@ -1,0 +1,14 @@
+@prefix : <https://example.org/subjects#>.
+@prefix skos: <http://www.w3.org/2004/02/skos/core#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+
+:cat rdfs:label "Cat";
+    skos:note "Small domesticated carnivorous mammal.";
+    skos:broaderTransitive :mammal, :animal;
+    skos:semanticRelation :animal;
+    a skos:Concept.
+:mammal skos:narrower :cat;
+    a skos:Concept.
+:animal skos:narrowerTransitive :cat;
+    skos:inScheme :scheme.
+:scheme skos:hasTopConcept :animal.

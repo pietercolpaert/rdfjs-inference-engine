@@ -1,0 +1,11 @@
+# RDF input for the SKOS Core taxonomy example.
+
+PREFIX : <https://example.org/subjects#>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+:cat skos:prefLabel "Cat" ;
+  skos:definition "Small domesticated carnivorous mammal." ;
+  skos:broader :mammal .
+
+:mammal skos:broader :animal .
+:animal skos:topConceptOf :scheme .

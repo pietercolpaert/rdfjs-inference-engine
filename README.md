@@ -56,7 +56,31 @@ The OWL 2 RL profile includes the RDFS entailments needed by the example, includ
 
 It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples from emitted inference output because they are usually closure-maintenance tautologies rather than useful application data.
 
+The repository also includes a SKOS Core profile:
+
+```text
+rules/skos-entailment.n3
+```
+
+It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
+
 The ruleset is meant to be passed to the library as a rule profile. In normal projects, keep rule profiles vendored/versioned and pass your own background quads to `load()`.
+
+You can load both bundled profiles at the same time by passing an array to `load()`:
+
+```ts
+const profiles = [
+   readFileSync('rules/owl2rl-eyeling.n3', 'utf8'),
+   readFileSync('rules/skos-entailment.n3', 'utf8'),
+];
+
+const background = parseToQuads(readFileSync('examples/owl-skos-catalog/ontology.n3', 'utf8'));
+const reasoner = new InferenceEngine();
+reasoner.load(profiles, background);
+
+const data = parseToQuads(readFileSync('examples/owl-skos-catalog/input.trig', 'utf8'));
+const inferred = Array.from(reasoner.infer(data));
+```
 
 ### 2. Background knowledge
 
@@ -131,7 +155,7 @@ Include it directly in a web page:
 
 The bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `Parser`, `Writer`, `DataFactory`, `parseRdfOrMessages()`, `writeQuads()`, and `writeMessages()`.
 
-The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile. The page provides syntax-highlighted RDF editors for:
+The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile, so the playground currently runs the OWL 2 RL and SKOS Core profiles together. It also bundles the self-contained examples from `examples/` into an example picker. The page provides syntax-highlighted RDF editors for:
 
 - ontology/background RDF used to generate the runtime, selected as either a URL or text input;
 - ordinary RDF input or an RDF Messages log, selected as either a URL or text input;
@@ -147,7 +171,11 @@ npm run build:browser
 
 Git hooks are tracked in `.githooks/`. `npm install` or `npm run hooks:install` configures the repository to use them. The pre-commit hook regenerates and stages the browser bundles; the pre-push hook regenerates them again and blocks the push if the generated files differ from what is committed.
 
-## Run the transit fleet example
+## Examples
+
+All examples are self-contained folders under `examples/`. Each runnable example keeps its own `run.ts` next to its `ontology.n3`, input, and expected output fixture. Shared example utilities live in `examples/util.ts`; there is no separate `examples/src/` folder.
+
+### Run the transit fleet example
 
 From the repository root:
 
@@ -162,6 +190,7 @@ The transit fleet example is self-contained in `examples/transit-fleet/`:
 - `ontology.n3`
 - `input.trig`
 - `expected-output.n3`
+- `run.ts`
 
 The script uses the TypeScript library and has two phases.
 
@@ -194,13 +223,14 @@ npm run example:transit-fleet --silent > /tmp/owl2rl-transit-fleet-output.n3
 diff -u examples/transit-fleet/expected-output.n3 /tmp/owl2rl-transit-fleet-output.n3
 ```
 
-## Run the shipment logistics OWL 2 RL example
+### Run the shipment logistics OWL 2 RL example
 
 The more elaborate example in `examples/shipment-logistics/` exercises OWL 2 RL features beyond subclass/domain/range reasoning:
 
 - `ontology.n3`
 - `input.trig`
 - `expected-selected-output.n3`
+- `run.ts`
 
 - `owl:equivalentClass`
 - `owl:equivalentProperty`
@@ -226,6 +256,54 @@ npm run test:shipment-logistics
 ```
 
 The selected expected output is stored in `examples/shipment-logistics/expected-selected-output.n3`.
+
+### Run the SKOS taxonomy example
+
+The SKOS-only example in `examples/skos-taxonomy/` uses `rules/skos-entailment.n3` to materialize SKOS Core consequences such as `skos:broaderTransitive`, `skos:narrower`, `skos:semanticRelation`, `rdfs:label`, `skos:note`, and concept-scheme top-concept links.
+
+Run it with:
+
+```bash
+npm run example:skos-taxonomy
+```
+
+Check its selected expected output with:
+
+```bash
+npm run test:skos-taxonomy
+```
+
+### Run the combined OWL 2 RL + SKOS Core example
+
+The combined example in `examples/owl-skos-catalog/` loads both rule sets at the same time. OWL/RDFS rules infer that catalog topics are SKOS concepts and map a domain-specific property to `skos:related`; SKOS rules then infer the symmetric related link, `skos:semanticRelation`, and SKOS domain/range typing.
+
+Run it with:
+
+```bash
+npm run example:owl-skos-catalog
+```
+
+Check its selected expected output with:
+
+```bash
+npm run test:owl-skos-catalog
+```
+
+### Run the RDF Messages example
+
+The streaming example in `examples/transit-messages/` uses an RDF Messages log as input and emits inferred RDF Messages as output.
+
+Run it with:
+
+```bash
+npm run example:transit-messages
+```
+
+Check the RDF Messages fixture with:
+
+```bash
+npm run test:transit-messages
+```
 
 ## MobiBench OWL 2 RL tests
 
@@ -318,10 +396,26 @@ npm run build --silent && node dist/tests/run-official-owl2rl.js --manifests=/20
 
 The `--all` mode is intentionally stricter and may expose unsupported or currently failing areas of the implementation.
 
-The default test command runs both the compatible MobiBench subset and the compatible W3C subset:
+## SKOS Core entailment tests
+
+The repository includes a local SKOS Core test harness for `rules/skos-entailment.n3`:
+
+```bash
+npm run test:skos
+```
+
+The tests are derived from positive entailments and explicit non-entailments in W3C SKOS Reference sections 3-10. They cover concept schemes, labels, notes, semantic relations, ordered collections, mapping properties, `skos:exactMatch` transitivity, and guards against overreaching rules such as transitive `skos:broader`, transitive `skos:closeMatch`, or automatic concept-scheme containment across semantic relations.
+
+The default test command runs the SKOS Core tests plus both compatible OWL 2 RL subsets:
 
 ```bash
 npm test
+```
+
+To run only the OWL 2 RL suites:
+
+```bash
+npm run test:owl
 ```
 
 The example output checks are kept separately:
@@ -329,6 +423,8 @@ The example output checks are kept separately:
 ```bash
 npm run test:examples
 ```
+
+This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, and RDF Messages examples.
 
 ## Preprocessing and generated runtimes
 
@@ -376,10 +472,12 @@ background/
 generated/
    runtime.n3                  # regenerated when rules or ontology change
 examples/
+   util.ts                     # shared example parsing/writing helpers
    my-example/
       ontology.n3              # example-specific background quads
       input.trig               # example input data
       expected-output.n3       # regression-test fixture
+      run.ts                   # example-specific runner
 ```
 
 For server use, keep rule profiles and background data stable, regenerate
@@ -464,6 +562,7 @@ There are still practical and semantic boundaries:
 - Eyeling repository: https://github.com/eyereasoner/eyeling
 - Eyeling builtins catalog: https://github.com/eyereasoner/eyeling/blob/main/eyeling-builtins.ttl
 - Eyeling issue for datatype builtins: https://github.com/eyereasoner/eyeling/issues/18
+- W3C SKOS Reference: https://www.w3.org/TR/skos-reference/
 - OWL 2 RL profile: https://www.w3.org/TR/owl2-profiles/
 - OWL 2 RL/RIF rules: https://www.w3.org/TR/rif-owl-rl/
 - Notation3 Community Group specification: https://w3c-cg.github.io/N3/spec/

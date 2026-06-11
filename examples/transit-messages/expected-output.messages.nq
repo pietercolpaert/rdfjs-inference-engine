@@ -1,0 +1,6 @@
+VERSION "1.2-messages"
+<https://example.org/transit#bus-42> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://example.org/transit#Bus> .
+<https://example.org/transit#bus-42> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://example.org/transit#Vehicle> .
+MESSAGE
+<https://example.org/transit#bus-43> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://example.org/transit#Vehicle> .
+<https://example.org/transit#operator-8> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://example.org/transit#Operator> .

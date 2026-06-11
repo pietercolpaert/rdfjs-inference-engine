@@ -37,6 +37,61 @@ const bundledRulesPlugin = {
   },
 };
 
+const bundledExamplesPlugin = {
+  name: 'bundled-examples',
+  setup(build) {
+    build.onResolve({ filter: /^bundled-examples$/ }, () => ({ path: 'bundled-examples', namespace: 'bundled-examples' }));
+    build.onLoad({ filter: /.*/, namespace: 'bundled-examples' }, async () => {
+      const entries = await readdir('examples', { withFileTypes: true });
+      const examples = [];
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name === 'src') {
+          continue;
+        }
+
+        const dir = join('examples', entry.name);
+        const files = await readdir(dir);
+        if (!files.includes('ontology.n3')) {
+          continue;
+        }
+
+        const inputFile = ['input.trig', 'input.n3', 'input.ttl', 'input.messages.trig']
+          .find((candidate) => files.includes(candidate));
+        if (!inputFile) {
+          continue;
+        }
+
+        examples.push({
+          id: entry.name,
+          label: humanizeExampleId(entry.name),
+          backgroundFile: `examples/${entry.name}/ontology.n3`,
+          dataFile: `examples/${entry.name}/${inputFile}`,
+          background: await readFile(join(dir, 'ontology.n3'), 'utf8'),
+          data: await readFile(join(dir, inputFile), 'utf8'),
+        });
+      }
+
+      examples.sort((left, right) => left.label.localeCompare(right.label));
+
+      return {
+        contents: `export const bundledExamples = ${JSON.stringify(examples)};`,
+        loader: 'js',
+      };
+    });
+  },
+};
+
+function humanizeExampleId(id) {
+  const overrides = {
+    'transit-fleet': 'Transit fleet (OWL/RDFS)',
+    'shipment-logistics': 'Shipment logistics (OWL 2 RL)',
+    'skos-taxonomy': 'SKOS taxonomy (SKOS Core)',
+    'owl-skos-catalog': 'Catalog topics (OWL 2 RL + SKOS Core)',
+    'transit-messages': 'Transit stream (RDF Messages)',
+  };
+  return overrides[id] ?? id.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 await build({
   ...common,
   entryPoints: ['browser-src/index.ts'],
@@ -50,7 +105,7 @@ await build({
   entryPoints: ['browser-src/playground.ts'],
   outfile: 'browser/playground.min.js',
   format: 'iife',
-  plugins: [bundledRulesPlugin],
+  plugins: [bundledRulesPlugin, bundledExamplesPlugin],
   loader: {
     '.n3': 'text',
     '.trig': 'text',

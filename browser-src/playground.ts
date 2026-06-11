@@ -1,6 +1,5 @@
 import { bundledRuleFiles, bundledRules } from 'bundled-rules';
-import defaultBackground from '../examples/transit-fleet/ontology.n3';
-import defaultData from '../examples/transit-fleet/input.trig';
+import { bundledExamples } from 'bundled-examples';
 
 declare const CodeMirror: any;
 
@@ -20,6 +19,15 @@ type PlaygroundState = {
   dataUrl?: string;
   backgroundText?: string;
   dataText?: string;
+};
+
+type BundledExample = {
+  id: string;
+  label: string;
+  backgroundFile: string;
+  dataFile: string;
+  background: string;
+  data: string;
 };
 
 type ActiveRun = {
@@ -44,8 +52,8 @@ type WorkerMessage =
 const defaultState = {
   backgroundMode: 'text' as InputMode,
   dataMode: 'text' as InputMode,
-  backgroundText: defaultBackground,
-  dataText: defaultData,
+  backgroundText: defaultExample().background,
+  dataText: defaultExample().data,
 };
 
 const editors = {
@@ -55,6 +63,7 @@ const editors = {
 };
 
 const controls = {
+  exampleSelect: getSelect('exampleSelect'),
   backgroundMode: getSelect('backgroundMode'),
   dataMode: getSelect('dataMode'),
   backgroundUrl: getInput('backgroundUrl'),
@@ -77,14 +86,15 @@ let stateUpdateTimer = 0;
 let activeRun: ActiveRun | null = null;
 
 if (controls.rulesSummary) {
-  controls.rulesSummary.textContent = `Bundled rules: ${bundledRuleFiles.join(', ') || 'none'}`;
+  controls.rulesSummary.textContent = `Bundled inference profiles: ${bundledRuleFiles.join(', ') || 'none'}`;
 }
+populateExamples();
 loadStateFromHash();
 applyModeVisibility();
 wireControls();
 scheduleStateUpdate();
 setRunning(false);
-setStatus('Ready. Choose URL or text input, then run the bundled rule profile.');
+setStatus('Ready. Choose an example, URL, or text input, then run OWL 2 RL + SKOS Core inference.');
 
 function createEditor(id: string, value: string): Editor {
   const textarea = document.getElementById(id) as HTMLTextAreaElement | null;
@@ -105,6 +115,7 @@ function wireControls(): void {
   controls.runButton.addEventListener('click', () => void runInference());
   controls.stopButton.addEventListener('click', stopActiveRun);
   controls.resetButton.addEventListener('click', resetDefaults);
+  controls.exampleSelect.addEventListener('change', () => loadBundledExample(controls.exampleSelect.value));
   controls.shareButton.addEventListener('click', () => {
     updateHashNow();
     void navigator.clipboard?.writeText(window.location.href);
@@ -227,7 +238,7 @@ self.onmessage = async (event) => {
 
     const reasoner = new api.InferenceEngine();
     const started = performance.now();
-    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled rules folder profile' }, background.quads);
+    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core profiles' }, background.quads);
     const compiledAt = performance.now();
     self.postMessage({ type: 'runtime', message: background.quads.length + ' background quads, ' + request.bundledRuleCount + ' rule file(s), runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
@@ -242,20 +253,32 @@ self.onmessage = async (event) => {
         inferredCount += inferred.length;
       }
       self.postMessage({ type: 'status', message: 'Processed ' + total + ' of ' + total + ' message(s). Serializing ' + inferredCount + ' inferred quad(s)…' });
-      const output = await api.writeMessages(inferredMessages);
+      const output = await api.writeMessages(inferredMessages, outputPrefixes());
       self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' message(s), inferred ' + inferredCount + ' quad(s) as RDF Messages. Compile ' + (compiledAt - started).toFixed(0) + ' ms, infer ' + (performance.now() - compiledAt).toFixed(0) + ' ms.' });
     } else {
       const total = data.quads.length;
       self.postMessage({ type: 'status', message: 'Processed 0 of ' + total + ' input quad(s)…' });
       const inferred = Array.from(reasoner.infer(data.quads));
       self.postMessage({ type: 'status', message: 'Processed ' + total + ' of ' + total + ' input quad(s). Serializing ' + inferred.length + ' inferred quad(s)…' });
-      const output = await api.writeQuads(inferred, { ex: 'https://example.org/transit#' });
+      const output = await api.writeQuads(inferred, outputPrefixes());
       self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inferred.length + ' quad(s). Compile ' + (compiledAt - started).toFixed(0) + ' ms, infer ' + (performance.now() - compiledAt).toFixed(0) + ' ms.' });
     }
   } catch (error) {
     self.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
   }
 };
+
+function outputPrefixes() {
+  return {
+    transit: 'https://example.org/transit#',
+    logistics: 'https://example.org/logistics#',
+    subjects: 'https://example.org/subjects#',
+    catalog: 'https://example.org/catalog#',
+    skos: 'http://www.w3.org/2004/02/skos/core#',
+    rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
+    owl: 'http://www.w3.org/2002/07/owl#',
+  };
+}
 `;
   const blob = new Blob([source], { type: 'text/javascript' });
   return new Worker(URL.createObjectURL(blob));
@@ -328,18 +351,55 @@ function getMode(kind: 'background' | 'data'): InputMode {
 }
 
 function resetDefaults(): void {
+  const example = defaultExample();
   suppressStateUpdate = true;
+  controls.exampleSelect.value = example.id;
   controls.backgroundMode.value = defaultState.backgroundMode;
   controls.dataMode.value = defaultState.dataMode;
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
-  editors.backgroundText.setValue(defaultState.backgroundText);
-  editors.dataText.setValue(defaultState.dataText);
+  editors.backgroundText.setValue(example.background);
+  editors.dataText.setValue(example.data);
   editors.outputText.setValue('');
   suppressStateUpdate = false;
   applyModeVisibility();
   updateHashNow();
-  setStatus('Reset to the bundled example.');
+  setStatus(`Reset to ${example.label}.`);
+}
+
+function populateExamples(): void {
+  controls.exampleSelect.textContent = '';
+  for (const example of bundledExamples as BundledExample[]) {
+    const option = document.createElement('option');
+    option.value = example.id;
+    option.textContent = `${example.label} — ${example.backgroundFile} + ${example.dataFile}`;
+    controls.exampleSelect.appendChild(option);
+  }
+  controls.exampleSelect.value = defaultExample().id;
+}
+
+function loadBundledExample(id: string): void {
+  const example = findExample(id) ?? defaultExample();
+  suppressStateUpdate = true;
+  controls.backgroundMode.value = 'text';
+  controls.dataMode.value = 'text';
+  controls.backgroundUrl.value = '';
+  controls.dataUrl.value = '';
+  editors.backgroundText.setValue(example.background);
+  editors.dataText.setValue(example.data);
+  editors.outputText.setValue('');
+  suppressStateUpdate = false;
+  applyModeVisibility();
+  updateHashNow();
+  setStatus(`Loaded ${example.label} from ${example.backgroundFile} and ${example.dataFile}.`);
+}
+
+function defaultExample(): BundledExample {
+  return findExample('owl-skos-catalog') ?? (bundledExamples as BundledExample[])[0];
+}
+
+function findExample(id: string): BundledExample | undefined {
+  return (bundledExamples as BundledExample[]).find((example) => example.id === id);
 }
 
 function collectState(): PlaygroundState {

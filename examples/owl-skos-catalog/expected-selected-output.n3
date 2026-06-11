@@ -1,0 +1,8 @@
+@prefix : <https://example.org/catalog#>.
+@prefix skos: <http://www.w3.org/2004/02/skos/core#>.
+
+:openData a skos:Concept;
+    skos:related :transportData;
+    skos:semanticRelation :transportData.
+:transportData a skos:Concept;
+    skos:related :openData.

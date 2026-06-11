@@ -1,0 +1,13 @@
+# Combined OWL 2 RL + SKOS Core example background.
+#
+# OWL/RDFS rules are needed to lift :DatasetConcept instances to skos:Concept
+# and to map :relatedTopic to skos:related. SKOS rules are then needed for
+# skos:related symmetry, skos:semanticRelation, and SKOS domain/range typing.
+
+@prefix : <https://example.org/catalog#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+:DatasetConcept rdfs:subClassOf skos:Concept .
+:relatedTopic owl:equivalentProperty skos:related .

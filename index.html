@@ -126,6 +126,7 @@
     }
 
     .mode-row,
+    .example-row,
     .uri-input-row {
       display: flex;
       flex-wrap: wrap;
@@ -135,6 +136,7 @@
     }
 
     .mode-row select,
+    .example-row select,
     .uri-input-row input[type="url"] {
       min-width: min(100%, 18rem);
       border: 1px solid var(--border);
@@ -151,6 +153,7 @@
     }
 
     .mode-row select:focus,
+    .example-row select:focus,
     .uri-input-row input[type="url"]:focus {
       border-color: var(--accent);
       background: var(--panel);
@@ -286,6 +289,7 @@
       }
 
       .mode-row,
+      .example-row,
       .uri-input-row,
       .actions {
         flex-direction: column;
@@ -293,6 +297,7 @@
       }
 
       .mode-row select,
+      .example-row select,
       .uri-input-row input[type="url"] {
         width: 100%;
         font-size: 16px;
@@ -313,9 +318,19 @@
   <div class="page">
     <header>
       <h1>RDF-JS inference engine playground</h1>
-      <p class="meta">The playground at this moment does OWL2RL inferencing. We might add support for more later.</p>
+      <p class="meta">Run generated-runtime inference in the browser with the bundled OWL 2 RL and SKOS Core rule profiles. Use ordinary RDF input or RDF Messages logs.</p>
     </header>
     <main class="grid">
+      <section class="card">
+        <h2 class="section-title">Bundled example</h2>
+        <p class="meta">Load one of the self-contained examples from the repository examples folder, then run it with both OWL 2 RL and SKOS Core support enabled.</p>
+        <div class="example-row">
+          <label for="exampleSelect">Example</label>
+          <select id="exampleSelect"></select>
+          <span id="rulesSummary" class="rules-summary"></span>
+        </div>
+      </section>
+
       <section class="card half">
         <h2 class="section-title">Background knowledge</h2>
         <p class="meta">Provide the ontology, alignments, context information... in TriG, Turtle, N-triples or N-quads.</p>

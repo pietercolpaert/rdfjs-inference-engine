@@ -1,0 +1,10 @@
+# Background vocabulary for the RDF Messages transit example.
+
+@prefix :    <https://example.org/transit#> .
+@prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#> .
+
+:Bus rdfs:subClassOf :Vehicle .
+:ElectricBus rdfs:subClassOf :Bus .
+
+:operatedBy rdfs:domain :Vehicle ;
+  rdfs:range :Operator .
