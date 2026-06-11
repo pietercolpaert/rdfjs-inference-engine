@@ -54,7 +54,7 @@ The OWL 2 RL profile includes the RDFS entailments needed by the example, includ
 - `rdfs:domain`
 - `rdfs:range`
 
-It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples from emitted inference output because they are usually closure-maintenance tautologies rather than useful application data.
+It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples, internal OWL 2 RL datatype helper triples, and datatype-rule facts with literals in subject position from emitted inference output because they are usually closure-maintenance facts rather than useful application data.
 
 The repository also includes a SKOS Core profile:
 
@@ -512,7 +512,7 @@ That means cases such as these can now be handled by builtins rather than ad-hoc
 "2026-06-10T12:00:00Z"^^xsd:dateTime dt:sameValueAs "2026-06-10T14:00:00+02:00"^^xsd:dateTime .
 ```
 
-The OWL 2 RL profile also emits optional `owlrl:canonicalLiteral` helper triples. These are not OWL 2 RL entailments; they are useful for diagnostics and can be ignored or removed if unwanted.
+The OWL 2 RL profile internally creates `owlrl:term` and `owlrl:canonicalLiteral` helper triples around literal values so Eyeling datatype builtins can compare and canonicalize literals. Datatype rules may also derive facts about literal terms themselves, such as literal `rdf:type` datatype assertions or literal `owl:differentFrom` comparisons. These are not useful RDF application triples and serialize poorly in RDF formats that do not allow literal subjects, so `InferenceEngine` filters them from emitted output.
 
 ## Inconsistency handling
 

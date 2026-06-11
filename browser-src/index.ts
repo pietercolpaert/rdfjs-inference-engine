@@ -11,6 +11,11 @@ import {
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
+const OWLRL = 'https://example.org/owlrl-n3#';
+const INTERNAL_HELPER_PREDICATES = new Set([
+  OWLRL + 'term',
+  OWLRL + 'canonicalLiteral',
+]);
 
 const reasonStream = (eyeling as any).reasonStream;
 
@@ -322,7 +327,7 @@ function blankNodeLabel(value: string): string {
 }
 
 function addDerived(output: Quad[], seen: Set<string>, quad: Quad): void {
-  if (isReflexiveSameAs(quad)) {
+  if (isReflexiveSameAs(quad) || isInternalHelperQuad(quad) || hasLiteralSubject(quad)) {
     return;
   }
 
@@ -337,6 +342,15 @@ function isReflexiveSameAs(quad: Quad): boolean {
   return quad.predicate.termType === 'NamedNode'
     && quad.predicate.value === OWL_SAME_AS
     && termEquals(quad.subject, quad.object);
+}
+
+function isInternalHelperQuad(quad: Quad): boolean {
+  return quad.predicate.termType === 'NamedNode'
+    && INTERNAL_HELPER_PREDICATES.has(quad.predicate.value);
+}
+
+function hasLiteralSubject(quad: Quad): boolean {
+  return (quad.subject as unknown as Term).termType === 'Literal';
 }
 
 function termEquals(left: Term, right: Term): boolean {
