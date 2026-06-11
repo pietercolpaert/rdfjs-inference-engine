@@ -33,6 +33,10 @@ type BundledExample = {
 type ActiveRun = {
   controller: AbortController;
   worker?: Worker;
+  startedAt: number;
+  finishedAt?: number;
+  elapsedTimer?: number;
+  runtimeMessage?: string;
 };
 
 type WorkerRequest = {
@@ -144,12 +148,13 @@ async function runInference(): Promise<void> {
     return;
   }
 
-  const run: ActiveRun = { controller: new AbortController() };
+  const run: ActiveRun = { controller: new AbortController(), startedAt: performance.now() };
   activeRun = run;
 
   try {
     setRunning(true);
     controls.runtimeStats.textContent = '';
+    startElapsedCounter(run);
     setStatus('Preparing inference…');
     editors.outputText.setValue('');
 
@@ -172,14 +177,16 @@ async function runInference(): Promise<void> {
       dataUrl,
     });
   } catch (error) {
+    finishElapsedCounter(run);
     if (isAbortError(error)) {
-      setStatus('Stopped. No more messages or quads will be processed.');
+      setStatus(`Stopped after ${formatDuration(getElapsedMs(run))}. No more messages or quads will be processed.`);
     } else {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus(`Error: ${message}`);
+      setStatus(`Error after ${formatDuration(getElapsedMs(run))}: ${message}`);
       editors.outputText.setValue(message);
     }
   } finally {
+    finishElapsedCounter(run);
     if (activeRun === run) {
       activeRun = null;
     }
@@ -205,14 +212,16 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
       if (message.type === 'status') {
         setStatus(message.message);
       } else if (message.type === 'runtime') {
-        controls.runtimeStats.textContent = message.message;
+        run.runtimeMessage = message.message;
+        updateElapsedCounter(run);
       } else if (message.type === 'append') {
         editors.outputText.setValue(editors.outputText.getValue() + message.chunk);
       } else if (message.type === 'result') {
+        finishElapsedCounter(run);
         if (message.output !== undefined) {
           editors.outputText.setValue(message.output);
         }
-        setStatus(message.status);
+        setStatus(`${message.status} Total elapsed ${formatDuration(getElapsedMs(run))}.`);
         resolve();
       } else if (message.type === 'error') {
         reject(new Error(message.message));
@@ -453,6 +462,48 @@ function setRunning(running: boolean): void {
   controls.runButton.disabled = running;
   controls.stopButton.hidden = !running;
   controls.stopButton.disabled = !running;
+}
+
+function startElapsedCounter(run: ActiveRun): void {
+  updateElapsedCounter(run);
+  run.elapsedTimer = window.setInterval(() => updateElapsedCounter(run), 100);
+}
+
+function finishElapsedCounter(run: ActiveRun): void {
+  if (run.finishedAt === undefined) {
+    run.finishedAt = performance.now();
+  }
+  if (run.elapsedTimer !== undefined) {
+    window.clearInterval(run.elapsedTimer);
+    run.elapsedTimer = undefined;
+  }
+  updateElapsedCounter(run);
+}
+
+function updateElapsedCounter(run: ActiveRun): void {
+  const label = run.finishedAt === undefined ? 'Elapsed' : 'Total elapsed';
+  const parts = [`${label} ${formatDuration(getElapsedMs(run))}`];
+  if (run.runtimeMessage) {
+    parts.push(run.runtimeMessage);
+  }
+  controls.runtimeStats.textContent = parts.join(' · ');
+}
+
+function getElapsedMs(run: ActiveRun): number {
+  return (run.finishedAt ?? performance.now()) - run.startedAt;
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.max(0, ms / 1000);
+  if (seconds < 10) {
+    return `${seconds.toFixed(1)} s`;
+  }
+  if (seconds < 60) {
+    return `${seconds.toFixed(0)} s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const wholeSeconds = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${minutes} min ${wholeSeconds} s`;
 }
 
 function throwIfAborted(signal: AbortSignal): void {
