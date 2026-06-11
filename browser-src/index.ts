@@ -2,6 +2,7 @@ import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import eyeling from 'eyeling/browser';
 import {
   DataFactory as RdfParserDataFactory,
+  IncrementalParser,
   Parser,
   Writer,
   isMessageQuad,
@@ -361,6 +362,7 @@ function termKey(term: Term): string {
 
 export {
   RdfParserDataFactory as DataFactory,
+  IncrementalParser,
   Parser,
   Writer,
   isMessageQuad,

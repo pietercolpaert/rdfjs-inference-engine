@@ -161,7 +161,7 @@ The root `index.html` file is a browser playground. At browser-build time, it bu
 - ordinary RDF input or an RDF Messages log, selected as either a URL or text input;
 - inferred output triples.
 
-It uses `rdf-parser-ts` message detection. Ordinary RDF input is passed to `infer()`. RDF Messages input is grouped by message and passed through the browser `stream()` object. In that case, the inferred output is serialized as RDF Messages too, starting with `VERSION "1.2-messages"` and delimiting inferred message chunks with `MESSAGE`. The playground stores editable state in the URL hash so examples can be shared as links.
+It uses `rdf-parser-ts` message detection. Ordinary RDF input is passed to `infer()`. RDF Messages input is processed message by message and serialized as RDF Messages too, starting with `VERSION "1.2-messages"` and delimiting inferred message chunks with `MESSAGE`. When the data source is an RDF Messages URL, the playground parses the response stream incrementally and appends inferred output while the input stream is still being read instead of loading the whole data file first. The playground stores editable state in the URL hash so examples can be shared as links.
 
 Build only the browser artifacts with:
 

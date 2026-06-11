@@ -40,13 +40,16 @@ type WorkerRequest = {
   bundledRules: string;
   bundledRuleCount: number;
   backgroundSource: string;
-  dataSource: string;
+  dataMode: InputMode;
+  dataSource?: string;
+  dataUrl?: string;
 };
 
 type WorkerMessage =
   | { type: 'status'; message: string }
   | { type: 'runtime'; message: string }
-  | { type: 'result'; output: string; status: string }
+  | { type: 'append'; chunk: string }
+  | { type: 'result'; output?: string; status: string }
   | { type: 'error'; message: string };
 
 const defaultState = {
@@ -152,15 +155,21 @@ async function runInference(): Promise<void> {
 
     const backgroundSource = await getSource('background', run.controller.signal);
     throwIfAborted(run.controller.signal);
-    const dataSource = await getSource('data', run.controller.signal);
-    throwIfAborted(run.controller.signal);
+    const dataMode = getMode('data');
+    const dataSource = dataMode === 'text' ? editors.dataText.getValue() : undefined;
+    const dataUrl = dataMode === 'url' ? controls.dataUrl.value.trim() : undefined;
+    if (dataMode === 'url' && !dataUrl) {
+      throw new Error('Enter a data URL or switch to text input.');
+    }
 
     await runWorkerInference(run, {
       apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', window.location.href).href,
       bundledRules,
       bundledRuleCount: bundledRuleFiles.length,
       backgroundSource,
+      dataMode,
       dataSource,
+      dataUrl,
     });
   } catch (error) {
     if (isAbortError(error)) {
@@ -197,8 +206,12 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
         setStatus(message.message);
       } else if (message.type === 'runtime') {
         controls.runtimeStats.textContent = message.message;
+      } else if (message.type === 'append') {
+        editors.outputText.setValue(editors.outputText.getValue() + message.chunk);
       } else if (message.type === 'result') {
-        editors.outputText.setValue(message.output);
+        if (message.output !== undefined) {
+          editors.outputText.setValue(message.output);
+        }
         setStatus(message.status);
         resolve();
       } else if (message.type === 'error') {
@@ -227,14 +240,7 @@ self.onmessage = async (event) => {
 
     self.postMessage({ type: 'status', message: 'Parsing background knowledge…' });
     const background = api.parseRdfOrMessages(request.backgroundSource);
-    self.postMessage({ type: 'status', message: 'Parsed ' + background.quads.length + ' background quad(s). Parsing input data…' });
-
-    const data = api.parseRdfOrMessages(request.dataSource);
-    if (data.isMessages) {
-      self.postMessage({ type: 'status', message: 'Parsed ' + data.messages.length + ' message(s) containing ' + data.quads.length + ' quad(s). Compiling runtime…' });
-    } else {
-      self.postMessage({ type: 'status', message: 'Parsed ' + data.quads.length + ' input quad(s). Compiling runtime…' });
-    }
+    self.postMessage({ type: 'status', message: 'Parsed ' + background.quads.length + ' background quad(s). Compiling runtime…' });
 
     const reasoner = new api.InferenceEngine();
     const started = performance.now();
@@ -242,31 +248,161 @@ self.onmessage = async (event) => {
     const compiledAt = performance.now();
     self.postMessage({ type: 'runtime', message: background.quads.length + ' background quads, ' + request.bundledRuleCount + ' rule file(s), runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
-    if (data.isMessages) {
-      const inferredMessages = [];
-      let inferredCount = 0;
-      const total = data.messages.length;
-      for (let index = 0; index < total; index += 1) {
-        self.postMessage({ type: 'status', message: 'Processed ' + index + ' of ' + total + ' message(s)…' });
-        const inferred = Array.from(reasoner.infer(data.messages[index]));
-        inferredMessages.push(inferred);
-        inferredCount += inferred.length;
-      }
-      self.postMessage({ type: 'status', message: 'Processed ' + total + ' of ' + total + ' message(s). Serializing ' + inferredCount + ' inferred quad(s)…' });
-      const output = await api.writeMessages(inferredMessages, outputPrefixes());
-      self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' message(s), inferred ' + inferredCount + ' quad(s) as RDF Messages. Compile ' + (compiledAt - started).toFixed(0) + ' ms, infer ' + (performance.now() - compiledAt).toFixed(0) + ' ms.' });
-    } else {
-      const total = data.quads.length;
-      self.postMessage({ type: 'status', message: 'Processed 0 of ' + total + ' input quad(s)…' });
-      const inferred = Array.from(reasoner.infer(data.quads));
-      self.postMessage({ type: 'status', message: 'Processed ' + total + ' of ' + total + ' input quad(s). Serializing ' + inferred.length + ' inferred quad(s)…' });
-      const output = await api.writeQuads(inferred, outputPrefixes());
-      self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inferred.length + ' quad(s). Compile ' + (compiledAt - started).toFixed(0) + ' ms, infer ' + (performance.now() - compiledAt).toFixed(0) + ' ms.' });
-    }
+    await processInputData(api, reasoner, request, compiledAt, started);
   } catch (error) {
     self.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
   }
 };
+
+async function processInputData(api, reasoner, request, compiledAt, started) {
+  if (request.dataMode === 'url') {
+    await processUrlInput(api, reasoner, request.dataUrl, compiledAt, started);
+    return;
+  }
+
+  await processTextInput(api, reasoner, request.dataSource || '', compiledAt, started);
+}
+
+async function processTextInput(api, reasoner, source, compiledAt, started) {
+  self.postMessage({ type: 'status', message: 'Parsing text input…' });
+  const state = createStreamingState(api, reasoner, compiledAt, started, 'text input');
+  handleParsedItems(state, state.parser.write(source));
+  handleParsedItems(state, state.parser.end());
+  await finishStreamingState(state);
+}
+
+async function processUrlInput(api, reasoner, url, compiledAt, started) {
+  if (!url) {
+    throw new Error('Missing data URL.');
+  }
+
+  self.postMessage({ type: 'status', message: 'Fetching input data stream…' });
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Could not fetch ' + url + ': ' + response.status + ' ' + response.statusText);
+  }
+  if (!response.body) {
+    const source = await response.text();
+    await processTextInput(api, reasoner, source, compiledAt, started);
+    return;
+  }
+
+  const state = createStreamingState(api, reasoner, compiledAt, started, url);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+
+  for (;;) {
+    const read = await reader.read();
+    if (read.done) {
+      break;
+    }
+    bytes += read.value.byteLength;
+    const text = decoder.decode(read.value, { stream: true });
+    handleParsedItems(state, state.parser.write(text));
+    self.postMessage({ type: 'status', message: progressMessage(state, 'Streaming input: read ' + Math.round(bytes / 1024) + ' KiB') });
+  }
+
+  const tail = decoder.decode();
+  if (tail) {
+    handleParsedItems(state, state.parser.write(tail));
+  }
+  handleParsedItems(state, state.parser.end());
+  await finishStreamingState(state);
+}
+
+function createStreamingState(api, reasoner, compiledAt, started, sourceLabel) {
+  return {
+    api,
+    reasoner,
+    parser: new api.IncrementalParser({ factory: api.DataFactory }),
+    sourceLabel,
+    compiledAt,
+    started,
+    messagesMode: false,
+    ordinaryQuads: [],
+    currentMessage: [],
+    currentMessageCounter: 0,
+    parsedQuadCount: 0,
+    processedMessageCount: 0,
+    inferredCount: 0,
+    writer: null,
+  };
+}
+
+function handleParsedItems(state, items) {
+  for (const item of items) {
+    if (state.api.isMessageQuad(item)) {
+      state.messagesMode = true;
+      while (state.currentMessageCounter < item.messageCounter) {
+        processCurrentMessage(state);
+        state.currentMessageCounter += 1;
+        state.currentMessage = [];
+      }
+      state.currentMessage.push(item.quad);
+      state.parsedQuadCount += 1;
+    } else if (state.messagesMode) {
+      throw new Error('Cannot mix RDF Messages and ordinary RDF parser output in one input stream.');
+    } else {
+      state.ordinaryQuads.push(item);
+      state.parsedQuadCount += 1;
+    }
+  }
+}
+
+async function finishStreamingState(state) {
+  if (state.messagesMode) {
+    processCurrentMessage(state);
+    if (state.writer) {
+      await endWriter(state.writer);
+    }
+    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), inferred ' + state.inferredCount + ' quad(s). Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+    return;
+  }
+
+  const total = state.ordinaryQuads.length;
+  self.postMessage({ type: 'status', message: 'Parsed ' + total + ' input quad(s). Running inference…' });
+  const inferred = Array.from(state.reasoner.infer(state.ordinaryQuads));
+  self.postMessage({ type: 'status', message: 'Processed ' + total + ' input quad(s). Serializing ' + inferred.length + ' inferred quad(s)…' });
+  const output = await state.api.writeQuads(inferred, outputPrefixes());
+  self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inferred.length + ' quad(s). Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+}
+
+function processCurrentMessage(state) {
+  if (!state.writer) {
+    state.writer = createMessageWriter(state.api);
+  }
+  self.postMessage({ type: 'status', message: 'Processing message ' + (state.currentMessageCounter + 1) + ' after parsing ' + state.parsedQuadCount + ' quad(s)…' });
+  const inferred = Array.from(state.reasoner.infer(state.currentMessage));
+  state.writer.addMessage(inferred);
+  state.inferredCount += inferred.length;
+  state.processedMessageCount += 1;
+}
+
+function createMessageWriter(api) {
+  return new api.Writer({
+    write(chunk, _encoding, callback) {
+      self.postMessage({ type: 'append', chunk });
+      callback?.(null);
+    },
+    end(callback) {
+      callback?.(null, '');
+    },
+  }, { prefixes: outputPrefixes(), rdfMessages: true, format: 'N-Quads' });
+}
+
+function endWriter(writer) {
+  return new Promise((resolve, reject) => {
+    writer.end((error) => error ? reject(error) : resolve());
+  });
+}
+
+function progressMessage(state, prefix) {
+  if (state.messagesMode) {
+    return prefix + '; parsed ' + state.parsedQuadCount + ' RDF Messages quad(s), processed ' + state.processedMessageCount + ' message(s), inferred ' + state.inferredCount + ' quad(s)…';
+  }
+  return prefix + '; parsed ' + state.parsedQuadCount + ' input quad(s)…';
+}
 
 function outputPrefixes() {
   return {
