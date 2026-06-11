@@ -88,6 +88,7 @@ function humanizeExampleId(id) {
     'skos-taxonomy': 'SKOS taxonomy (SKOS Core)',
     'owl-skos-catalog': 'Catalog topics (OWL 2 RL + SKOS Core)',
     'transit-messages': 'Transit stream (RDF Messages)',
+    'stateful-materialization': 'Stateful materialization (RDF Messages)',
   };
   return overrides[id] ?? id.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

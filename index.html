@@ -127,12 +127,39 @@
 
     .mode-row,
     .example-row,
-    .uri-input-row {
+    .uri-input-row,
+    .option-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 0.65rem;
       margin: 0.8rem 0 0.75rem;
+    }
+
+    .option-row {
+      align-items: flex-start;
+      padding: 0.75rem 0.85rem;
+      border: 1px solid var(--border-soft);
+      border-radius: 0.85rem;
+      background: var(--panel-soft);
+    }
+
+    .option-row input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      margin-top: 0.15rem;
+      accent-color: var(--accent);
+    }
+
+    .option-row label {
+      margin: 0;
+    }
+
+    .option-copy {
+      display: flex;
+      flex: 1 1 24rem;
+      flex-direction: column;
+      gap: 0.2rem;
     }
 
     .mode-row select,
@@ -291,9 +318,15 @@
       .mode-row,
       .example-row,
       .uri-input-row,
+      .option-row,
       .actions {
         flex-direction: column;
         align-items: stretch;
+      }
+
+      .option-row {
+        flex-direction: row;
+        align-items: flex-start;
       }
 
       .mode-row select,
@@ -360,6 +393,13 @@
             <option value="text">Text input</option>
             <option value="url">URL</option>
           </select>
+        </div>
+        <div class="option-row">
+          <input id="statefulMaterialization" type="checkbox">
+          <div class="option-copy">
+            <label for="statefulMaterialization">Stateful materialization for RDF Messages</label>
+            <span class="hint">Keep prior asserted and inferred message triples as local state, then reason over that state plus the next message.</span>
+          </div>
         </div>
         <div id="dataUrlPanel" class="uri-input-row">
           <label for="dataUrl">Data or RDF Messages URL</label>

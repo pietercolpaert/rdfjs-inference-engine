@@ -1,0 +1,10 @@
+# RDF Messages input for the stateful materialization example.
+# The two facts are split across messages on purpose.
+
+VERSION "1.2-messages"
+PREFIX : <https://example.org/family#>
+
+:alice a :Female .
+
+MESSAGE
+:bob :hasParent :alice .

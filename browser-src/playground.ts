@@ -18,6 +18,7 @@ type Editor = {
 type PlaygroundState = {
   backgroundMode?: InputMode;
   dataMode?: InputMode;
+  statefulMaterialization?: boolean;
   backgroundUrl?: string;
   dataUrl?: string;
   backgroundText?: string;
@@ -49,6 +50,7 @@ type WorkerRequest = {
   bundledRuleCount: number;
   backgroundSource: string;
   dataMode: InputMode;
+  statefulMaterialization: boolean;
   dataSource?: string;
   dataUrl?: string;
 };
@@ -77,6 +79,7 @@ const controls = {
   exampleSelect: getSelect('exampleSelect'),
   backgroundMode: getSelect('backgroundMode'),
   dataMode: getSelect('dataMode'),
+  statefulMaterialization: getInput('statefulMaterialization'),
   backgroundUrl: getInput('backgroundUrl'),
   dataUrl: getInput('dataUrl'),
   backgroundUrlPanel: getElement('backgroundUrlPanel'),
@@ -147,6 +150,7 @@ function wireControls(): void {
   for (const input of [controls.backgroundUrl, controls.dataUrl]) {
     input.addEventListener('input', scheduleStateUpdate);
   }
+  controls.statefulMaterialization.addEventListener('change', scheduleStateUpdate);
 }
 
 async function runInference(): Promise<void> {
@@ -180,6 +184,7 @@ async function runInference(): Promise<void> {
       bundledRuleCount: bundledRuleFiles.length,
       backgroundSource,
       dataMode,
+      statefulMaterialization: controls.statefulMaterialization.checked,
       dataSource,
       dataUrl,
     });
@@ -253,6 +258,7 @@ function createInferenceWorker(): Worker {
 self.onmessage = async (event) => {
   const request = event.data;
   try {
+    self.currentWorkerRequest = request;
     importScripts(request.apiScriptUrl);
     const api = self.RdfjsInferenceEngine;
     if (!api) {
@@ -272,6 +278,8 @@ self.onmessage = async (event) => {
     await processInputData(api, reasoner, request, compiledAt, started);
   } catch (error) {
     self.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+  } finally {
+    self.currentWorkerRequest = null;
   }
 };
 
@@ -286,7 +294,7 @@ async function processInputData(api, reasoner, request, compiledAt, started) {
 
 async function processTextInput(api, reasoner, source, compiledAt, started) {
   self.postMessage({ type: 'status', message: 'Parsing text input…' });
-  const state = createStreamingState(api, reasoner, compiledAt, started, 'text input');
+  const state = createStreamingState(api, reasoner, compiledAt, started, 'text input', requestStatefulMaterialization());
   handleParsedItems(state, state.parser.write(source));
   handleParsedItems(state, state.parser.end());
   await finishStreamingState(state);
@@ -308,7 +316,7 @@ async function processUrlInput(api, reasoner, url, compiledAt, started) {
     return;
   }
 
-  const state = createStreamingState(api, reasoner, compiledAt, started, url);
+  const state = createStreamingState(api, reasoner, compiledAt, started, url, requestStatefulMaterialization());
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let bytes = 0;
@@ -332,7 +340,11 @@ async function processUrlInput(api, reasoner, url, compiledAt, started) {
   await finishStreamingState(state);
 }
 
-function createStreamingState(api, reasoner, compiledAt, started, sourceLabel) {
+function requestStatefulMaterialization() {
+  return Boolean(self.currentWorkerRequest && self.currentWorkerRequest.statefulMaterialization);
+}
+
+function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization) {
   return {
     api,
     reasoner,
@@ -340,6 +352,9 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel) {
     sourceLabel,
     compiledAt,
     started,
+    statefulMaterialization,
+    materializedState: [],
+    materializedStateKeys: new Set(),
     messagesMode: false,
     ordinaryQuads: [],
     currentMessage: [],
@@ -378,7 +393,7 @@ async function finishStreamingState(state) {
     if (state.writer) {
       await endWriter(state.writer);
     }
-    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), inferred ' + state.inferredCount + ' quad(s). Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + (state.statefulMaterialization ? ', state ' + state.materializedState.length + ' quad(s)' : '') + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
     return;
   }
 
@@ -397,11 +412,42 @@ function processCurrentMessage(state) {
   const started = performance.now();
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
-  const inferred = Array.from(state.reasoner.infer(state.currentMessage));
-  state.writer.addMessage(inferred);
-  state.inferredCount += inferred.length;
+  const inferenceInput = state.statefulMaterialization
+    ? state.materializedState.concat(state.currentMessage)
+    : state.currentMessage;
+  const inferred = Array.from(state.reasoner.infer(inferenceInput));
+  const output = state.statefulMaterialization
+    ? inferred.filter((quad) => !state.materializedStateKeys.has(quadKey(quad)))
+    : inferred;
+  if (state.statefulMaterialization) {
+    rememberAll(state, state.currentMessage);
+    rememberAll(state, inferred);
+  }
+  state.writer.addMessage(output);
+  state.inferredCount += output.length;
   state.processedMessageCount += 1;
-  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), inferred ' + state.inferredCount + ' quad(s)…');
+  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + (state.statefulMaterialization ? ', state ' + state.materializedState.length + ' quad(s)' : '') + '…');
+}
+
+function rememberAll(state, quads) {
+  for (const quad of quads) {
+    const key = quadKey(quad);
+    if (!state.materializedStateKeys.has(key)) {
+      state.materializedStateKeys.add(key);
+      state.materializedState.push(quad);
+    }
+  }
+}
+
+function quadKey(quad) {
+  return [quad.subject, quad.predicate, quad.object, quad.graph].map(termKey).join(' ');
+}
+
+function termKey(term) {
+  if (term.termType === 'Literal') {
+    return '"' + term.value + '"@' + term.language + '^^' + term.datatype.value;
+  }
+  return term.termType + ':' + term.value;
 }
 
 function postProgressStatus(state, message, force = false) {
@@ -446,7 +492,7 @@ function endWriter(writer) {
 
 function progressMessage(state, prefix) {
   if (state.messagesMode) {
-    return prefix + '; parsed ' + state.parsedQuadCount + ' RDF Messages quad(s), processed ' + state.processedMessageCount + ' message(s), inferred ' + state.inferredCount + ' quad(s)…';
+    return prefix + '; parsed ' + state.parsedQuadCount + ' RDF Messages quad(s), processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)…';
   }
   return prefix + '; parsed ' + state.parsedQuadCount + ' input quad(s)…';
 }
@@ -457,6 +503,7 @@ function outputPrefixes() {
     logistics: 'https://example.org/logistics#',
     subjects: 'https://example.org/subjects#',
     catalog: 'https://example.org/catalog#',
+    family: 'https://example.org/family#',
     skos: 'http://www.w3.org/2004/02/skos/core#',
     rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
     owl: 'http://www.w3.org/2002/07/owl#',
@@ -628,6 +675,7 @@ function resetDefaults(): void {
   controls.exampleSelect.value = example.id;
   controls.backgroundMode.value = defaultState.backgroundMode;
   controls.dataMode.value = defaultState.dataMode;
+  controls.statefulMaterialization.checked = false;
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
   editors.backgroundText.setValue(example.background);
@@ -655,6 +703,7 @@ function loadBundledExample(id: string): void {
   suppressStateUpdate = true;
   controls.backgroundMode.value = 'text';
   controls.dataMode.value = 'text';
+  controls.statefulMaterialization.checked = example.id === 'stateful-materialization';
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
   editors.backgroundText.setValue(example.background);
@@ -678,6 +727,7 @@ function collectState(): PlaygroundState {
   const state: PlaygroundState = {
     backgroundMode: getMode('background') === defaultState.backgroundMode ? undefined : getMode('background'),
     dataMode: getMode('data') === defaultState.dataMode ? undefined : getMode('data'),
+    statefulMaterialization: controls.statefulMaterialization.checked || undefined,
     backgroundUrl: controls.backgroundUrl.value.trim() || undefined,
     dataUrl: controls.dataUrl.value.trim() || undefined,
   };
@@ -704,6 +754,7 @@ function loadStateFromHash(): void {
   suppressStateUpdate = true;
   controls.backgroundMode.value = state.backgroundMode ?? defaultState.backgroundMode;
   controls.dataMode.value = state.dataMode ?? defaultState.dataMode;
+  controls.statefulMaterialization.checked = state.statefulMaterialization ?? false;
   controls.backgroundUrl.value = state.backgroundUrl ?? '';
   controls.dataUrl.value = state.dataUrl ?? '';
   if (state.backgroundText !== undefined) {

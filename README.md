@@ -163,6 +163,8 @@ The root `index.html` file is a browser playground. At browser-build time, it bu
 
 It uses `rdf-parser-ts` message detection. Ordinary RDF input is passed to `infer()`. RDF Messages input is processed message by message and serialized as RDF Messages too, starting with `VERSION "1.2-messages"` and delimiting inferred message chunks with `MESSAGE`. When the data source is an RDF Messages URL, the playground parses the response stream incrementally and appends inferred output while the input stream is still being read instead of loading the whole data file first. The playground stores editable state in the URL hash so examples can be shared as links.
 
+The playground also includes a **Stateful materialization for RDF Messages** checkbox. When enabled, each message's asserted triples and inferred delta are kept in a local materialized state graph and reused while processing the next message. The stateful materialization example uses this to infer that `:alice a :Mother` only after the second message supplies the parent relationship that combines with the first message's female assertion.
+
 Build only the browser artifacts with:
 
 ```bash
@@ -305,6 +307,29 @@ Check the RDF Messages fixture with:
 npm run test:transit-messages
 ```
 
+### Run the stateful materialization example
+
+The example in `examples/stateful-materialization/` demonstrates why stream enrichment sometimes needs a materialized state graph instead of processing each RDF Message independently.
+
+Its ontology says that a `:Mother` is equivalent to the intersection of `:Female` and `:Parent`, and that the object of `:hasParent` is a `:Parent`. The input deliberately splits the evidence across two RDF Messages:
+
+1. first message: `:alice a :Female`;
+2. second message: `:bob :hasParent :alice`.
+
+Without stateful materialization, the second message can infer only that `:alice a :Parent`; it cannot also infer `:alice a :Mother`, because the `:Female` assertion was in a previous message. With `--stateful-materialization`, the runner stores each asserted message and each inferred delta in a local materialized state graph, then reasons over that state plus the next message. The second message can then infer that `:alice a :Mother`.
+
+Run the stateful version with:
+
+```bash
+npm run example:stateful-materialization
+```
+
+Compare the stateless and stateful fixtures with:
+
+```bash
+npm run test:stateful-materialization
+```
+
 ## MobiBench OWL 2 RL tests
 
 The repository includes a MobiBench harness for the OWL 2 RL RDF-based test-suite archive:
@@ -424,7 +449,7 @@ The example output checks are kept separately:
 npm run test:examples
 ```
 
-This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, and RDF Messages examples.
+This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, RDF Messages, and stateful materialization examples.
 
 ## Preprocessing and generated runtimes
 
