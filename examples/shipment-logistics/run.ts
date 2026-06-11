@@ -10,11 +10,10 @@ const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const OWL = 'http://www.w3.org/2002/07/owl#';
 
 async function main(): Promise<void> {
-  const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
   const ontology = parseToQuads(readFileSync('examples/shipment-logistics/ontology.n3', 'utf8'));
   const reasoner = new InferenceEngine();
 
-  reasoner.load(profile, ontology);
+  reasoner.load(ontology);
   mkdirSync(dirname('generated/shipment-logistics-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/shipment-logistics-runtime.n3');
 

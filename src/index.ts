@@ -1,4 +1,4 @@
-export { InferenceEngine, defaultRuntimeCompiler, serializeQuadsAsN3 } from './InferenceEngine';
+export { InferenceEngine, defaultRuntimeCompiler, loadDefaultRuleProfiles, serializeQuadsAsN3 } from './InferenceEngine';
 export type {
   InferenceEngineOptions,
   LoadedRuleProfile,

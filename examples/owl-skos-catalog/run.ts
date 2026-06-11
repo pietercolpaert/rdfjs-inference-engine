@@ -7,14 +7,10 @@ const EX = 'https://example.org/catalog#';
 const SKOS = 'http://www.w3.org/2004/02/skos/core#';
 
 async function main(): Promise<void> {
-  const profiles = [
-    readFileSync('rules/owl2rl-eyeling.n3', 'utf8'),
-    readFileSync('rules/skos-entailment.n3', 'utf8'),
-  ];
   const ontology = parseToQuads(readFileSync('examples/owl-skos-catalog/ontology.n3', 'utf8'));
   const reasoner = new InferenceEngine();
 
-  reasoner.load(profiles, ontology);
+  reasoner.load(ontology);
   mkdirSync(dirname('generated/owl-skos-catalog-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/owl-skos-catalog-runtime.n3');
 

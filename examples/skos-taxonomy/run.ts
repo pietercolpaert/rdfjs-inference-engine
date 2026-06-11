@@ -9,11 +9,10 @@ const SKOS = 'http://www.w3.org/2004/02/skos/core#';
 const RDFS = 'http://www.w3.org/2000/01/rdf-schema#';
 
 async function main(): Promise<void> {
-  const profile = readFileSync('rules/skos-entailment.n3', 'utf8');
   const ontology = parseToQuads(readFileSync('examples/skos-taxonomy/ontology.n3', 'utf8'));
   const reasoner = new InferenceEngine();
 
-  reasoner.load(profile, ontology);
+  reasoner.load(ontology);
   mkdirSync(dirname('generated/skos-taxonomy-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/skos-taxonomy-runtime.n3');
 

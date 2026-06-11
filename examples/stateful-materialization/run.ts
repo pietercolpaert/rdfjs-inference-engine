@@ -10,11 +10,10 @@ const SELECTED_TYPES = new Set([FAMILY + 'Parent', FAMILY + 'Mother']);
 
 async function main(): Promise<void> {
   const statefulMaterialization = process.argv.includes('--stateful-materialization');
-  const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
   const ontology = parseToQuads(readFileSync('examples/stateful-materialization/ontology.n3', 'utf8'));
   const reasoner = new InferenceEngine();
 
-  reasoner.load(profile, ontology);
+  reasoner.load(ontology);
   mkdirSync(dirname('generated/stateful-materialization-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/stateful-materialization-runtime.n3');
 

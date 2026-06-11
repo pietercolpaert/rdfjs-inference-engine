@@ -2,7 +2,7 @@
 
 This repository contains a small TypeScript library for doing **generated-runtime materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
 
-The library core is intentionally agnostic about the ontology language or rule profile. The runnable example uses the bundled OWL 2 RL profile, which also contains the RDFS entailments needed by the small demo vocabulary.
+The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder.
 
 ## Install
 
@@ -20,18 +20,6 @@ import { InferenceEngine } from 'rdfjs-inference-engine';
 
 The package ships the compiled Node API in `dist/src/`, browser bundles in `browser/`, the playground `index.html`, and the bundled rule profiles in `rules/`.
 
-## Requirements
-
-Eyeling requires Node.js. The upstream package currently documents Node.js `>=18`.
-
-Use the latest Eyeling version. The OWL 2 RL profile uses datatype builtins added after issue `eyereasoner/eyeling#18`.
-
-The example can be run without installing Eyeling globally:
-
-```bash
-npx --yes eyeling --version
-```
-
 For local repository development, install dependencies and build the library with:
 
 ```bash
@@ -45,7 +33,7 @@ npm run build
 
 The core idea is:
 
-1. load one or more N3 rule profiles, such as the included [OWL 2 RL profile](rules/owl2rl-eyeling.n3) and the [SKOS entailment](rules/skos-entailment.n3) file;
+1. load all bundled N3 rule profiles from `rules/` by default, or pass explicit profiles when you need a smaller/custom ruleset;
 2. load RDF-JS background vocabulary, ontology, taxonomy, or configuration quads;
 3. precompute the static background closure once;
 4. create a generated runtime N3 file with either the default generic compiler or a caller-provided compiler;
@@ -55,13 +43,11 @@ This is useful when a service receives RDF, enriches it immediately, and stores 
 
 ### 1. N3 rules as profiles
 
-The file:
+The idea is to use one or all of the N3 files shipped with this package. In Node.js, calling `reasoner.load(background)` loads all `.n3` files from the package `rules/` directory by default. The browser playground does the same at build time by bundling every `.n3` file from `rules/`.
 
-```text
-rules/owl2rl-eyeling.n3
-```
+#### rules/owl2rl-eyeling.n3
 
-contains an N3 implementation-oriented OWL 2 RL/RDF ruleset for Eyeling. The engine treats this as ordinary N3 text; it does not hard-code OWL or RDFS semantics.
+This contains an N3 implementation-oriented OWL 2 RL/RDF ruleset for Eyeling. The engine treats this as ordinary N3 text; it does not hard-code OWL or RDFS semantics.
 
 The OWL 2 RL profile includes the RDFS entailments needed by the example, including rules for:
 
@@ -72,52 +58,26 @@ The OWL 2 RL profile includes the RDFS entailments needed by the example, includ
 
 It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples, internal OWL 2 RL datatype helper triples, and datatype-rule facts with literals in subject position from emitted inference output because they are usually closure-maintenance facts rather than useful application data.
 
-The repository also includes a SKOS Core profile:
+#### rules/skos-entailment.n3
 
-```text
-rules/skos-entailment.n3
-```
+This is a SKOS Core profile. It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
 
-It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
+The bundled rulesets are meant to be loaded as rule profiles. In normal projects, keep any additional rule profiles vendored/versioned and pass your own background quads to `load()`.
 
-The ruleset is meant to be passed to the library as a rule profile. In normal projects, keep rule profiles vendored/versioned and pass your own background quads to `load()`.
-
-You can load both bundled profiles at the same time by passing an array to `load()`:
+By default, load all bundled rule profiles with only the background dataset:
 
 ```ts
-const profiles = [
-   readFileSync('rules/owl2rl-eyeling.n3', 'utf8'),
-   readFileSync('rules/skos-entailment.n3', 'utf8'),
-];
-
 const background = parseToQuads(readFileSync('examples/owl-skos-catalog/ontology.n3', 'utf8'));
 const reasoner = new InferenceEngine();
-reasoner.load(profiles, background);
+reasoner.load(background);
 
 const data = parseToQuads(readFileSync('examples/owl-skos-catalog/input.trig', 'utf8'));
 const inferred = Array.from(reasoner.infer(data));
 ```
 
-### 2. Background knowledge
+You can still pass one profile or an array of profiles explicitly if you want to override the default.
 
-The example background vocabulary is:
-
-```text
-examples/transit-fleet/ontology.n3
-```
-
-It defines a tiny transit model:
-
-```n3
-:ElectricBus rdfs:subClassOf :Bus .
-:Bus rdfs:subClassOf :Vehicle .
-:operatedBy rdfs:domain :Vehicle ;
-  rdfs:range :Operator .
-```
-
-The RDFS entailments come from `rules/owl2rl-eyeling.n3`; there is no TypeScript implementation of RDFS or OWL entailment. When the input says that `:bus-42 a :ElectricBus`, the generated runtime derives that `:bus-42 a :Bus` and `:bus-42 a :Vehicle`. When the input says that `:bus-42 :operatedBy :operator-7`, the generated runtime derives that `:operator-7 a :Operator`.
-
-### 3. TypeScript API
+### TypeScript API
 
 The main class is `InferenceEngine`.
 
@@ -127,11 +87,13 @@ import type { Quad } from '@rdfjs/types';
 import { DataFactory, isMessageQuad, Parser } from 'rdf-parser-ts';
 import { InferenceEngine } from 'rdfjs-inference-engine';
 
-const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
 const ontology = parseToQuads(readFileSync('examples/transit-fleet/ontology.n3', 'utf8'));
 
+// You can also pass a previously saved runtime in this constructor.
 const reasoner = new InferenceEngine();
-reasoner.load(profile, ontology);
+reasoner.load(ontology);
+
+// Optional: save the generated runtime for reuse later.
 reasoner.saveRuntime('generated/transit-fleet-runtime.n3');
 
 const data = parseToQuads(readFileSync('examples/transit-fleet/input.trig', 'utf8'));
@@ -149,6 +111,7 @@ function parseToQuads(source: string): Quad[] {
 `InferenceEngine` supports:
 
 - `constructor({ runtime })` or `constructor({ runtimePath })` to load a previously generated runtime;
+- `load(vocabularyDataset)` to load all bundled `rules/*.n3`, precompute the static background closure, and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset)` to precompute the static background closure and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset, { runtimeCompiler })` to provide custom compilation for a specific rule profile or ontology language;
 - `saveRuntime(path)` to save that runtime as an N3 file;

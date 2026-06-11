@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { DataFactory as RdfParserDataFactory } from 'rdf-parser-ts';
@@ -100,7 +101,10 @@ export class InferenceEngine {
     return this.staticClosure.filter((quad) => shouldEmitQuad(quad, outputMode));
   }
 
-  public load(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): string {
+  public load(vocabulary: VocabularyDataset, options?: LoadOptions): string;
+  public load(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options?: LoadOptions): string;
+  public load(profilesOrVocabulary: RuleProfile | RuleProfile[] | VocabularyDataset, vocabularyOrOptions?: VocabularyDataset | LoadOptions, options: LoadOptions = {}): string {
+    const { profiles, vocabulary, loadOptions } = normalizeLoadArguments(profilesOrVocabulary, vocabularyOrOptions, options);
     const normalizedProfiles = normalizeProfiles(profiles);
     const profileN3 = normalizedProfiles.map((profile) => profile.n3).join('\n\n');
     const vocabularyQuads = quadsFromVocabulary(vocabulary);
@@ -112,14 +116,14 @@ export class InferenceEngine {
 
     this.staticClosure = (closure.closureQuads ?? []) as Quad[];
 
-    const runtimeCompiler = options.runtimeCompiler ?? this.runtimeCompiler;
+    const runtimeCompiler = loadOptions.runtimeCompiler ?? this.runtimeCompiler;
     this.runtime = runtimeCompiler({
       profiles: normalizedProfiles,
       profileN3,
       vocabulary: vocabularyQuads,
       closure: this.staticClosure,
       dataFactory: this.dataFactory,
-      options,
+      options: loadOptions,
     });
 
     return this.runtime;
@@ -178,6 +182,102 @@ export class InferenceEngine {
       throw new Error('No inference runtime is loaded. Call load(...) or pass runtime/runtimePath to the constructor first.');
     }
   }
+}
+
+export function loadDefaultRuleProfiles(rulesDir?: string): LoadedRuleProfile[] {
+  const candidateDirs = [
+    rulesDir,
+    resolve(__dirname, '../../rules'),
+    resolve(__dirname, '../rules'),
+    resolve(process.cwd(), 'rules'),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  const uniqueCandidateDirs = Array.from(new Set(candidateDirs));
+  for (const candidate of uniqueCandidateDirs) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+
+    const files = readdirSync(candidate).filter((file) => file.endsWith('.n3')).sort();
+    if (files.length === 0) {
+      continue;
+    }
+
+    return files.map((file) => ({
+      n3: readFileSync(join(candidate, file), 'utf8'),
+      label: `rules/${file}`,
+    }));
+  }
+
+  throw new Error('Could not find default rule profiles. Pass explicit rule profiles to load(...) or install the package with rules/*.n3.');
+}
+
+function normalizeLoadArguments(
+  profilesOrVocabulary: RuleProfile | RuleProfile[] | VocabularyDataset,
+  vocabularyOrOptions?: VocabularyDataset | LoadOptions,
+  options: LoadOptions = {},
+): { profiles: RuleProfile | RuleProfile[]; vocabulary: VocabularyDataset; loadOptions: LoadOptions } {
+  if (vocabularyOrOptions !== undefined && !isLoadOptions(vocabularyOrOptions)) {
+    if (!isRuleProfileInput(profilesOrVocabulary, { allowEmptyArray: true })) {
+      throw new TypeError('Expected explicit rule profiles before the vocabulary dataset.');
+    }
+    return {
+      profiles: profilesOrVocabulary,
+      vocabulary: vocabularyOrOptions,
+      loadOptions: options,
+    };
+  }
+
+  if (isRuleProfileInput(profilesOrVocabulary, { allowEmptyArray: false })) {
+    throw new TypeError('Expected a vocabulary dataset when explicit rule profiles are provided.');
+  }
+
+  return {
+    profiles: loadDefaultRuleProfiles(),
+    vocabulary: profilesOrVocabulary,
+    loadOptions: isLoadOptions(vocabularyOrOptions) ? vocabularyOrOptions : options,
+  };
+}
+
+function isRuleProfileInput(value: RuleProfile | RuleProfile[] | VocabularyDataset, options: { allowEmptyArray: boolean }): value is RuleProfile | RuleProfile[] {
+  if (typeof value === 'string') {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0
+      ? options.allowEmptyArray
+      : value.some((item) => typeof item === 'string' || isRuleProfileObject(item));
+  }
+
+  return isRuleProfileObject(value);
+}
+
+function isRuleProfileObject(value: unknown): value is Exclude<RuleProfile, string> {
+  return typeof value === 'object'
+    && value !== null
+    && ('n3' in value || 'text' in value || 'label' in value || 'baseIri' in value)
+    && !('subject' in value && 'predicate' in value && 'object' in value);
+}
+
+function isLoadOptions(value: unknown): value is LoadOptions {
+  if (value === undefined) {
+    return false;
+  }
+
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  if (Symbol.iterator in Object(value)
+    || typeof (value as { forEach?: unknown }).forEach === 'function'
+    || ('subject' in value && 'predicate' in value && 'object' in value)) {
+    return false;
+  }
+
+  return typeof value === 'object'
+    && value !== null
+    && ('runtimeCompiler' in value || 'includeStaticClosure' in value || Object.keys(value).length === 0);
 }
 
 export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
