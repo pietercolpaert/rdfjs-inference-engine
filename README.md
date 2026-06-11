@@ -1,4 +1,4 @@
-# RDF-JS inference engine with generated Eyeling runtimes
+# RDF-JS inference engine
 
 This repository contains a small TypeScript library for doing **generated-runtime materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
 
@@ -54,7 +54,7 @@ The OWL 2 RL profile includes the RDFS entailments needed by the example, includ
 - `rdfs:domain`
 - `rdfs:range`
 
-It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. That is why the example output includes reflexive `owl:sameAs` triples in addition to the RDFS consequences.
+It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples from emitted inference output because they are usually closure-maintenance tautologies rather than useful application data.
 
 The ruleset is meant to be passed to the library as a rule profile. In normal projects, keep rule profiles vendored/versioned and pass your own background quads to `load()`.
 
@@ -63,7 +63,7 @@ The ruleset is meant to be passed to the library as a rule profile. In normal pr
 The example background vocabulary is:
 
 ```text
-ontologies/transit.n3
+examples/transit-fleet/ontology.n3
 ```
 
 It defines a tiny transit model:
@@ -88,13 +88,13 @@ import { DataFactory, isMessageQuad, Parser } from 'rdf-parser-ts';
 import { InferenceEngine } from 'rdfjs-inference-engine';
 
 const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
-const ontology = parseToQuads(readFileSync('ontologies/transit.n3', 'utf8'));
+const ontology = parseToQuads(readFileSync('examples/transit-fleet/ontology.n3', 'utf8'));
 
 const reasoner = new InferenceEngine();
 reasoner.load(profile, ontology);
-reasoner.saveRuntime('generated/runtime.n3');
+reasoner.saveRuntime('generated/transit-fleet-runtime.n3');
 
-const data = parseToQuads(readFileSync('examples/input/data.trig', 'utf8'));
+const data = parseToQuads(readFileSync('examples/transit-fleet/input.trig', 'utf8'));
 const inferred = reasoner.infer(data);
 
 function parseToQuads(source: string): Quad[] {
@@ -147,13 +147,21 @@ npm run build:browser
 
 Git hooks are tracked in `.githooks/`. `npm install` or `npm run hooks:install` configures the repository to use them. The pre-commit hook regenerates and stages the browser bundles; the pre-push hook regenerates them again and blocks the push if the generated files differ from what is committed.
 
-## Run the example
+## Run the transit fleet example
 
 From the repository root:
 
 ```bash
 ./scripts/run-example.sh
+# or:
+npm run example:transit-fleet
 ```
+
+The transit fleet example is self-contained in `examples/transit-fleet/`:
+
+- `ontology.n3`
+- `input.trig`
+- `expected-output.n3`
 
 The script uses the TypeScript library and has two phases.
 
@@ -161,7 +169,7 @@ First, it materializes the ruleset plus background vocabulary without input data
 uses the default compiler to create a generated runtime file:
 
 ```text
-generated/runtime.n3
+generated/transit-fleet-runtime.n3
 ```
 
 That generated file contains the OWL 2 RL rule profile plus the precomputed background closure. Second, Eyeling processes ordinary RDF input using only this generated runtime file plus the input file. Because this second pass runs without `--stream-messages` and without `log:query`, the library returns only newly derived quads from Eyeling's `onDerived` callback.
@@ -171,8 +179,6 @@ Expected output:
 ```n3
 @prefix : <https://example.org/transit#>.
 
-:bus-42 <http://www.w3.org/2002/07/owl#sameAs> :bus-42.
-:operator-7 <http://www.w3.org/2002/07/owl#sameAs> :operator-7.
 :bus-42 a :Vehicle.
 :operator-7 a :Operator.
 :bus-42 a :Bus.
@@ -184,13 +190,17 @@ triples from the generated runtime.
 To check the example mechanically:
 
 ```bash
-./scripts/run-example.sh > /tmp/owl2rl-example-output.n3
-diff -u examples/expected-output.n3 /tmp/owl2rl-example-output.n3
+npm run example:transit-fleet --silent > /tmp/owl2rl-transit-fleet-output.n3
+diff -u examples/transit-fleet/expected-output.n3 /tmp/owl2rl-transit-fleet-output.n3
 ```
 
-## Run the complex OWL 2 RL example
+## Run the shipment logistics OWL 2 RL example
 
-The more elaborate example in `examples/complex/` exercises OWL 2 RL features beyond subclass/domain/range reasoning:
+The more elaborate example in `examples/shipment-logistics/` exercises OWL 2 RL features beyond subclass/domain/range reasoning:
+
+- `ontology.n3`
+- `input.trig`
+- `expected-selected-output.n3`
 
 - `owl:equivalentClass`
 - `owl:equivalentProperty`
@@ -206,16 +216,16 @@ The more elaborate example in `examples/complex/` exercises OWL 2 RL features be
 Run it with:
 
 ```bash
-npm run example:complex
+npm run example:shipment-logistics
 ```
 
 The script asserts that all selected expected entailments are present in the closure, then prints only that selected subset so the fixture stays readable:
 
 ```bash
-npm run test:complex
+npm run test:shipment-logistics
 ```
 
-The selected expected output is stored in `examples/complex/expected-selected-output.n3`.
+The selected expected output is stored in `examples/shipment-logistics/expected-selected-output.n3`.
 
 ## MobiBench OWL 2 RL tests
 
@@ -328,7 +338,7 @@ npm run test:examples
    ruleset and background quads, including asserted background triples;
 2. the default compiler creates a generic runtime from the profiles and static closure, or a caller-provided compiler can create optimized profile-specific runtime rules;
 3. it stores the generated runtime in memory;
-4. `saveRuntime()` can persist that runtime as `generated/runtime.n3`;
+4. `saveRuntime()` can persist that runtime as a generated `.n3` file such as `generated/transit-fleet-runtime.n3`;
 5. `infer()` uses only the generated runtime and the incoming RDF
    input, without message support and without `log:query`.
 
@@ -350,7 +360,7 @@ A typical ingest-time architecture looks like this:
 
 ```text
 RDF input
-  -> Eyeling with generated/runtime.n3
+   -> Eyeling with generated/<example>-runtime.n3
   -> derived triples
   -> deduplication / validation / persistence
   -> SPARQL endpoint, event bus, cache, or materialized RDF store
@@ -361,13 +371,15 @@ Recommended project structure:
 ```text
 rules/
    profile.n3                  # keep rule profiles vendored and versioned
-ontologies/
-   domain.n3                   # your domain ontology
+background/
+   domain.n3                   # your domain ontology or other stable quads
 generated/
    runtime.n3                  # regenerated when rules or ontology change
 examples/
-   input/*.trig                # RDF input data
-   expected-output/*.n3        # regression-test fixtures
+   my-example/
+      ontology.n3              # example-specific background quads
+      input.trig               # example input data
+      expected-output.n3       # regression-test fixture
 ```
 
 For server use, keep rule profiles and background data stable, regenerate

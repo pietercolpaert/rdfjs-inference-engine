@@ -1,6 +1,6 @@
 import { bundledRuleFiles, bundledRules } from 'bundled-rules';
-import defaultBackground from '../ontologies/transit.n3';
-import defaultData from '../examples/input/data.trig';
+import defaultBackground from '../examples/transit-fleet/ontology.n3';
+import defaultData from '../examples/transit-fleet/input.trig';
 
 declare const CodeMirror: any;
 
