@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import type { Quad } from '@rdfjs/types';
 import { InferenceEngine } from '../src';
-import { graphContainsAll, parseRdfXml, readCachedUrl } from './utils';
+import { addReflexiveSameAsClosure, graphContainsAll, parseRdfXml, readCachedUrl } from './utils';
 
 const TEST = 'http://www.w3.org/2007/OWL/testOntology#';
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+const OWL = 'http://www.w3.org/2002/07/owl#';
 const OWLRL = 'https://example.org/owlrl-n3#';
 const DEFAULT_MANIFEST_BASE_URL = 'https://www.w3.org/';
 const DEFAULT_CACHE_DIR = '.cache/owl2rl';
@@ -84,6 +85,7 @@ interface RunnableTest extends ManifestCase {
 interface ParsedArgs {
   all: boolean;
   list: boolean;
+  conformance: boolean;
   ids?: Set<string>;
   manifests?: string[];
   cacheDir: string;
@@ -118,17 +120,26 @@ async function main(): Promise<void> {
   }
 
   const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
-  const prepared = new InferenceEngine();
+  const outputMode = args.conformance || args.all ? 'conformance' : 'application';
+  const prepared = new InferenceEngine({ outputMode });
   prepared.load(profile, []);
   const runtime = prepared.getRuntime();
+  const staticClosure = outputMode === 'conformance' ? prepared.getStaticClosure({ outputMode }) : [];
 
   const results: TestResult[] = [];
   for (const test of selected) {
     const id = test.identifier[0];
     try {
-      const premise = await parseRdfXml(test.rdfXmlPremiseOntology[0], `${test.iri}/premise`);
-      const reasoner = new InferenceEngine({ runtime });
-      const closure = [...premise, ...reasoner.infer(premise)];
+      const premiseBaseIri = `${test.iri}/premise`;
+      const premise = await expandImports(
+        await parseRdfXml(test.rdfXmlPremiseOntology[0], premiseBaseIri),
+        args.cacheDir,
+        outputMode === 'conformance' ? new Set<string>([premiseBaseIri]) : undefined,
+      );
+      const inferenceOutputMode = outputMode === 'conformance' ? 'application' : outputMode;
+      const reasoner = new InferenceEngine({ runtime, outputMode: inferenceOutputMode });
+      const rawClosure = [...staticClosure, ...premise, ...reasoner.infer(premise, { outputMode: inferenceOutputMode })];
+      const closure = outputMode === 'conformance' ? addReflexiveSameAsClosure(rawClosure) : rawClosure;
 
       const ok = await evaluateTest(test, closure);
       results.push({ id, kind: test.kind, ok });
@@ -152,6 +163,9 @@ async function main(): Promise<void> {
 async function evaluateTest(test: RunnableTest, closure: Quad[]): Promise<boolean> {
   if (test.kind === 'positive') {
     const conclusion = await parseRdfXml(test.rdfXmlConclusionOntology[0], `${test.iri}/conclusion`);
+    if (hasAllDifferentConclusion(conclusion)) {
+      return allDifferentConclusionsSatisfied(closure, conclusion);
+    }
     return graphContainsAll(closure, conclusion);
   }
 
@@ -167,6 +181,96 @@ async function evaluateTest(test: RunnableTest, closure: Quad[]): Promise<boolea
   return hasInconsistencyDiagnostic(closure);
 }
 
+function hasAllDifferentConclusion(conclusion: Quad[]): boolean {
+  return conclusion.some((quad) => (
+    quad.predicate.value === RDF + 'type'
+    && quad.object.termType === 'NamedNode'
+    && quad.object.value === OWL + 'AllDifferent'
+  ));
+}
+
+function allDifferentConclusionsSatisfied(closure: Quad[], conclusion: Quad[]): boolean {
+  const differentPairs = new Set<string>();
+  for (const quad of closure) {
+    if (quad.predicate.value === OWL + 'differentFrom') {
+      differentPairs.add(`${quad.subject.value}\u0000${quad.object.value}`);
+      differentPairs.add(`${quad.object.value}\u0000${quad.subject.value}`);
+    }
+  }
+
+  for (const members of allDifferentMemberLists(conclusion)) {
+    for (let left = 0; left < members.length; left += 1) {
+      for (let right = left + 1; right < members.length; right += 1) {
+        if (!differentPairs.has(`${members[left]}\u0000${members[right]}`)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+function allDifferentMemberLists(conclusion: Quad[]): string[][] {
+  const firstByListNode = new Map<string, string>();
+  const restByListNode = new Map<string, string>();
+  const lists: string[][] = [];
+
+  for (const quad of conclusion) {
+    if (quad.subject.termType === 'BlankNode' && quad.predicate.value === RDF + 'first' && quad.object.termType === 'NamedNode') {
+      firstByListNode.set(quad.subject.value, quad.object.value);
+    } else if (quad.subject.termType === 'BlankNode' && quad.predicate.value === RDF + 'rest') {
+      restByListNode.set(quad.subject.value, quad.object.value);
+    }
+  }
+
+  for (const quad of conclusion) {
+    if (quad.predicate.value === OWL + 'members' && quad.object.termType === 'BlankNode') {
+      const members: string[] = [];
+      let listNode = quad.object.value;
+      const visited = new Set<string>();
+      while (!visited.has(listNode) && firstByListNode.has(listNode)) {
+        visited.add(listNode);
+        members.push(firstByListNode.get(listNode)!);
+        const rest = restByListNode.get(listNode);
+        if (!rest || rest === RDF + 'nil') {
+          break;
+        }
+        listNode = rest;
+      }
+      lists.push(members);
+    }
+  }
+
+  return lists;
+}
+
+async function expandImports(quads: Quad[], cacheDir: string, visited?: Set<string>): Promise<Quad[]> {
+  if (!visited) {
+    return quads;
+  }
+
+  const expanded = [...quads];
+  const imports = quads
+    .filter((quad) => quad.predicate.value === OWL + 'imports' && quad.object.termType === 'NamedNode')
+    .map((quad) => quad.object.value);
+
+  for (const importUrl of imports) {
+    if (visited.has(importUrl)) {
+      continue;
+    }
+    visited.add(importUrl);
+    const imported = await parseRdfXml(await readCachedUrl(downloadUrl(importUrl), manifestCachePath(cacheDir, importUrl)), importUrl);
+    expanded.push(...await expandImports(imported, cacheDir, visited));
+  }
+
+  return expanded;
+}
+
+function downloadUrl(url: string): string {
+  return url.replace(/^http:\/\/www\.w3\.org\//, 'https://www.w3.org/');
+}
+
 function hasInconsistencyDiagnostic(quads: Quad[]): boolean {
   return quads.some((quad) => (
     quad.predicate.value === RDF + 'type'
@@ -176,11 +280,13 @@ function hasInconsistencyDiagnostic(quads: Quad[]): boolean {
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-  const parsed: ParsedArgs = { all: false, list: false, cacheDir: process.env.OWL2_TEST_MANIFEST_CACHE_DIR ?? DEFAULT_CACHE_DIR };
+  const parsed: ParsedArgs = { all: false, list: false, conformance: false, cacheDir: process.env.OWL2_TEST_MANIFEST_CACHE_DIR ?? DEFAULT_CACHE_DIR };
 
   for (const arg of args) {
     if (arg === '--all') {
       parsed.all = true;
+    } else if (arg === '--conformance') {
+      parsed.conformance = true;
     } else if (arg === '--list') {
       parsed.list = true;
     } else if (arg.startsWith('--ids=')) {

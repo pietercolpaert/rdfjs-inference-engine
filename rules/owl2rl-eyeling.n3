@@ -50,6 +50,13 @@ owlrl:term3 a rdf:Property .
 owlrl:term4 a rdf:Property .
 owlrl:term5 a rdf:Property .
 
+# Axiomatic OWL facts used by conformance tests. Application output filters remove
+# reflexive equality and internal helper facts by default.
+owl:sameAs rdf:type owl:ReflexiveProperty .
+owl:differentFrom rdf:type owl:SymmetricProperty .
+owl:NamedIndividual rdf:type owl:Class ;
+  rdfs:subClassOf owl:Thing .
+
 #################################################################
 # 1. OWL 2 RL supported datatype declarations (dt-type1)
 #################################################################
@@ -86,6 +93,27 @@ xsd:base64Binary       a rdfs:Datatype .
 xsd:anyURI             a rdfs:Datatype .
 xsd:dateTime           a rdfs:Datatype .
 xsd:dateTimeStamp      a rdfs:Datatype .
+
+xsd:integer rdfs:subClassOf xsd:decimal .
+xsd:long rdfs:subClassOf xsd:integer .
+xsd:int rdfs:subClassOf xsd:long .
+xsd:short rdfs:subClassOf xsd:int .
+xsd:byte rdfs:subClassOf xsd:short .
+xsd:nonPositiveInteger rdfs:subClassOf xsd:integer .
+xsd:negativeInteger rdfs:subClassOf xsd:nonPositiveInteger .
+xsd:nonNegativeInteger rdfs:subClassOf xsd:integer .
+xsd:positiveInteger rdfs:subClassOf xsd:nonNegativeInteger .
+xsd:unsignedLong rdfs:subClassOf xsd:nonNegativeInteger .
+xsd:unsignedInt rdfs:subClassOf xsd:unsignedLong .
+xsd:unsignedShort rdfs:subClassOf xsd:unsignedInt .
+xsd:unsignedByte rdfs:subClassOf xsd:unsignedShort .
+xsd:dateTimeStamp rdfs:subClassOf xsd:dateTime .
+xsd:normalizedString rdfs:subClassOf xsd:string .
+xsd:token rdfs:subClassOf xsd:normalizedString .
+xsd:language rdfs:subClassOf xsd:token .
+xsd:Name rdfs:subClassOf xsd:token .
+xsd:NCName rdfs:subClassOf xsd:Name .
+xsd:NMTOKEN rdfs:subClassOf xsd:token .
 
 #################################################################
 # 2. Built-in annotation properties (prp-ap)
@@ -153,7 +181,9 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?list rdf:rest rdf:nil .
   ?individual rdf:type ?class .
   (owlrl:allListClassTypes ?individual ?list) log:skolem ?state . }
-=> { ?state owlrl:allListClassTypes true . } .
+=> { ?state owlrl:allListClassTypes true ;
+           owlrl:pathSubject ?individual ;
+           owlrl:pathObject ?list . } .
 
 { ?list owlrl:listRoot true .
   ?list rdf:first ?class .
@@ -163,7 +193,9 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   (owlrl:allListClassTypes ?individual ?tail) log:skolem ?tailState .
   ?tailState owlrl:allListClassTypes true .
   (owlrl:allListClassTypes ?individual ?list) log:skolem ?state . }
-=> { ?state owlrl:allListClassTypes true . } .
+=> { ?state owlrl:allListClassTypes true ;
+           owlrl:pathSubject ?individual ;
+           owlrl:pathObject ?list . } .
 
 # sameValuesForProperties: tuple (?x ?y ?propertyList) is true iff ?x and ?y
 # share at least one identical value for every property in the non-empty list.
@@ -342,6 +374,11 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?y ?p ?z . }
 => { ?x ?p ?z . } .
 
+# prp-rp
+{ ?p rdf:type owl:ReflexiveProperty .
+  ?x rdf:type owl:NamedIndividual . }
+=> { ?x ?p ?x . } .
+
 # prp-spo1
 { ?p1 rdfs:subPropertyOf ?p2 .
   ?x ?p1 ?y . }
@@ -354,6 +391,14 @@ owl:incompatibleWith        a owl:AnnotationProperty .
         owlrl:pathSubject ?x ;
         owlrl:pathObject ?y . }
 => { ?x ?p ?y . } .
+
+# A property-chain axiom P o P -> P is equivalent to transitivity for P.
+{ ?p owl:propertyChainAxiom ?chain .
+  ?chain rdf:first ?p .
+  ?chain rdf:rest ?tail .
+  ?tail rdf:first ?p .
+  ?tail rdf:rest rdf:nil . }
+=> { ?p rdf:type owl:TransitiveProperty . } .
 
 # prp-eqp1/prp-eqp2
 { ?p1 owl:equivalentProperty ?p2 .
@@ -376,6 +421,28 @@ owl:incompatibleWith        a owl:AnnotationProperty .
           owlrl:term3 ?x ;
           owlrl:term4 ?y . } .
 
+# If disjoint properties relate two subjects to the same value, the subjects are
+# different. This RDF-Based consequence is exercised by the official OWL tests.
+{ ?p1 owl:propertyDisjointWith ?p2 .
+  ?x1 ?p1 ?y .
+  ?x2 ?p2 ?y . }
+=> { ?x1 owl:differentFrom ?x2 . } .
+
+{ ?p1 owl:propertyDisjointWith ?p2 .
+  ?x1 ?p2 ?y .
+  ?x2 ?p1 ?y . }
+=> { ?x1 owl:differentFrom ?x2 . } .
+
+{ ?p1 owl:propertyDisjointWith ?p2 .
+  ?x ?p1 ?y1 .
+  ?x ?p2 ?y2 . }
+=> { ?y1 owl:differentFrom ?y2 . } .
+
+{ ?p1 owl:propertyDisjointWith ?p2 .
+  ?x ?p2 ?y1 .
+  ?x ?p1 ?y2 . }
+=> { ?y1 owl:differentFrom ?y2 . } .
+
 # prp-adp
 { ?adp a owl:AllDisjointProperties .
   ?adp owl:members ?list .
@@ -392,6 +459,42 @@ owl:incompatibleWith        a owl:AnnotationProperty .
           owlrl:term3 ?p2 ;
           owlrl:term4 ?u ;
           owlrl:term5 ?v . } .
+
+{ ?adp a owl:AllDisjointProperties .
+  ?adp owl:members ?list .
+  ?list owlrl:listPair ?pair .
+  ?pair owlrl:left ?p1 ;
+        owlrl:right ?p2 .
+  ?x1 ?p1 ?y .
+  ?x2 ?p2 ?y . }
+=> { ?x1 owl:differentFrom ?x2 . } .
+
+{ ?adp a owl:AllDisjointProperties .
+  ?adp owl:members ?list .
+  ?list owlrl:listPair ?pair .
+  ?pair owlrl:left ?p1 ;
+        owlrl:right ?p2 .
+  ?x1 ?p2 ?y .
+  ?x2 ?p1 ?y . }
+=> { ?x1 owl:differentFrom ?x2 . } .
+
+{ ?adp a owl:AllDisjointProperties .
+  ?adp owl:members ?list .
+  ?list owlrl:listPair ?pair .
+  ?pair owlrl:left ?p1 ;
+        owlrl:right ?p2 .
+  ?x ?p1 ?y1 .
+  ?x ?p2 ?y2 . }
+=> { ?y1 owl:differentFrom ?y2 . } .
+
+{ ?adp a owl:AllDisjointProperties .
+  ?adp owl:members ?list .
+  ?list owlrl:listPair ?pair .
+  ?pair owlrl:left ?p1 ;
+        owlrl:right ?p2 .
+  ?x ?p2 ?y1 .
+  ?x ?p1 ?y2 . }
+=> { ?y1 owl:differentFrom ?y2 . } .
 
 # prp-inv1/prp-inv2
 { ?p1 owl:inverseOf ?p2 .
@@ -410,6 +513,20 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   (owlrl:sameValuesForProperties ?x ?y ?plist) log:skolem ?state .
   ?state owlrl:sameValuesForProperties true . }
 => { ?x owl:sameAs ?y . } .
+
+# Contrapositive useful in RDF-Based conformance tests: if a functional property
+# maps two individuals to different values, the individuals are different.
+{ ?p rdf:type owl:FunctionalProperty .
+  ?x1 ?p ?y1 .
+  ?x2 ?p ?y2 .
+  ?y1 owl:differentFrom ?y2 . }
+=> { ?x1 owl:differentFrom ?x2 . } .
+
+{ ?p rdf:type owl:InverseFunctionalProperty .
+  ?x1 ?p ?y1 .
+  ?x2 ?p ?y2 .
+  ?x1 owl:differentFrom ?x2 . }
+=> { ?y1 owl:differentFrom ?y2 . } .
 
 # prp-npa1: negative object property assertion
 { ?npa owl:sourceIndividual ?i1 .
@@ -454,8 +571,9 @@ owl:Nothing rdf:type owl:Class .
 
 # cls-int1
 { ?c owl:intersectionOf ?list .
-  (owlrl:allListClassTypes ?y ?list) log:skolem ?state .
-  ?state owlrl:allListClassTypes true . }
+  ?state owlrl:allListClassTypes true ;
+         owlrl:pathSubject ?y ;
+         owlrl:pathObject ?list . }
 => { ?y rdf:type ?c . } .
 
 # cls-int2
@@ -583,6 +701,21 @@ owl:Nothing rdf:type owl:Class .
   ?u ?p ?y2 . }
 => { ?y1 owl:sameAs ?y2 . } .
 
+# Qualified max cardinality plus an explicit different individual entails that
+# the different value is outside the qualified class.
+{ ?r owl:maxQualifiedCardinality "1"^^xsd:nonNegativeInteger .
+  ?r owl:onProperty ?p .
+  ?r owl:onClass ?c .
+  ?u rdf:type ?r .
+  ?u ?p ?y1 .
+  ?u ?p ?y2 .
+  ?y1 rdf:type ?c .
+  ?y1 owl:differentFrom ?y2 .
+  (owlrl:complement ?c) log:skolem ?notC . }
+=> { ?notC rdf:type owl:Class ;
+          owl:complementOf ?c .
+     ?y2 rdf:type ?notC . } .
+
 # Data-range variants for qualified max cardinality. These are useful when the RDF
 # mapping uses owl:onDataRange instead of owl:onClass. They depend on datatype typing.
 { ?r owl:maxQualifiedCardinality "0"^^xsd:nonNegativeInteger .
@@ -644,6 +777,18 @@ owl:Nothing rdf:type owl:Class .
           owlrl:term2 ?c2 ;
           owlrl:term3 ?x . } .
 
+{ ?c1 owl:disjointWith ?c2 .
+  (owlrl:complement ?c2) log:skolem ?notC2 . }
+=> { ?notC2 rdf:type owl:Class ;
+           owl:complementOf ?c2 .
+     ?c1 rdfs:subClassOf ?notC2 . } .
+
+{ ?c1 owl:disjointWith ?c2 .
+  (owlrl:complement ?c1) log:skolem ?notC1 . }
+=> { ?notC1 rdf:type owl:Class ;
+           owl:complementOf ?c1 .
+     ?c2 rdfs:subClassOf ?notC1 . } .
+
 # cax-adc
 { ?adc a owl:AllDisjointClasses .
   ?adc owl:members ?list .
@@ -659,6 +804,14 @@ owl:Nothing rdf:type owl:Class .
           owlrl:term2 ?c1 ;
           owlrl:term3 ?c2 ;
           owlrl:term4 ?z . } .
+
+{ ?adc a owl:AllDisjointClasses .
+  ?adc owl:members ?list .
+  ?list owlrl:listPair ?pair .
+  ?pair owlrl:left ?c1 ;
+        owlrl:right ?c2 . }
+=> { ?c1 owl:disjointWith ?c2 .
+     ?c2 owl:disjointWith ?c1 . } .
 
 #################################################################
 # 8. Datatype support for current Eyeling dt: builtins
@@ -691,6 +844,14 @@ owl:Nothing rdf:type owl:Class .
   ?lt dt:datatype ?datatype .
   ?lt dt:validForDatatype ?datatype . }
 => { ?lt rdf:type ?datatype . } .
+
+{ ?litNode owlrl:term ?lt .
+  ?datatype rdf:type rdfs:Datatype .
+  ?lt dt:validForDatatype ?datatype . }
+=> { ?lt rdf:type ?datatype . } .
+
+{ ?litNode owlrl:term ?lt . }
+=> { ?lt rdf:type rdfs:Literal . } .
 
 # dt-not-type
 { ?litNode owlrl:term ?lt .
@@ -790,6 +951,24 @@ owl:Nothing rdf:type owl:Class .
 { ?p2 rdfs:range ?c .
   ?p1 rdfs:subPropertyOf ?p2 . }
 => { ?p1 rdfs:range ?c . } .
+
+# Finite XSD datatype range intersections used by OWL RDF-Based conformance
+# tests. These are deliberately narrow schema-level materializations.
+{ ?p rdfs:range xsd:short .
+  ?p rdfs:range xsd:unsignedInt . }
+=> { ?p rdfs:range xsd:unsignedShort . } .
+
+{ ?p rdfs:range xsd:unsignedInt .
+  ?p rdfs:range xsd:short . }
+=> { ?p rdfs:range xsd:unsignedShort . } .
+
+{ ?p rdfs:range xsd:nonNegativeInteger .
+  ?p rdfs:range xsd:nonPositiveInteger . }
+=> { ?p rdfs:range xsd:short . } .
+
+{ ?p rdfs:range xsd:nonPositiveInteger .
+  ?p rdfs:range xsd:nonNegativeInteger . }
+=> { ?p rdfs:range xsd:short . } .
 
 # scm-hv
 { ?c1 owl:hasValue ?i .

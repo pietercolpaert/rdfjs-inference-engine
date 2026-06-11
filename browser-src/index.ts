@@ -13,8 +13,25 @@ const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const OWLRL = 'https://example.org/owlrl-n3#';
 const INTERNAL_HELPER_PREDICATES = new Set([
+  OWLRL + 'listRoot',
+  OWLRL + 'listMember',
+  OWLRL + 'listPair',
+  OWLRL + 'left',
+  OWLRL + 'right',
+  OWLRL + 'allListClassTypes',
+  OWLRL + 'sameValuesForProperties',
+  OWLRL + 'propertyChainHolds',
+  OWLRL + 'pathChain',
+  OWLRL + 'pathSubject',
+  OWLRL + 'pathObject',
   OWLRL + 'term',
   OWLRL + 'canonicalLiteral',
+  OWLRL + 'rule',
+  OWLRL + 'term1',
+  OWLRL + 'term2',
+  OWLRL + 'term3',
+  OWLRL + 'term4',
+  OWLRL + 'term5',
 ]);
 
 const reasonStream = (eyeling as any).reasonStream;
@@ -32,6 +49,13 @@ export interface InferenceEngineOptions {
   runtime?: string;
   dataFactory?: DataFactory;
   runtimeCompiler?: RuntimeCompiler;
+  outputMode?: InferenceOutputMode;
+}
+
+export type InferenceOutputMode = 'application' | 'conformance';
+
+export interface InferenceOptions {
+  outputMode?: InferenceOutputMode;
 }
 
 export interface LoadOptions {
@@ -60,12 +84,15 @@ type Listener = (...args: any[]) => void;
 
 export class InferenceEngine {
   private runtime = '';
+  private staticClosure: Quad[] = [];
   private readonly dataFactory: DataFactory;
   private readonly runtimeCompiler: RuntimeCompiler;
+  private readonly outputMode: InferenceOutputMode;
 
   public constructor(options: InferenceEngineOptions = {}) {
     this.dataFactory = options.dataFactory ?? (RdfParserDataFactory as unknown as DataFactory);
     this.runtimeCompiler = options.runtimeCompiler ?? defaultRuntimeCompiler;
+    this.outputMode = options.outputMode ?? 'application';
 
     if (options.runtime) {
       this.runtime = options.runtime;
@@ -74,6 +101,11 @@ export class InferenceEngine {
 
   public getRuntime(): string {
     return this.runtime;
+  }
+
+  public getStaticClosure(options: InferenceOptions = {}): Quad[] {
+    const outputMode = options.outputMode ?? this.outputMode;
+    return this.staticClosure.filter((quad) => shouldEmitQuad(quad, outputMode));
   }
 
   public load(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): string {
@@ -86,12 +118,14 @@ export class InferenceEngine {
       skipUnsupportedRdfJs: true,
     });
 
+    this.staticClosure = (closure.closureQuads ?? []) as Quad[];
+
     const runtimeCompiler = options.runtimeCompiler ?? this.runtimeCompiler;
     this.runtime = runtimeCompiler({
       profiles: normalizedProfiles,
       profileN3,
       vocabulary: vocabularyQuads,
-      closure: (closure.closureQuads ?? []) as Quad[],
+      closure: this.staticClosure,
       dataFactory: this.dataFactory,
       options,
     });
@@ -99,10 +133,11 @@ export class InferenceEngine {
     return this.runtime;
   }
 
-  public *infer(data: Quad[]): Generator<Quad> {
+  public *infer(data: Quad[], options: InferenceOptions = {}): Generator<Quad> {
     this.assertLoaded();
     const derived: Quad[] = [];
     const seen = new Set<string>();
+    const outputMode = options.outputMode ?? this.outputMode;
 
     reasonStream({ n3: this.runtime, quads: data }, {
       rdfjs: true,
@@ -110,11 +145,11 @@ export class InferenceEngine {
       skipUnsupportedRdfJs: true,
       onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
         if (item.quad) {
-          addDerived(derived, seen, item.quad);
+          addDerived(derived, seen, item.quad, outputMode);
         }
         if (item.quads) {
           for (const quad of item.quads) {
-            addDerived(derived, seen, quad);
+            addDerived(derived, seen, quad, outputMode);
           }
         }
       },
@@ -326,8 +361,8 @@ function blankNodeLabel(value: string): string {
     : `b${Array.from(value).map((character) => character.codePointAt(0)?.toString(16).padStart(2, '0') ?? '').join('')}`;
 }
 
-function addDerived(output: Quad[], seen: Set<string>, quad: Quad): void {
-  if (isReflexiveSameAs(quad) || isInternalHelperQuad(quad) || hasLiteralSubject(quad)) {
+function addDerived(output: Quad[], seen: Set<string>, quad: Quad, outputMode: InferenceOutputMode): void {
+  if (!shouldEmitQuad(quad, outputMode)) {
     return;
   }
 
@@ -336,6 +371,18 @@ function addDerived(output: Quad[], seen: Set<string>, quad: Quad): void {
     seen.add(key);
     output.push(quad);
   }
+}
+
+function shouldEmitQuad(quad: Quad, outputMode: InferenceOutputMode): boolean {
+  if (isInternalHelperQuad(quad)) {
+    return false;
+  }
+  if (isReflexiveSameAs(quad)) {
+    return false;
+  }
+
+  return outputMode === 'conformance'
+    || !hasLiteralSubject(quad);
 }
 
 function isReflexiveSameAs(quad: Quad): boolean {

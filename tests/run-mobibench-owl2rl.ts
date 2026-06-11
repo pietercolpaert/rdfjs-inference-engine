@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import AdmZip from 'adm-zip';
 import type { Quad } from '@rdfjs/types';
 import { InferenceEngine } from '../src';
-import { graphContainsAll, parseRdf, readCachedBinaryUrl } from './utils';
+import { addReflexiveSameAsClosure, graphContainsAll, parseRdf, readCachedBinaryUrl } from './utils';
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const OWLRL = 'https://example.org/owlrl-n3#';
@@ -83,6 +83,7 @@ interface TestResult {
 interface ParsedArgs {
   all: boolean;
   list: boolean;
+  conformance: boolean;
   ids?: Set<string>;
   archiveUrl: string;
   cachePath: string;
@@ -112,16 +113,19 @@ async function main(): Promise<void> {
   }
 
   const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
-  const prepared = new InferenceEngine();
+  const outputMode = args.conformance || args.all ? 'conformance' : 'application';
+  const prepared = new InferenceEngine({ outputMode });
   prepared.load(profile, []);
   const runtime = prepared.getRuntime();
+  const staticClosure = outputMode === 'conformance' ? prepared.getStaticClosure({ outputMode }) : [];
 
   const results: TestResult[] = [];
   for (const test of selected) {
     try {
       const premise = parseRdf(test.premise ?? test.graph ?? '');
-      const reasoner = new InferenceEngine({ runtime });
-      const closure = [...premise, ...reasoner.infer(premise)];
+      const reasoner = new InferenceEngine({ runtime, outputMode });
+      const rawClosure = [...staticClosure, ...premise, ...reasoner.infer(premise, { outputMode })];
+      const closure = outputMode === 'conformance' ? addReflexiveSameAsClosure(rawClosure) : rawClosure;
       const ok = evaluateTest(test, closure);
 
       results.push({ id: test.id, kind: test.kind, ok });
@@ -194,6 +198,7 @@ function parseArgs(args: string[]): ParsedArgs {
   const parsed: ParsedArgs = {
     all: false,
     list: false,
+    conformance: false,
     archiveUrl: process.env.MOBIBENCH_OWL2RL_ARCHIVE_URL ?? DEFAULT_ARCHIVE_URL,
     cachePath: process.env.MOBIBENCH_OWL2RL_CACHE ?? DEFAULT_CACHE_PATH,
   };
@@ -201,6 +206,8 @@ function parseArgs(args: string[]): ParsedArgs {
   for (const arg of args) {
     if (arg === '--all') {
       parsed.all = true;
+    } else if (arg === '--conformance') {
+      parsed.conformance = true;
     } else if (arg === '--list') {
       parsed.list = true;
     } else if (arg.startsWith('--ids=')) {

@@ -1,10 +1,12 @@
-import { createWriteStream, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { Readable } from 'node:stream';
 import { get } from 'node:https';
 import type { Quad, Term } from '@rdfjs/types';
 import { DataFactory, isMessageQuad, Parser } from 'rdf-parser-ts';
 import { RdfXmlParser } from 'rdfxml-streaming-parser';
+
+const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 
 export function parseRdf(source: string): Quad[] {
   const parser = new Parser({ factory: DataFactory });
@@ -29,7 +31,7 @@ export async function parseRdfXml(source: string, baseIRI: string): Promise<Quad
 }
 
 export async function readCachedUrl(url: string, cachePath: string): Promise<string> {
-  if (existsSync(cachePath)) {
+  if (existsSync(cachePath) && statSync(cachePath).size > 0) {
     return readFileSync(cachePath, 'utf8');
   }
 
@@ -44,7 +46,7 @@ export async function readCachedUrl(url: string, cachePath: string): Promise<str
 }
 
 export async function readCachedBinaryUrl(url: string, cachePath: string): Promise<Buffer> {
-  if (existsSync(cachePath)) {
+  if (existsSync(cachePath) && statSync(cachePath).size > 0) {
     return readFileSync(cachePath);
   }
 
@@ -93,6 +95,20 @@ export function graphContainsAll(actual: Quad[], expected: Quad[]): boolean {
 
     return false;
   }
+}
+
+export function addReflexiveSameAsClosure(quads: Quad[]): Quad[] {
+  const result = [...quads];
+  const seen = new Set(result.map(quadKey));
+  for (const term of allConcreteTerms(quads)) {
+    const quad = DataFactory.quad(term as any, DataFactory.namedNode(OWL_SAME_AS), term as any) as Quad;
+    const key = quadKey(quad);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(quad);
+    }
+  }
+  return result;
 }
 
 export function quadKey(quad: Quad): string {
@@ -149,6 +165,18 @@ function candidateTerms(quads: Quad[]): Set<Term> {
   for (const quad of quads) {
     for (const term of [quad.subject, quad.object]) {
       if (term.termType === 'NamedNode' || term.termType === 'BlankNode') {
+        termsByKey.set(termKey(term), term);
+      }
+    }
+  }
+  return new Set(termsByKey.values());
+}
+
+function allConcreteTerms(quads: Quad[]): Set<Term> {
+  const termsByKey = new Map<string, Term>();
+  for (const quad of quads) {
+    for (const term of [quad.subject, quad.predicate, quad.object, quad.graph]) {
+      if (term.termType !== 'DefaultGraph') {
         termsByKey.set(termKey(term), term);
       }
     }
