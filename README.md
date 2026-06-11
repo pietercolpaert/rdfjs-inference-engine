@@ -41,42 +41,6 @@ The core idea is:
 
 This is useful when a service receives RDF, enriches it immediately, and stores or publishes materialized triples so downstream systems can query ordinary RDF without running the same inference step themselves.
 
-### 1. N3 rules as profiles
-
-The idea is to use one or all of the N3 files shipped with this package. In Node.js, calling `reasoner.load(background)` loads all `.n3` files from the package `rules/` directory by default. The browser playground does the same at build time by bundling every `.n3` file from `rules/`.
-
-#### rules/owl2rl-eyeling.n3
-
-This contains an N3 implementation-oriented OWL 2 RL/RDF ruleset for Eyeling. The engine treats this as ordinary N3 text; it does not hard-code OWL or RDFS semantics.
-
-The OWL 2 RL profile includes the RDFS entailments needed by the example, including rules for:
-
-- `rdfs:subClassOf`
-- `rdfs:subPropertyOf`
-- `rdfs:domain`
-- `rdfs:range`
-
-It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples, internal OWL 2 RL datatype helper triples, and datatype-rule facts with literals in subject position from emitted inference output because they are usually closure-maintenance facts rather than useful application data.
-
-#### rules/skos-entailment.n3
-
-This is a SKOS Core profile. It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
-
-The bundled rulesets are meant to be loaded as rule profiles. In normal projects, keep any additional rule profiles vendored/versioned and pass your own background quads to `load()`.
-
-By default, load all bundled rule profiles with only the background dataset:
-
-```ts
-const background = parseToQuads(readFileSync('examples/owl-skos-catalog/ontology.n3', 'utf8'));
-const reasoner = new InferenceEngine();
-reasoner.load(background);
-
-const data = parseToQuads(readFileSync('examples/owl-skos-catalog/input.trig', 'utf8'));
-const inferred = Array.from(reasoner.infer(data));
-```
-
-You can still pass one profile or an array of profiles explicitly if you want to override the default.
-
 ### TypeScript API
 
 The main class is `InferenceEngine`.
@@ -118,6 +82,43 @@ function parseToQuads(source: string): Quad[] {
 - `infer(quads)` to infer over an array of RDF-JS quads and return a generator of inferred RDF-JS quads;
 - `createInferenceStream()` / `stream()` to create an object-mode transform stream where each incoming iterable of quads produces one array of inferred quads.
 
+### N3 rules as profiles
+
+The idea is to use one or all of the N3 files shipped with this package. In Node.js, calling `reasoner.load(background)` loads all `.n3` files from the package `rules/` directory by default. The browser playground does the same at build time by bundling every `.n3` file from `rules/`.
+
+#### rules/owl2rl-eyeling.n3
+
+This contains an N3 implementation-oriented OWL 2 RL/RDF ruleset for Eyeling. The engine treats this as ordinary N3 text; it does not hard-code OWL or RDFS semantics.
+
+The OWL 2 RL profile includes the RDFS entailments needed by the example, including rules for:
+
+- `rdfs:subClassOf`
+- `rdfs:subPropertyOf`
+- `rdfs:domain`
+- `rdfs:range`
+
+It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples, internal OWL 2 RL datatype helper triples, and datatype-rule facts with literals in subject position from emitted inference output because they are usually closure-maintenance facts rather than useful application data.
+
+#### rules/skos-entailment.n3
+
+This is a SKOS Core profile. It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
+
+The bundled rulesets are meant to be loaded as rule profiles. In normal projects, keep any additional rule profiles vendored/versioned and pass your own background quads to `load()`.
+
+By default, load all bundled rule profiles with only the background dataset:
+
+```ts
+const background = parseToQuads(readFileSync('examples/owl-skos-catalog/ontology.n3', 'utf8'));
+const reasoner = new InferenceEngine();
+reasoner.load(background);
+
+const data = parseToQuads(readFileSync('examples/owl-skos-catalog/input.trig', 'utf8'));
+const inferred = Array.from(reasoner.infer(data));
+```
+
+You can still pass one profile or an array of profiles explicitly if you want to override the default.
+
+
 ### Browser bundle and playground
 
 The browser build creates a minified global bundle:
@@ -154,159 +155,19 @@ Git hooks are tracked in `.githooks/`. `npm install` or `npm run hooks:install` 
 
 ## Examples
 
-All examples are self-contained folders under `examples/`. Each runnable example keeps its own `run.ts` next to its `ontology.n3`, input, and expected output fixture. Shared example utilities live in `examples/util.ts`; there is no separate `examples/src/` folder.
+All examples are self-contained folders under `examples/`. Each runnable example keeps its own `README.md`, `run.ts`, ontology/background file, input file, and expected output fixture. Shared example utilities live in `examples/util.ts`; there is no separate `examples/src/` folder.
 
-### Run the transit fleet example
+- [examples/transit-fleet/README.md](examples/transit-fleet/README.md) — minimal OWL 2 RL/RDFS subclass, domain, and range materialization.
+- [examples/shipment-logistics/README.md](examples/shipment-logistics/README.md) — broader OWL 2 RL materialization features.
+- [examples/skos-taxonomy/README.md](examples/skos-taxonomy/README.md) — SKOS Core taxonomy materialization.
+- [examples/owl-skos-catalog/README.md](examples/owl-skos-catalog/README.md) — combined OWL 2 RL + SKOS Core reasoning.
+- [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
+- [examples/stateful-materialization/README.md](examples/stateful-materialization/README.md) — stateful RDF Messages materialization across messages.
 
-From the repository root:
-
-```bash
-./scripts/run-example.sh
-# or:
-npm run example:transit-fleet
-```
-
-The transit fleet example is self-contained in `examples/transit-fleet/`:
-
-- `ontology.n3`
-- `input.trig`
-- `expected-output.n3`
-- `run.ts`
-
-The script uses the TypeScript library and has two phases.
-
-First, it materializes the ruleset plus background vocabulary without input data, then
-uses the default compiler to create a generated runtime file:
-
-```text
-generated/transit-fleet-runtime.n3
-```
-
-That generated file contains the OWL 2 RL rule profile plus the precomputed background closure. Second, Eyeling processes ordinary RDF input using only this generated runtime file plus the input file. Because this second pass runs without `--stream-messages` and without `log:query`, the library returns only newly derived quads from Eyeling's `onDerived` callback.
-
-Expected output:
-
-```n3
-@prefix : <https://example.org/transit#>.
-
-:bus-42 a :Vehicle.
-:operator-7 a :Operator.
-:bus-42 a :Bus.
-```
-
-The input triples themselves are not returned; Eyeling emits the newly derived
-triples from the generated runtime.
-
-To check the example mechanically:
+Run all example output checks from the repository root with:
 
 ```bash
-npm run example:transit-fleet --silent > /tmp/owl2rl-transit-fleet-output.n3
-diff -u examples/transit-fleet/expected-output.n3 /tmp/owl2rl-transit-fleet-output.n3
-```
-
-### Run the shipment logistics OWL 2 RL example
-
-The more elaborate example in `examples/shipment-logistics/` exercises OWL 2 RL features beyond subclass/domain/range reasoning:
-
-- `ontology.n3`
-- `input.trig`
-- `expected-selected-output.n3`
-- `run.ts`
-
-- `owl:equivalentClass`
-- `owl:equivalentProperty`
-- `owl:inverseOf`
-- `owl:SymmetricProperty`
-- `owl:TransitiveProperty`
-- `owl:FunctionalProperty`
-- `owl:InverseFunctionalProperty`
-- `owl:hasValue`
-- `owl:someValuesFrom`
-- `owl:allValuesFrom`
-
-Run it with:
-
-```bash
-npm run example:shipment-logistics
-```
-
-The script asserts that all selected expected entailments are present in the closure, then prints only that selected subset so the fixture stays readable:
-
-```bash
-npm run test:shipment-logistics
-```
-
-The selected expected output is stored in `examples/shipment-logistics/expected-selected-output.n3`.
-
-### Run the SKOS taxonomy example
-
-The SKOS-only example in `examples/skos-taxonomy/` uses `rules/skos-entailment.n3` to materialize SKOS Core consequences such as `skos:broaderTransitive`, `skos:narrower`, `skos:semanticRelation`, `rdfs:label`, `skos:note`, and concept-scheme top-concept links.
-
-Run it with:
-
-```bash
-npm run example:skos-taxonomy
-```
-
-Check its selected expected output with:
-
-```bash
-npm run test:skos-taxonomy
-```
-
-### Run the combined OWL 2 RL + SKOS Core example
-
-The combined example in `examples/owl-skos-catalog/` loads both rule sets at the same time. OWL/RDFS rules infer that catalog topics are SKOS concepts and map a domain-specific property to `skos:related`; SKOS rules then infer the symmetric related link, `skos:semanticRelation`, and SKOS domain/range typing.
-
-Run it with:
-
-```bash
-npm run example:owl-skos-catalog
-```
-
-Check its selected expected output with:
-
-```bash
-npm run test:owl-skos-catalog
-```
-
-### Run the RDF Messages example
-
-The streaming example in `examples/transit-messages/` uses an RDF Messages log as input and emits inferred RDF Messages as output.
-
-Run it with:
-
-```bash
-npm run example:transit-messages
-```
-
-Check the RDF Messages fixture with:
-
-```bash
-npm run test:transit-messages
-```
-
-### Run the stateful materialization example
-
-The example in `examples/stateful-materialization/` demonstrates why stream enrichment sometimes needs a materialized state graph instead of processing each RDF Message independently.
-
-Its ontology says that a `:Mother` is equivalent to the intersection of `:Female` and `:Parent`, and that the object of `:hasParent` is a `:Parent`. The input deliberately splits the evidence across two RDF Messages:
-
-1. first message: `:alice a :Female`;
-2. second message: `:bob :hasParent :alice`.
-
-Without stateful materialization, the second message can infer only that `:alice a :Parent`; it cannot also infer `:alice a :Mother`, because the `:Female` assertion was in a previous message. With `--stateful-materialization`, the runner stores each asserted message and each inferred delta in a local materialized state graph, then reasons over that state plus the next message. The second message can then infer that `:alice a :Mother`.
-
-Run the stateful version with:
-
-```bash
-npm run example:stateful-materialization
-```
-
-Compare the stateless and stateful fixtures with:
-
-```bash
-npm run test:stateful-materialization
+npm run test:examples
 ```
 
 ## MobiBench OWL 2 RL tests
