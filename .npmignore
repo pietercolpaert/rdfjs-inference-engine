@@ -1,0 +1,32 @@
+# Development dependencies and local installs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Source and development-only files
+src/
+browser-src/
+examples/
+tests/
+scripts/
+tsconfig.json
+
+# Generated/local runtime artifacts
+generated/
+coverage/
+.cache/
+*.tsbuildinfo
+
+# Repository metadata and automation
+.git/
+.github/
+.githooks/
+.gitignore
+
+# Editor/OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
