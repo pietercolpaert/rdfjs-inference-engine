@@ -8,6 +8,9 @@ type InputMode = 'text' | 'url';
 type Editor = {
   getValue(): string;
   setValue(value: string): void;
+  replaceRange?(replacement: string, from: { line: number; ch: number }): void;
+  lastLine?(): number;
+  getLine?(line: number): string;
   refresh(): void;
   on(event: string, listener: () => void): void;
 };
@@ -37,6 +40,7 @@ type ActiveRun = {
   finishedAt?: number;
   elapsedTimer?: number;
   runtimeMessage?: string;
+  statusMessage?: string;
 };
 
 type WorkerRequest = {
@@ -91,6 +95,8 @@ const controls = {
 let suppressStateUpdate = false;
 let stateUpdateTimer = 0;
 let activeRun: ActiveRun | null = null;
+let outputAppendBuffer = '';
+let outputAppendTimer = 0;
 
 if (controls.rulesSummary) {
   controls.rulesSummary.textContent = `Bundled inference profiles: ${bundledRuleFiles.join(', ') || 'none'}`;
@@ -154,9 +160,10 @@ async function runInference(): Promise<void> {
   try {
     setRunning(true);
     controls.runtimeStats.textContent = '';
+    clearOutputAppendBuffer();
     startElapsedCounter(run);
-    setStatus('Preparing inference…');
     editors.outputText.setValue('');
+    setRunStatus(run, 'Preparing inference…');
 
     const backgroundSource = await getSource('background', run.controller.signal);
     throwIfAborted(run.controller.signal);
@@ -177,14 +184,16 @@ async function runInference(): Promise<void> {
       dataUrl,
     });
   } catch (error) {
-    finishElapsedCounter(run);
     if (isAbortError(error)) {
-      setStatus(`Stopped after ${formatDuration(getElapsedMs(run))}. No more messages or quads will be processed.`);
+      flushOutputAppendBuffer();
+      run.statusMessage = 'Stopped. No more messages or quads will be processed.';
     } else {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus(`Error after ${formatDuration(getElapsedMs(run))}: ${message}`);
+      clearOutputAppendBuffer();
+      run.statusMessage = `Error: ${message}`;
       editors.outputText.setValue(message);
     }
+    finishElapsedCounter(run);
   } finally {
     finishElapsedCounter(run);
     if (activeRun === run) {
@@ -210,18 +219,21 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
       const message = event.data;
       if (message.type === 'status') {
-        setStatus(message.message);
+        setRunStatus(run, message.message);
       } else if (message.type === 'runtime') {
         run.runtimeMessage = message.message;
         updateElapsedCounter(run);
       } else if (message.type === 'append') {
-        editors.outputText.setValue(editors.outputText.getValue() + message.chunk);
+        appendOutput(message.chunk);
       } else if (message.type === 'result') {
-        finishElapsedCounter(run);
+        run.statusMessage = message.status;
         if (message.output !== undefined) {
+          clearOutputAppendBuffer();
           editors.outputText.setValue(message.output);
+        } else {
+          flushOutputAppendBuffer();
         }
-        setStatus(`${message.status} Total elapsed ${formatDuration(getElapsedMs(run))}.`);
+        finishElapsedCounter(run);
         resolve();
       } else if (message.type === 'error') {
         reject(new Error(message.message));
@@ -309,7 +321,7 @@ async function processUrlInput(api, reasoner, url, compiledAt, started) {
     bytes += read.value.byteLength;
     const text = decoder.decode(read.value, { stream: true });
     handleParsedItems(state, state.parser.write(text));
-    self.postMessage({ type: 'status', message: progressMessage(state, 'Streaming input: read ' + Math.round(bytes / 1024) + ' KiB') });
+    postProgressStatus(state, progressMessage(state, 'Streaming input: read ' + Math.round(bytes / 1024) + ' KiB'));
   }
 
   const tail = decoder.decode();
@@ -335,6 +347,7 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel) {
     parsedQuadCount: 0,
     processedMessageCount: 0,
     inferredCount: 0,
+    lastStatusAt: 0,
     writer: null,
   };
 }
@@ -381,11 +394,36 @@ function processCurrentMessage(state) {
   if (!state.writer) {
     state.writer = createMessageWriter(state.api);
   }
-  self.postMessage({ type: 'status', message: 'Processing message ' + (state.currentMessageCounter + 1) + ' after parsing ' + state.parsedQuadCount + ' quad(s)…' });
+  const started = performance.now();
+  const messageNumber = state.currentMessageCounter + 1;
+  postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
   const inferred = Array.from(state.reasoner.infer(state.currentMessage));
   state.writer.addMessage(inferred);
   state.inferredCount += inferred.length;
   state.processedMessageCount += 1;
+  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), inferred ' + state.inferredCount + ' quad(s)…');
+}
+
+function postProgressStatus(state, message, force = false) {
+  const now = performance.now();
+  if (!force && now - state.lastStatusAt < 500) {
+    return;
+  }
+  state.lastStatusAt = now;
+  self.postMessage({ type: 'status', message });
+}
+
+function formatWorkerDuration(ms) {
+  if (ms < 1000) {
+    return ms.toFixed(0) + ' ms';
+  }
+  const seconds = ms / 1000;
+  if (seconds < 60) {
+    return seconds.toFixed(1) + ' s';
+  }
+  const minutes = Math.floor(seconds / 60);
+  const wholeSeconds = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return minutes + ' min ' + wholeSeconds + ' s';
 }
 
 function createMessageWriter(api) {
@@ -464,9 +502,14 @@ function setRunning(running: boolean): void {
   controls.stopButton.disabled = !running;
 }
 
+function setRunStatus(run: ActiveRun, message: string): void {
+  run.statusMessage = message;
+  renderRunStatus(run);
+}
+
 function startElapsedCounter(run: ActiveRun): void {
   updateElapsedCounter(run);
-  run.elapsedTimer = window.setInterval(() => updateElapsedCounter(run), 100);
+  run.elapsedTimer = window.setInterval(() => updateElapsedCounter(run), 250);
 }
 
 function finishElapsedCounter(run: ActiveRun): void {
@@ -487,6 +530,48 @@ function updateElapsedCounter(run: ActiveRun): void {
     parts.push(run.runtimeMessage);
   }
   controls.runtimeStats.textContent = parts.join(' · ');
+  renderRunStatus(run);
+}
+
+function renderRunStatus(run: ActiveRun): void {
+  if (!run.statusMessage) {
+    return;
+  }
+  const label = run.finishedAt === undefined ? 'Elapsed' : 'Total elapsed';
+  setStatus(`${run.statusMessage} ${label} ${formatDuration(getElapsedMs(run))}.`);
+}
+
+function appendOutput(chunk: string): void {
+  outputAppendBuffer += chunk;
+  if (!outputAppendTimer) {
+    outputAppendTimer = window.setTimeout(flushOutputAppendBuffer, 100);
+  }
+}
+
+function flushOutputAppendBuffer(): void {
+  if (outputAppendTimer) {
+    window.clearTimeout(outputAppendTimer);
+    outputAppendTimer = 0;
+  }
+  if (!outputAppendBuffer) {
+    return;
+  }
+  const chunk = outputAppendBuffer;
+  outputAppendBuffer = '';
+  if (editors.outputText.replaceRange && editors.outputText.lastLine && editors.outputText.getLine) {
+    const line = editors.outputText.lastLine();
+    editors.outputText.replaceRange(chunk, { line, ch: editors.outputText.getLine(line).length });
+  } else {
+    editors.outputText.setValue(editors.outputText.getValue() + chunk);
+  }
+}
+
+function clearOutputAppendBuffer(): void {
+  if (outputAppendTimer) {
+    window.clearTimeout(outputAppendTimer);
+    outputAppendTimer = 0;
+  }
+  outputAppendBuffer = '';
 }
 
 function getElapsedMs(run: ActiveRun): number {
