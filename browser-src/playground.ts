@@ -22,7 +22,24 @@ type PlaygroundState = {
   dataText?: string;
 };
 
-const api = (window as any).RdfjsInferenceEngine;
+type ActiveRun = {
+  controller: AbortController;
+  worker?: Worker;
+};
+
+type WorkerRequest = {
+  apiScriptUrl: string;
+  bundledRules: string;
+  bundledRuleCount: number;
+  backgroundSource: string;
+  dataSource: string;
+};
+
+type WorkerMessage =
+  | { type: 'status'; message: string }
+  | { type: 'runtime'; message: string }
+  | { type: 'result'; output: string; status: string }
+  | { type: 'error'; message: string };
 
 const defaultState = {
   backgroundMode: 'text' as InputMode,
@@ -47,21 +64,26 @@ const controls = {
   dataUrlPanel: getElement('dataUrlPanel'),
   dataTextPanel: getElement('dataTextPanel'),
   runButton: getButton('runButton'),
+  stopButton: getButton('stopButton'),
   resetButton: getButton('resetButton'),
   shareButton: getButton('shareButton'),
   status: getElement('status'),
   runtimeStats: getElement('runtimeStats'),
-  rulesSummary: getElement('rulesSummary'),
+  rulesSummary: getOptionalElement('rulesSummary'),
 };
 
 let suppressStateUpdate = false;
 let stateUpdateTimer = 0;
+let activeRun: ActiveRun | null = null;
 
-controls.rulesSummary.textContent = `Bundled rules: ${bundledRuleFiles.join(', ') || 'none'}`;
+if (controls.rulesSummary) {
+  controls.rulesSummary.textContent = `Bundled rules: ${bundledRuleFiles.join(', ') || 'none'}`;
+}
 loadStateFromHash();
 applyModeVisibility();
 wireControls();
 scheduleStateUpdate();
+setRunning(false);
 setStatus('Ready. Choose URL or text input, then run the bundled rule profile.');
 
 function createEditor(id: string, value: string): Editor {
@@ -81,6 +103,7 @@ function createEditor(id: string, value: string): Editor {
 
 function wireControls(): void {
   controls.runButton.addEventListener('click', () => void runInference());
+  controls.stopButton.addEventListener('click', stopActiveRun);
   controls.resetButton.addEventListener('click', resetDefaults);
   controls.shareButton.addEventListener('click', () => {
     updateHashNow();
@@ -103,69 +126,142 @@ function wireControls(): void {
 }
 
 async function runInference(): Promise<void> {
+  if (activeRun) {
+    return;
+  }
+
+  const run: ActiveRun = { controller: new AbortController() };
+  activeRun = run;
+
   try {
-    controls.runButton.disabled = true;
-    setStatus('Loading RDF, parsing quads, and compiling generated runtime…');
+    setRunning(true);
+    controls.runtimeStats.textContent = '';
+    setStatus('Preparing inference…');
     editors.outputText.setValue('');
 
-    const backgroundSource = await getSource('background');
-    const dataSource = await getSource('data');
-    const background = api.parseRdfOrMessages(backgroundSource);
-    const data = api.parseRdfOrMessages(dataSource);
+    const backgroundSource = await getSource('background', run.controller.signal);
+    throwIfAborted(run.controller.signal);
+    const dataSource = await getSource('data', run.controller.signal);
+    throwIfAborted(run.controller.signal);
 
-    const reasoner = new api.InferenceEngine();
-    const started = performance.now();
-    const runtime = reasoner.load({ n3: bundledRules, label: 'Bundled rules folder profile' }, background.quads);
-    const compiledAt = performance.now();
-
-    controls.runtimeStats.textContent = `${background.quads.length} background quads, ${bundledRuleFiles.length} rule file(s), runtime ${(runtime.length / 1024).toFixed(1)} KiB`;
-
-    if (data.isMessages) {
-      setStatus(`Detected RDF Messages log with ${data.messages.length} message(s). Streaming inference…`);
-      await runStreamingInference(reasoner, data.messages);
-    } else {
-      const inferred = Array.from(reasoner.infer(data.quads));
-      editors.outputText.setValue(await api.writeQuads(inferred, { ex: 'https://example.org/transit#' }));
-      setStatus(`Done. ${inferred.length} inferred quad(s). Compile ${(compiledAt - started).toFixed(0)} ms, infer ${(performance.now() - compiledAt).toFixed(0)} ms.`);
-    }
+    await runWorkerInference(run, {
+      apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', window.location.href).href,
+      bundledRules,
+      bundledRuleCount: bundledRuleFiles.length,
+      backgroundSource,
+      dataSource,
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    setStatus(`Error: ${message}`);
-    editors.outputText.setValue(message);
+    if (isAbortError(error)) {
+      setStatus('Stopped. No more messages or quads will be processed.');
+    } else {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(`Error: ${message}`);
+      editors.outputText.setValue(message);
+    }
   } finally {
-    controls.runButton.disabled = false;
+    if (activeRun === run) {
+      activeRun = null;
+    }
+    run.worker?.terminate();
+    setRunning(false);
   }
 }
 
-async function runStreamingInference(reasoner: any, messages: any[][]): Promise<void> {
-  const inferredMessages: any[][] = [];
-  let inferredCount = 0;
-  let serializationQueue = Promise.resolve();
-  const stream = reasoner.stream();
+function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const worker = createInferenceWorker();
+    run.worker = worker;
 
-  await new Promise<void>((resolve, reject) => {
-    stream.on('data', (inferred: any[]) => {
-      inferredMessages.push(inferred);
-      inferredCount += inferred.length;
-      serializationQueue = serializationQueue.then(async () => {
-        editors.outputText.setValue(await api.writeMessages(inferredMessages));
-      });
-    });
-    stream.on('error', reject);
-    stream.on('end', () => {
-      serializationQueue.then(resolve, reject);
-    });
+    const abort = () => {
+      worker.terminate();
+      reject(new DOMException('Inference was stopped.', 'AbortError'));
+    };
 
-    for (const message of messages) {
-      stream.write(message);
-    }
-    stream.end();
+    run.controller.signal.addEventListener('abort', abort, { once: true });
+
+    worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+      const message = event.data;
+      if (message.type === 'status') {
+        setStatus(message.message);
+      } else if (message.type === 'runtime') {
+        controls.runtimeStats.textContent = message.message;
+      } else if (message.type === 'result') {
+        editors.outputText.setValue(message.output);
+        setStatus(message.status);
+        resolve();
+      } else if (message.type === 'error') {
+        reject(new Error(message.message));
+      }
+    };
+
+    worker.onerror = (event) => {
+      reject(new Error(event.message));
+    };
+
+    worker.postMessage(request);
   });
-
-  setStatus(`Done. Streamed ${messages.length} message(s), ${inferredCount} inferred quad(s) as RDF Messages.`);
 }
 
-async function getSource(kind: 'background' | 'data'): Promise<string> {
+function createInferenceWorker(): Worker {
+  const source = `
+self.onmessage = async (event) => {
+  const request = event.data;
+  try {
+    importScripts(request.apiScriptUrl);
+    const api = self.RdfjsInferenceEngine;
+    if (!api) {
+      throw new Error('Could not load the browser inference engine bundle.');
+    }
+
+    self.postMessage({ type: 'status', message: 'Parsing background knowledge…' });
+    const background = api.parseRdfOrMessages(request.backgroundSource);
+    self.postMessage({ type: 'status', message: 'Parsed ' + background.quads.length + ' background quad(s). Parsing input data…' });
+
+    const data = api.parseRdfOrMessages(request.dataSource);
+    if (data.isMessages) {
+      self.postMessage({ type: 'status', message: 'Parsed ' + data.messages.length + ' message(s) containing ' + data.quads.length + ' quad(s). Compiling runtime…' });
+    } else {
+      self.postMessage({ type: 'status', message: 'Parsed ' + data.quads.length + ' input quad(s). Compiling runtime…' });
+    }
+
+    const reasoner = new api.InferenceEngine();
+    const started = performance.now();
+    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled rules folder profile' }, background.quads);
+    const compiledAt = performance.now();
+    self.postMessage({ type: 'runtime', message: background.quads.length + ' background quads, ' + request.bundledRuleCount + ' rule file(s), runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
+
+    if (data.isMessages) {
+      const inferredMessages = [];
+      let inferredCount = 0;
+      const total = data.messages.length;
+      for (let index = 0; index < total; index += 1) {
+        self.postMessage({ type: 'status', message: 'Processed ' + index + ' of ' + total + ' message(s)…' });
+        const inferred = Array.from(reasoner.infer(data.messages[index]));
+        inferredMessages.push(inferred);
+        inferredCount += inferred.length;
+      }
+      self.postMessage({ type: 'status', message: 'Processed ' + total + ' of ' + total + ' message(s). Serializing ' + inferredCount + ' inferred quad(s)…' });
+      const output = await api.writeMessages(inferredMessages);
+      self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' message(s), inferred ' + inferredCount + ' quad(s) as RDF Messages. Compile ' + (compiledAt - started).toFixed(0) + ' ms, infer ' + (performance.now() - compiledAt).toFixed(0) + ' ms.' });
+    } else {
+      const total = data.quads.length;
+      self.postMessage({ type: 'status', message: 'Processed 0 of ' + total + ' input quad(s)…' });
+      const inferred = Array.from(reasoner.infer(data.quads));
+      self.postMessage({ type: 'status', message: 'Processed ' + total + ' of ' + total + ' input quad(s). Serializing ' + inferred.length + ' inferred quad(s)…' });
+      const output = await api.writeQuads(inferred, { ex: 'https://example.org/transit#' });
+      self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inferred.length + ' quad(s). Compile ' + (compiledAt - started).toFixed(0) + ' ms, infer ' + (performance.now() - compiledAt).toFixed(0) + ' ms.' });
+    }
+  } catch (error) {
+    self.postMessage({ type: 'error', message: error instanceof Error ? error.message : String(error) });
+  }
+};
+`;
+  const blob = new Blob([source], { type: 'text/javascript' });
+  return new Worker(URL.createObjectURL(blob));
+}
+
+async function getSource(kind: 'background' | 'data', signal: AbortSignal): Promise<string> {
   const mode = getMode(kind);
   if (mode === 'text') {
     return kind === 'background' ? editors.backgroundText.getValue() : editors.dataText.getValue();
@@ -177,12 +273,37 @@ async function getSource(kind: 'background' | 'data'): Promise<string> {
     throw new Error(`Enter a ${kind === 'background' ? 'background RDF' : 'data'} URL or switch to text input.`);
   }
 
-  setStatus(`Fetching ${kind === 'background' ? 'background RDF' : 'input data'}…`);
-  const response = await fetch(url);
+  setStatus(`Fetching ${kind === 'background' ? 'background RDF' : 'input data'} before processing…`);
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(`Could not fetch ${url}: ${response.status} ${response.statusText}`);
   }
   return response.text();
+}
+
+function stopActiveRun(): void {
+  if (!activeRun) {
+    return;
+  }
+  setStatus('Stopping after the current worker step…');
+  controls.stopButton.disabled = true;
+  activeRun.controller.abort();
+}
+
+function setRunning(running: boolean): void {
+  controls.runButton.disabled = running;
+  controls.stopButton.hidden = !running;
+  controls.stopButton.disabled = !running;
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw new DOMException('Inference was stopped.', 'AbortError');
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }
 
 function applyModeVisibility(): void {
@@ -319,4 +440,8 @@ function getElement(id: string): HTMLElement {
     throw new Error(`Missing element #${id}`);
   }
   return element;
+}
+
+function getOptionalElement(id: string): HTMLElement | null {
+  return document.getElementById(id);
 }
