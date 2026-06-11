@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RDF-JS inference engine playground</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    :root {
+      color-scheme: light;
+      --bg: #f5f5f7;
+      --panel: #ffffff;
+      --panel-soft: #f9fafb;
+      --border: #d1d5db;
+      --border-soft: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --muted-soft: #9ca3af;
+      --accent: #2563eb;
+      --accent-dark: #1d4ed8;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    html {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      overflow-x: hidden;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      font: inherit;
+    }
+
+    .page {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding-top: calc(1.5rem + env(safe-area-inset-top));
+      padding-right: calc(1rem + env(safe-area-inset-right));
+      padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+      padding-left: calc(1rem + env(safe-area-inset-left));
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.9rem;
+      font-weight: 650;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      max-width: 62rem;
+      margin: 0.35rem auto 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .card {
+      grid-column: span 12;
+      overflow: hidden;
+      background: var(--panel);
+      border-radius: 1rem;
+      padding: 1rem 1.25rem 1.25rem;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .section-title {
+      margin: 0 0 0.45rem;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .hint,
+    .meta,
+    .status {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .rules-summary {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #1e40af;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    label {
+      display: inline-block;
+      margin-bottom: 0.35rem;
+      color: #374151;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .mode-row,
+    .uri-input-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.65rem;
+      margin: 0.8rem 0 0.75rem;
+    }
+
+    .mode-row select,
+    .uri-input-row input[type="url"] {
+      min-width: min(100%, 18rem);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 0.55rem 0.9rem;
+      outline: none;
+    }
+
+    .uri-input-row input[type="url"] {
+      flex: 1;
+      min-width: min(100%, 24rem);
+    }
+
+    .mode-row select:focus,
+    .uri-input-row input[type="url"]:focus {
+      border-color: var(--accent);
+      background: var(--panel);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+    }
+
+    button {
+      min-height: 44px;
+      border: none;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.55rem 1.25rem;
+      box-shadow: 0 10px 15px rgba(37, 99, 235, 0.25);
+      transition: transform 0.05s ease-out, box-shadow 0.05s ease-out, opacity 0.1s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 24px rgba(37, 99, 235, 0.32);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: var(--text);
+      box-shadow: none;
+    }
+
+    button.secondary:hover:not(:disabled) {
+      box-shadow: 0 10px 15px rgba(17, 24, 39, 0.12);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .actions .status {
+      flex: 1 1 22rem;
+    }
+
+    .stats {
+      color: var(--accent-dark);
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    textarea {
+      width: 100%;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 1rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      resize: vertical;
+    }
+
+    .CodeMirror {
+      height: 24rem;
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: var(--panel);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .CodeMirror.CodeMirror-focused {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35);
+      outline: none;
+    }
+
+    .CodeMirror-gutters {
+      border-right: 1px solid var(--border-soft);
+      background: var(--panel-soft);
+    }
+
+    .CodeMirror-scroll {
+      overflow: auto !important;
+    }
+
+    .output .CodeMirror {
+      height: 28rem;
+      font-size: 0.85rem;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    @media (min-width: 1000px) {
+      .half {
+        grid-column: span 6;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        gap: 0.85rem;
+        padding-top: calc(1.1rem + env(safe-area-inset-top));
+        padding-right: calc(0.85rem + env(safe-area-inset-right));
+        padding-bottom: calc(2.5rem + env(safe-area-inset-bottom));
+        padding-left: calc(0.85rem + env(safe-area-inset-left));
+      }
+
+      header h1 {
+        font-size: 1.35rem;
+      }
+
+      header p {
+        text-align: left;
+      }
+
+      .card {
+        padding: 0.95rem 1rem 1.05rem;
+      }
+
+      .mode-row,
+      .uri-input-row,
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .mode-row select,
+      .uri-input-row input[type="url"] {
+        width: 100%;
+        font-size: 16px;
+      }
+
+      .actions {
+        position: sticky;
+        bottom: calc(env(safe-area-inset-bottom) + 10px);
+        padding: 0.75rem 0;
+        background: rgba(245, 245, 247, 0.88);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid rgba(148, 163, 184, 0.35);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>RDF-JS inference engine playground</h1>
+      <p class="meta">The playground at this moment does OWL2RL inferencing. We might add support for more later.</p>
+    </header>
+    <main class="grid">
+      <section class="card half">
+        <h2 class="section-title">Background knowledge</h2>
+        <p class="meta">Provide the ontology, alignments, context information... in TriG, Turtle, N-triples or N-quads.</p>
+        <div class="mode-row">
+          <label for="backgroundMode">Input source</label>
+          <select id="backgroundMode">
+            <option value="text">Text input</option>
+            <option value="url">URL</option>
+          </select>
+        </div>
+        <div id="backgroundUrlPanel" class="uri-input-row">
+          <label for="backgroundUrl">Background RDF URL</label>
+          <input id="backgroundUrl" type="url" placeholder="https://.../ontology.ttl">
+          <span class="hint">Fetched when you run inference. The server must allow browser CORS requests.</span>
+        </div>
+        <div id="backgroundTextPanel">
+          <textarea id="backgroundText" spellcheck="false"></textarea>
+        </div>
+      </section>
+
+      <section class="card half">
+        <h2 class="section-title">Input data</h2>
+        <p class="meta">Can be an RDF response (TriG, Turtle, N-triples or N-quads) or an RDF Messages log.</p>
+        <div class="mode-row">
+          <label for="dataMode">Input source</label>
+          <select id="dataMode">
+            <option value="text">Text input</option>
+            <option value="url">URL</option>
+          </select>
+        </div>
+        <div id="dataUrlPanel" class="uri-input-row">
+          <label for="dataUrl">Data or RDF Messages URL</label>
+          <input id="dataUrl" type="url" placeholder="https://.../data.trig">
+          <span class="hint">Fetched when you run inference..</span>
+        </div>
+        <div id="dataTextPanel">
+          <textarea id="dataText" spellcheck="false"></textarea>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="actions">
+          <button id="runButton" type="button">Run inference</button>
+          <button id="resetButton" class="secondary" type="button">Reset demo</button>
+          <button id="shareButton" class="secondary" type="button">Copy share URL</button>
+          <span id="status" class="status"></span>
+          <span id="runtimeStats" class="stats"></span>
+        </div>
+      </section>
+
+      <section class="card output">
+        <h2 class="section-title">Inferred triples</h2>
+        <p class="meta">Newly inferred triples.</p>
+        <textarea id="outputText" spellcheck="false"></textarea>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/turtle/turtle.js"></script>
+  <script src="browser/rdfjs-inference-engine.min.js"></script>
+  <script src="browser/playground.min.js"></script>
+</body>
+</html>

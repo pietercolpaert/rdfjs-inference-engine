@@ -33,6 +33,8 @@ npm install
 npm run build
 ```
 
+`npm run build` now builds both the Node package output and the committed browser bundles in `browser/`.
+
 ## How it works
 
 ### 1. N3 rules as profiles
@@ -112,6 +114,38 @@ function parseToQuads(source: string): Quad[] {
 - `saveRuntime(path)` to save that runtime as an N3 file;
 - `infer(quads)` to infer over an array of RDF-JS quads and return a generator of inferred RDF-JS quads;
 - `createInferenceStream()` / `stream()` to create an object-mode transform stream where each incoming iterable of quads produces one array of inferred quads.
+
+### Browser bundle and playground
+
+The browser build creates a minified global bundle:
+
+```text
+browser/rdfjs-inference-engine.min.js
+```
+
+Include it directly in a web page:
+
+```html
+<script src="browser/rdfjs-inference-engine.min.js"></script>
+```
+
+The bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `Parser`, `Writer`, `DataFactory`, `parseRdfOrMessages()`, `writeQuads()`, and `writeMessages()`.
+
+The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile. The page provides syntax-highlighted RDF editors for:
+
+- ontology/background RDF used to generate the runtime, selected as either a URL or text input;
+- ordinary RDF input or an RDF Messages log, selected as either a URL or text input;
+- inferred output triples.
+
+It uses `rdf-parser-ts` message detection. Ordinary RDF input is passed to `infer()`. RDF Messages input is grouped by message and passed through the browser `stream()` object. In that case, the inferred output is serialized as RDF Messages too, starting with `VERSION "1.2-messages"` and delimiting inferred message chunks with `MESSAGE`. The playground stores editable state in the URL hash so examples can be shared as links.
+
+Build only the browser artifacts with:
+
+```bash
+npm run build:browser
+```
+
+Git hooks are tracked in `.githooks/`. `npm install` or `npm run hooks:install` configures the repository to use them. The pre-commit hook regenerates and stages the browser bundles; the pre-push hook regenerates them again and blocks the push if the generated files differ from what is committed.
 
 ## Run the example
 

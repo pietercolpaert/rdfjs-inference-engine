@@ -4,6 +4,9 @@
   "description": "RDF-JS inference engine for generated Eyeling runtimes and N3 rule profiles.",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "browser": "browser/rdfjs-inference-engine.min.js",
+  "unpkg": "browser/rdfjs-inference-engine.min.js",
+  "jsdelivr": "browser/rdfjs-inference-engine.min.js",
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
@@ -13,7 +16,9 @@
   },
   "files": [
     "dist/src/",
+    "browser/",
     "rules/owl2rl-eyeling.n3",
+    "index.html",
     "README.md"
   ],
   "directories": {
@@ -21,7 +26,11 @@
   },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "build": "npm run clean --silent && tsc -p tsconfig.json",
+    "build": "npm run clean --silent && tsc -p tsconfig.json && npm run build:browser --silent",
+    "build:node": "npm run clean --silent && tsc -p tsconfig.json",
+    "build:browser": "node scripts/build-browser.mjs",
+    "hooks:install": "node scripts/install-hooks.cjs",
+    "prepare": "node scripts/install-hooks.cjs",
     "example": "npm run build --silent && node dist/examples/src/run-example.js",
     "example:complex": "npm run build --silent && node dist/examples/src/run-complex-example.js",
     "test:basic": "npm run example --silent > /tmp/owl2rl-example-output.n3 && diff -u examples/expected-output.n3 /tmp/owl2rl-example-output.n3",
@@ -54,6 +63,7 @@
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^25.9.2",
     "adm-zip": "^0.5.17",
+    "esbuild": "^0.28.0",
     "rdfxml-streaming-parser": "^3.2.0",
     "typescript": "^6.0.3"
   }

@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+npm run build:browser
+
+if ! git diff --quiet -- browser/rdfjs-inference-engine.min.js browser/playground.min.js; then
+  echo "Browser bundles changed during pre-push. Commit the regenerated files before pushing." >&2
+  exit 1
+fi
