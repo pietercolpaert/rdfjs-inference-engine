@@ -450,6 +450,22 @@ options:
 2. add project-specific filtering around the RDF-JS quads returned by `infer()`;
 3. keep the full Eyeling closure if your application needs diagnostics or helper triples.
 
+### OWL 2 RL optimization take-aways from MobiBench
+
+William Van Woensel and Syed Sibte Raza Abidi's paper [Optimizing and Benchmarking OWL2 RL for Semantic Reasoning on Mobile Platforms](https://semantic-web-journal.net/system/files/swj1666.pdf) is a useful design reference for this repository. Its main implementation insight is that OWL 2 RL is not just a fixed ruleset to run wholesale: it is a rule-materialization profile where rule selection, preprocessing, and output policy should be chosen for the application data and deployment constraints.
+
+The paper's take-aways map closely to this implementation:
+
+- **Datatype rules need engine support.** The paper identifies OWL 2 RL datatype rules such as `dt-type2`, `dt-not-type`, `dt-eq`, and `dt-diff` as rules that cannot be implemented consistently by arbitrary rule engines without datatype builtins. This repository therefore delegates datatype recognition, validation, canonicalization, equality, and inequality to Eyeling's `dt:` builtins instead of encoding fragile lexical comparisons in N3.
+- **Always-applicable rules are better treated as axioms/static closure.** The paper separates OWL 2 RL rules without antecedents into axiomatic triples. Here, `load()` precomputes a static background closure once and `getStaticClosure()` exposes it for conformance-style evaluation.
+- **List and n-ary rules often need helper facts.** The paper discusses list-membership helpers, rule instantiation, binarization, and auxiliary rules for constructs such as intersections, unions, property chains, and keys. This repository uses helper predicates internally, but filters those internal OWL 2 RL maintenance triples from application output.
+- **Reflexive `owl:sameAs` should not be blindly materialized.** The paper calls out `eq-ref` as an inefficient rule that can greatly bloat datasets. This engine treats reflexive `owl:sameAs` as a conformance/evaluation concern rather than useful emitted application data.
+- **Rule selection is a compiler opportunity.** MobiBench includes domain-based rule selection: if the ontology or data shape cannot trigger a rule, the rule can be omitted from a specialized ruleset. The generated-runtime architecture in this repository is a natural place to apply the same idea. A future `runtimeCompiler` could use a project ontology, SHACL shapes, or representative RDF Messages samples to prune OWL 2 RL rules whose antecedents cannot match the documented data shape.
+- **Schema and instance reasoning can be split.** The paper shows that stable ontologies can be materialized once with schema rules, after which cheaper instance rules can be applied repeatedly to incoming data. That is especially relevant for ingest pipelines and streaming RDF Messages workloads.
+- **Conformance tests need interpretation.** The paper notes that many W3C OWL 2 tests listed for OWL 2 RL are not actually covered by the OWL 2 RL rule profile, and that some tests are difficult to check for rule-materialization engines. This repository therefore distinguishes application output from conformance-oriented evaluation.
+
+In one of the next steps, we will thus be looking into allowing to pass a SHACL shape as well in the constructor to generate smaller application-specific runtimes for production pipelines whose data shape is known.
+
 ## Using this pattern in a project
 
 A typical ingest-time architecture looks like this:
@@ -562,6 +578,7 @@ There are still practical and semantic boundaries:
 - Eyeling repository: https://github.com/eyereasoner/eyeling
 - Eyeling builtins catalog: https://github.com/eyereasoner/eyeling/blob/main/eyeling-builtins.ttl
 - Eyeling issue for datatype builtins: https://github.com/eyereasoner/eyeling/issues/18
+- Van Woensel and Abidi, *Optimizing and Benchmarking OWL2 RL for Semantic Reasoning on Mobile Platforms*: https://semantic-web-journal.net/system/files/swj1666.pdf
 - W3C SKOS Reference: https://www.w3.org/TR/skos-reference/
 - OWL 2 RL profile: https://www.w3.org/TR/owl2-profiles/
 - OWL 2 RL/RIF rules: https://www.w3.org/TR/rif-owl-rl/
