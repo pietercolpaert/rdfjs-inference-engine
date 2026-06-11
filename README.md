@@ -202,7 +202,7 @@ Run the default compatible MobiBench subset with:
 npm run test:owl:mobibench
 ```
 
-The default subset covers RDFS subclass/subproperty/domain/range behavior, equality substitution, equivalent classes/properties, functional/inverse-functional/symmetric/transitive properties, restrictions, and inconsistency diagnostics. The harness can also list discovered MobiBench tests:
+The default subset covers RDFS subclass/subproperty/domain/range behavior, equality substitution, equivalent classes/properties, functional/inverse-functional/symmetric/transitive properties, restrictions, datatype equality/validation/inconsistency cases, and inconsistency diagnostics. The harness can also list discovered MobiBench tests:
 
 ```bash
 npm run build --silent && node dist/tests/run-mobibench-owl2rl.js --list
