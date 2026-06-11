@@ -261,11 +261,29 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
     sections.push('', '# Rule profiles', input.profileN3.trimEnd());
   }
 
-  if (input.options.includeStaticClosure !== false && input.closure.length > 0) {
-    sections.push('', '# Precomputed background closure', serializeQuadsAsN3(input.closure).trimEnd());
+  if (input.options.includeStaticClosure !== false) {
+    const backgroundClosure = uniqueQuads([...input.vocabulary, ...input.closure]);
+    if (backgroundClosure.length > 0) {
+      sections.push('', '# Precomputed background facts and closure', serializeQuadsAsN3(backgroundClosure).trimEnd());
+    }
   }
 
   return `${sections.join('\n')}\n`;
+}
+
+function uniqueQuads(quads: Iterable<Quad>): Quad[] {
+  const unique: Quad[] = [];
+  const seen = new Set<string>();
+
+  for (const quad of quads) {
+    const key = quadKey(quad);
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(quad);
+    }
+  }
+
+  return unique;
 }
 
 export function serializeQuadsAsN3(quads: Iterable<Quad>): string {

@@ -4,17 +4,25 @@ This repository contains a small TypeScript library for doing **generated-runtim
 
 The library core is intentionally agnostic about the ontology language or rule profile. The runnable example uses the bundled OWL 2 RL profile, which also contains the RDFS entailments needed by the small demo vocabulary.
 
-The core idea is:
+## Install
 
-1. load one or more N3 rule profiles, such as the included OWL 2 RL profile;
-2. load RDF-JS background vocabulary, ontology, taxonomy, or configuration quads;
-3. precompute the static background closure once;
-4. create a generated runtime N3 file with either the default generic compiler or a caller-provided compiler;
-5. run ordinary RDF input through that generated runtime and emit only newly inferred quads.
+Install the package from npm:
 
-This is useful when a service receives RDF, enriches it immediately, and stores or publishes materialized triples so downstream systems can query ordinary RDF without running the same inference step themselves.
+```bash
+npm install rdfjs-inference-engine
+```
+
+Then import the RDF-JS API from your application:
+
+```ts
+import { InferenceEngine } from 'rdfjs-inference-engine';
+```
+
+The package ships the compiled Node API in `dist/src/`, browser bundles in `browser/`, the playground `index.html`, and the bundled rule profiles in `rules/`.
 
 ## Requirements
+
+Eyeling requires Node.js. The upstream package currently documents Node.js `>=18`.
 
 Use the latest Eyeling version. The OWL 2 RL profile uses datatype builtins added after issue `eyereasoner/eyeling#18`.
 
@@ -24,9 +32,7 @@ The example can be run without installing Eyeling globally:
 npx --yes eyeling --version
 ```
 
-Eyeling requires Node.js. The upstream package currently documents Node.js `>=18`.
-
-Install dependencies and build the library with:
+For local repository development, install dependencies and build the library with:
 
 ```bash
 npm install
@@ -36,6 +42,16 @@ npm run build
 `npm run build` now builds both the Node package output and the committed browser bundles in `browser/`.
 
 ## How it works
+
+The core idea is:
+
+1. load one or more N3 rule profiles, such as the included [OWL 2 RL profile](rules/owl2rl-eyeling.n3) and the [SKOS entailment](rules/skos-entailment.n3) file;
+2. load RDF-JS background vocabulary, ontology, taxonomy, or configuration quads;
+3. precompute the static background closure once;
+4. create a generated runtime N3 file with either the default generic compiler or a caller-provided compiler;
+5. run ordinary RDF input through that generated runtime and emit only newly inferred quads.
+
+This is useful when a service receives RDF, enriches it immediately, and stores or publishes materialized triples so downstream systems can query ordinary RDF without running the same inference step themselves.
 
 ### 1. N3 rules as profiles
 

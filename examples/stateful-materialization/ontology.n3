@@ -10,14 +10,6 @@
 :Mother a owl:Class ;
   owl:equivalentClass :FemaleParent .
 
-:FemaleParent owl:intersectionOf :femaleParentClasses .
-
-:femaleParentClasses
-  rdf:first :Female ;
-  rdf:rest :femaleParentClassesTail .
-
-:femaleParentClassesTail
-  rdf:first :Parent ;
-  rdf:rest rdf:nil .
+:FemaleParent owl:intersectionOf ( :Female :Parent ) .
 
 :hasParent rdfs:range :Parent .
