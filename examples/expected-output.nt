@@ -1,7 +1,0 @@
-<https://example.org/transit#bus-42> a <https://example.org/transit#Bus> .
-<https://example.org/transit#bus-42> a <https://example.org/transit#Vehicle> .
-<https://example.org/transit#bus-42> <https://example.org/transit#operatedBy> <https://example.org/transit#operator-7> .
-<https://example.org/transit#operator-7> a <https://example.org/transit#Operator> .
-<https://example.org/transit#bus-42> a <https://example.org/transit#Vehicle> .
-<https://example.org/transit#bus-42> a <https://example.org/transit#ObservedVehicle> .
-<https://example.org/transit#bus-42> <https://example.org/transit#seenAt> <https://example.org/transit#stop-12> .

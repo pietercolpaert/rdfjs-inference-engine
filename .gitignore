@@ -1,0 +1,9 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Generated runtime files
+generated/
+
+# Downloaded official test manifests
+.cache/

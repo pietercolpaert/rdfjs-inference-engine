@@ -1,0 +1,7 @@
+@prefix : <https://example.org/transit#>.
+
+:bus-42 <http://www.w3.org/2002/07/owl#sameAs> :bus-42.
+:operator-7 <http://www.w3.org/2002/07/owl#sameAs> :operator-7.
+:bus-42 a :Vehicle.
+:operator-7 a :Operator.
+:bus-42 a :Bus.

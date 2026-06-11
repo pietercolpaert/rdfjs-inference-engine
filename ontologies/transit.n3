@@ -1,32 +1,10 @@
-# Demo ontology for OWL 2 RL stream enrichment with Eyeling.
+# Small demo vocabulary for RDFS ingest enrichment with Eyeling.
 
 @prefix :    <https://example.org/transit#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-:Vehicle a owl:Class .
-:Bus a owl:Class ;
-  rdfs:subClassOf :Vehicle .
-:ElectricBus a owl:Class ;
-  rdfs:subClassOf :Bus .
-:ObservedVehicle a owl:Class ;
-  rdfs:subClassOf :Vehicle .
-:Operator a owl:Class .
+:Bus rdfs:subClassOf :Vehicle .
+:ElectricBus rdfs:subClassOf :Bus .
 
-:VehicleObservation a owl:Class .
-
-:operatedBy a owl:ObjectProperty ;
-  rdfs:domain :Vehicle ;
+:operatedBy rdfs:domain :Vehicle ;
   rdfs:range :Operator .
-
-:observedVehicle a owl:ObjectProperty .
-:observedAt a owl:ObjectProperty .
-:seenAt a owl:ObjectProperty .
-
-:seatCount a owl:DatatypeProperty ;
-  rdfs:domain :Vehicle ;
-  rdfs:range xsd:integer .
-
-:reportedAt a owl:DatatypeProperty ;
-  rdfs:range xsd:dateTime .

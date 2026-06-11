@@ -1,0 +1,12 @@
+# RDF input for the example.
+#
+# Run with:
+#   ./scripts/run-example.sh
+
+PREFIX : <https://example.org/transit#>
+
+# Input facts. The generated runtime rules infer:
+#   :bus-42 a :Bus, :Vehicle
+#   :operator-7 a :Operator
+:bus-42 a :ElectricBus ;
+  :operatedBy :operator-7 .

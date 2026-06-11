@@ -1,0 +1,60 @@
+{
+  "name": "rdfjs-inference-engine",
+  "version": "0.1.0",
+  "description": "RDF-JS inference engine for generated Eyeling runtimes and N3 rule profiles.",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "require": "./dist/src/index.js",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist/src/",
+    "rules/owl2rl-eyeling.n3",
+    "README.md"
+  ],
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean --silent && tsc -p tsconfig.json",
+    "example": "npm run build --silent && node dist/examples/src/run-example.js",
+    "example:complex": "npm run build --silent && node dist/examples/src/run-complex-example.js",
+    "test:basic": "npm run example --silent > /tmp/owl2rl-example-output.n3 && diff -u examples/expected-output.n3 /tmp/owl2rl-example-output.n3",
+    "test:complex": "npm run example:complex --silent > /tmp/owl2rl-complex-output.n3 && diff -u examples/complex/expected-selected-output.n3 /tmp/owl2rl-complex-output.n3",
+    "test:examples": "npm run test:basic && npm run test:complex",
+    "test:owl:mobibench": "npm run build --silent && node dist/tests/run-mobibench-owl2rl.js",
+    "test:owl:official": "npm run build --silent && node dist/tests/run-official-owl2rl.js",
+    "test:mobibench": "npm run test:owl:mobibench",
+    "test:official": "npm run test:owl:official",
+    "test": "npm run test:owl:mobibench && npm run test:owl:official"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pietercolpaert/rdfjs-inference-engine.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/pietercolpaert/rdfjs-inference-engine/issues"
+  },
+  "homepage": "https://github.com/pietercolpaert/rdfjs-inference-engine#readme",
+  "dependencies": {
+    "@rdfjs/types": "^2.0.1",
+    "eyeling": "^1.28.7",
+    "rdf-parser-ts": "^0.2.4"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^25.9.2",
+    "adm-zip": "^0.5.17",
+    "rdfxml-streaming-parser": "^3.2.0",
+    "typescript": "^6.0.3"
+  }
+}

@@ -1,0 +1,43 @@
+# More elaborate OWL 2 RL demo vocabulary.
+
+@prefix :    <https://example.org/logistics#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#> .
+
+:Shipment a owl:Class .
+:ExpressShipment a owl:Class ;
+  owl:equivalentClass :PriorityShipment ;
+  rdfs:subClassOf :Shipment .
+:FragileShipment a owl:Class ;
+  rdfs:subClassOf [
+    a owl:Restriction ;
+    owl:onProperty :requiresHandling ;
+    owl:hasValue :carefulHandling
+  ] .
+:CountryDestinationShipment a owl:Class ;
+  owl:equivalentClass [
+    a owl:Restriction ;
+    owl:onProperty :destinationCountry ;
+    owl:someValuesFrom :Country
+  ] .
+:RegulatedShipment a owl:Class ;
+  owl:equivalentClass [
+    a owl:Restriction ;
+    owl:onProperty :contains ;
+    owl:allValuesFrom :RegulatedItem
+  ] .
+:Country a owl:Class .
+:RegulatedItem a owl:Class .
+
+:contains a owl:ObjectProperty ;
+  owl:equivalentProperty :hasPart .
+:handledBy a owl:ObjectProperty ;
+  owl:inverseOf :handles .
+:partnerOf a owl:ObjectProperty, owl:SymmetricProperty .
+:locatedIn a owl:ObjectProperty, owl:TransitiveProperty .
+:trackingCode a owl:ObjectProperty, owl:FunctionalProperty .
+:manifestId a owl:ObjectProperty, owl:InverseFunctionalProperty .
+
+:destinationCountry a owl:ObjectProperty .
+:requiresHandling a owl:ObjectProperty .
