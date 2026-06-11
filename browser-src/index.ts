@@ -9,6 +9,7 @@ import {
 } from 'rdf-parser-ts/browser';
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
+const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 
 const reasonStream = (eyeling as any).reasonStream;
 
@@ -318,11 +319,31 @@ function blankNodeLabel(value: string): string {
 }
 
 function addDerived(output: Quad[], seen: Set<string>, quad: Quad): void {
+  if (isReflexiveSameAs(quad)) {
+    return;
+  }
+
   const key = quadKey(quad);
   if (!seen.has(key)) {
     seen.add(key);
     output.push(quad);
   }
+}
+
+function isReflexiveSameAs(quad: Quad): boolean {
+  return quad.predicate.termType === 'NamedNode'
+    && quad.predicate.value === OWL_SAME_AS
+    && termEquals(quad.subject, quad.object);
+}
+
+function termEquals(left: Term, right: Term): boolean {
+  if (left.termType !== right.termType || left.value !== right.value) {
+    return false;
+  }
+  if (left.termType === 'Literal' && right.termType === 'Literal') {
+    return left.language === right.language && left.datatype.value === right.datatype.value;
+  }
+  return true;
 }
 
 function quadKey(quad: Quad): string {
