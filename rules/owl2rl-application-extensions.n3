@@ -1,0 +1,25 @@
+# OWL 2 RL application-oriented extensions for Eyeling.
+#
+# These rules are intentionally kept separate from owl2rl-eyeling.n3 because
+# they are not part of the published OWL 2 RL/RDF rule table.  They are sound
+# OWL semantic consequences for finite, materialization-oriented applications:
+# a known property value proves membership in the corresponding cardinality-1
+# restriction.  In OWL 2 DL terms, minCardinality 1 is equivalent to an
+# existential/someValuesFrom restriction over owl:Thing, and qualified
+# minQualifiedCardinality 1 is equivalent to someValuesFrom over the qualifier.
+
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+{ ?r owl:minCardinality "1"^^xsd:nonNegativeInteger .
+  ?r owl:onProperty ?p .
+  ?u ?p ?v . }
+=> { ?u rdf:type ?r . } .
+
+{ ?r owl:minQualifiedCardinality "1"^^xsd:nonNegativeInteger .
+  ?r owl:onProperty ?p .
+  ?r owl:onClass ?c .
+  ?u ?p ?v .
+  ?v rdf:type ?c . }
+=> { ?u rdf:type ?r . } .

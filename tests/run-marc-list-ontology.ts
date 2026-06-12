@@ -88,7 +88,7 @@ assert.equal(report.messageQuads, 446, 'Unexpected MARC message fixture size.');
 assert.ok(report.loadElapsed < timeoutMs, `MARC list ontology load took ${report.loadElapsed} ms.`);
 assert.ok(report.perMessage.every((message) => message.elapsed < timeoutMs), `At least one MARC message exceeded ${timeoutMs} ms: ${JSON.stringify(report.perMessage)}.`);
 assert.ok(report.allElapsed < timeoutMs, `Combined MARC message inference took ${report.allElapsed} ms.`);
-assert.equal(report.allOutputQuads, 33, 'Unexpected combined MARC inference output size.');
+assert.equal(report.allOutputQuads, 16, 'Unexpected combined MARC inference output size.');
 assert.ok(report.runtimeBytes > 0, 'Expected a non-empty generated runtime.');
 
 console.log(`MARC list ontology/data test: ${report.ontologyQuads} ontology quads loaded in ${report.loadElapsed} ms; ${report.messageQuads} message quads inferred in ${report.allElapsed} ms.`);

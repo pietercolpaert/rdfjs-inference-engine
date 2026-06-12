@@ -59,6 +59,64 @@ assert.equal(
   'Application output should not expose generated internal Skolem helper triples.',
 );
 
+const grandfatherReasoner = new InferenceEngine();
+grandfatherReasoner.load(
+  loadDefaultRuleProfiles(),
+  parseQuads(`
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@prefix ex: <https://example.org/#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:Grandfather
+  a owl:Class ;
+  rdfs:subClassOf ex:Person ;
+  owl:equivalentClass [
+    a owl:Class ;
+    owl:intersectionOf (
+      [
+        a owl:Restriction ;
+        owl:onProperty ex:gender ;
+        owl:hasValue "male"
+      ]
+      [
+        a owl:Restriction ;
+        owl:onProperty ex:child ;
+        owl:someValuesFrom [
+          a owl:Restriction ;
+          owl:onProperty ex:child ;
+          owl:minCardinality "1"^^xsd:nonNegativeInteger
+        ]
+      ]
+    )
+  ] .
+`),
+);
+const grandfatherOutput = Array.from(grandfatherReasoner.infer(parseQuads(`
+@prefix ex: <https://example.org/#> .
+
+ex:P1 a ex:Person ;
+  ex:child ex:P1.1, ex:P1.2 ;
+  ex:gender "male" .
+ex:P1.1 a ex:Person ; ex:child ex:P1.1.1 .
+ex:P1.1.1 a ex:Person .
+ex:P1.2 a ex:Person ; ex:child ex:P1.2.1, ex:P1.2.2 .
+ex:P1.2.1 a ex:Person .
+ex:P1.2.2 a ex:Person .
+`)));
+assert.ok(
+  grandfatherOutput.some((quad) => quad.subject.value === 'https://example.org/#P1'
+    && quad.predicate.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+    && quad.object.value === 'https://example.org/#Grandfather'),
+  'A male person with a child who has a child should be classified as ex:Grandfather.',
+);
+assert.equal(
+  grandfatherOutput.some((quad) => quad.predicate.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+    && quad.object.termType === 'BlankNode'),
+  false,
+  'Application output should not expose anonymous class-expression type triples.',
+);
+
 function parseQuads(source: string): Quad[] {
   return Array.from((parser.parse(source) ?? []) as Iterable<unknown>) as Quad[];
 }
