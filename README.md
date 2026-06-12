@@ -101,10 +101,6 @@ The OWL 2 RL profile includes the RDFS entailments needed by the example, includ
 
 It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expressions, property characteristics, datatype rules, and inconsistency diagnostics. The library filters reflexive `owl:sameAs` triples, internal OWL 2 RL datatype helper triples, generated Skolem helper triples, anonymous class-expression type triples, and datatype-rule facts with literals in subject position from emitted inference output because they are usually closure-maintenance facts rather than useful application data.
 
-#### rules/owl2rl-application-extensions.n3
-
-This contains application-oriented OWL semantic materialization rules that are useful together with OWL 2 RL, but are not part of the published OWL 2 RL/RDF rule table. The current extension materializes membership for `owl:minCardinality 1` and `owl:minQualifiedCardinality 1` restrictions from known property assertions. In OWL 2 DL terms, these cardinality-1 cases correspond to existential restrictions; keeping them in a separate profile makes the pure OWL 2 RL ruleset explicit while still allowing the default application profile to infer finite class-expression cases such as “Grandfather”.
-
 #### rules/skos-entailment.n3
 
 This is a SKOS Core profile. It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.

@@ -81,15 +81,15 @@ ex:Grandfather
       ]
       [
         a owl:Restriction ;
-        owl:onProperty ex:child ;
-        owl:someValuesFrom [
-          a owl:Restriction ;
-          owl:onProperty ex:child ;
-          owl:minCardinality "1"^^xsd:nonNegativeInteger
-        ]
+        owl:onProperty ex:hasGrandchild ;
+        owl:someValuesFrom owl:Thing
       ]
     )
   ] .
+
+ex:hasGrandchild
+  a owl:ObjectProperty ;
+  owl:propertyChainAxiom ( ex:child ex:child ) .
 `),
 );
 const grandfatherOutput = Array.from(grandfatherReasoner.infer(parseQuads(`
