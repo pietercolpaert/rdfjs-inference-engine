@@ -31,6 +31,9 @@
 
 owlrl:Inconsistency a rdfs:Class .
 owlrl:listRoot a rdf:Property .
+owlrl:intersectionListRoot a rdf:Property .
+owlrl:keyListRoot a rdf:Property .
+owlrl:propertyChainRoot a rdf:Property .
 owlrl:listMember a rdf:Property .
 owlrl:listPair a rdf:Property .
 owlrl:left a rdf:Property .
@@ -135,19 +138,34 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 
 # Mark OWL/RDF list roots that this ruleset needs to inspect.  This keeps
 # builtins such as rdf:first/rdf:rest called with a bound list term in Eyeling.
-{ ?x owl:intersectionOf ?list . } => { ?list owlrl:listRoot true . } .
+{ ?x owl:intersectionOf ?list . } => { ?list owlrl:listRoot true ; owlrl:intersectionListRoot true . } .
 { ?x owl:unionOf ?list . }        => { ?list owlrl:listRoot true . } .
 { ?x owl:oneOf ?list . }          => { ?list owlrl:listRoot true . } .
 { ?x owl:members ?list . }        => { ?list owlrl:listRoot true . } .
 { ?x owl:distinctMembers ?list . }=> { ?list owlrl:listRoot true . } .
-{ ?x owl:hasKey ?list . }         => { ?list owlrl:listRoot true . } .
-{ ?x owl:propertyChainAxiom ?list . } => { ?list owlrl:listRoot true . } .
+{ ?x owl:hasKey ?list . }         => { ?list owlrl:listRoot true ; owlrl:keyListRoot true . } .
+{ ?x owl:propertyChainAxiom ?list . } => { ?list owlrl:listRoot true ; owlrl:propertyChainRoot true . } .
 
 # Propagate list-root status to non-empty tails.
 { ?list owlrl:listRoot true .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
 => { ?tail owlrl:listRoot true . } .
+
+{ ?list owlrl:intersectionListRoot true .
+  ?list rdf:rest ?tail .
+  ?tail rdf:first ?head . }
+=> { ?tail owlrl:intersectionListRoot true . } .
+
+{ ?list owlrl:keyListRoot true .
+  ?list rdf:rest ?tail .
+  ?tail rdf:first ?head . }
+=> { ?tail owlrl:keyListRoot true . } .
+
+{ ?list owlrl:propertyChainRoot true .
+  ?list rdf:rest ?tail .
+  ?tail rdf:first ?head . }
+=> { ?tail owlrl:propertyChainRoot true . } .
 
 # list membership: LIST[h, ..., x, ...]
 { ?list owlrl:listRoot true .
@@ -176,7 +194,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 
 # allListClassTypes: tuple (?individual ?list) is true iff the individual
 # is rdf:type every class in the non-empty RDF list.
-{ ?list owlrl:listRoot true .
+{ ?list owlrl:intersectionListRoot true .
   ?list rdf:first ?class .
   ?list rdf:rest rdf:nil .
   ?individual rdf:type ?class .
@@ -185,7 +203,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
            owlrl:pathSubject ?individual ;
            owlrl:pathObject ?list . } .
 
-{ ?list owlrl:listRoot true .
+{ ?list owlrl:intersectionListRoot true .
   ?list rdf:first ?class .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
@@ -200,7 +218,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 # sameValuesForProperties: tuple (?x ?y ?propertyList) is true iff ?x and ?y
 # share at least one identical value for every property in the non-empty list.
 # Equality replacement rules make sameAs-equal values count as identical after closure.
-{ ?plist owlrl:listRoot true .
+{ ?plist owlrl:keyListRoot true .
   ?plist rdf:first ?p .
   ?plist rdf:rest rdf:nil .
   ?x ?p ?z .
@@ -208,7 +226,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   (owlrl:sameValuesForProperties ?x ?y ?plist) log:skolem ?state . }
 => { ?state owlrl:sameValuesForProperties true . } .
 
-{ ?plist owlrl:listRoot true .
+{ ?plist owlrl:keyListRoot true .
   ?plist rdf:first ?p .
   ?plist rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
@@ -221,7 +239,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 
 # property-chain helper. A path node states that the RDF list ?chain relates
 # ?x to ?y by following the properties in the list in order.
-{ ?chain owlrl:listRoot true .
+{ ?chain owlrl:propertyChainRoot true .
   ?chain rdf:first ?p .
   ?chain rdf:rest rdf:nil .
   ?x ?p ?y .
@@ -231,7 +249,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
            owlrl:pathSubject ?x ;
            owlrl:pathObject ?y . } .
 
-{ ?chain owlrl:listRoot true .
+{ ?chain owlrl:propertyChainRoot true .
   ?chain rdf:first ?p .
   ?chain rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
@@ -869,12 +887,18 @@ owl:Nothing rdf:type owl:Class .
 { ?n1 owlrl:term ?lt1 .
   ?n2 owlrl:term ?lt2 .
   ?lt1 log:notEqualTo ?lt2 .
+  ?lt1 dt:datatype ?dt1 .
+  ?dt1 log:notEqualTo xsd:string .
+  ?dt1 log:notEqualTo rdf:langString .
   ?lt1 dt:sameValueAs ?lt2 . }
 => { ?lt1 owl:sameAs ?lt2 . } .
 
 # dt-diff
 { ?n1 owlrl:term ?lt1 .
   ?n2 owlrl:term ?lt2 .
+  ?lt1 dt:datatype ?dt1 .
+  ?dt1 log:notEqualTo xsd:string .
+  ?dt1 log:notEqualTo rdf:langString .
   ?lt1 dt:differentValueFrom ?lt2 . }
 => { ?lt1 owl:differentFrom ?lt2 . } .
 

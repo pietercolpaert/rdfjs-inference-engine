@@ -46,13 +46,14 @@
     "test:stateful-materialization": "npm run build --silent && node dist/examples/stateful-materialization/run.js > /tmp/stateful-materialization-stateless-output.nq && diff -u examples/stateful-materialization/expected-stateless-output.messages.nq /tmp/stateful-materialization-stateless-output.nq && node dist/examples/stateful-materialization/run.js --stateful-materialization > /tmp/stateful-materialization-stateful-output.nq && diff -u examples/stateful-materialization/expected-stateful-output.messages.nq /tmp/stateful-materialization-stateful-output.nq",
     "test:examples": "npm run test:transit-fleet && npm run test:shipment-logistics && npm run test:skos-taxonomy && npm run test:owl-skos-catalog && npm run test:transit-messages && npm run test:stateful-materialization",
     "test:default-rules": "npm run build --silent && node dist/tests/run-default-rule-loading.js",
+    "test:marc-list-ontology": "npm run build --silent && node dist/tests/run-marc-list-ontology.js",
     "test:skos": "npm run build --silent && node dist/tests/run-skos-entailment.js",
     "test:owl:mobibench": "npm run build --silent && node dist/tests/run-mobibench-owl2rl.js",
     "test:owl:official": "npm run build --silent && node dist/tests/run-official-owl2rl.js",
     "test:owl": "npm run test:owl:mobibench && npm run test:owl:official",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run test:default-rules && npm run test:skos && npm run test:owl"
+    "test": "npm run test:default-rules && npm run test:marc-list-ontology && npm run test:skos && npm run test:owl"
   },
   "repository": {
     "type": "git",

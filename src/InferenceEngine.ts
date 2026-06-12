@@ -10,6 +10,9 @@ const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const OWLRL = 'https://example.org/owlrl-n3#';
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
+  OWLRL + 'intersectionListRoot',
+  OWLRL + 'keyListRoot',
+  OWLRL + 'propertyChainRoot',
   OWLRL + 'listMember',
   OWLRL + 'listPair',
   OWLRL + 'left',

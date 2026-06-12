@@ -14,6 +14,9 @@ const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const OWLRL = 'https://example.org/owlrl-n3#';
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
+  OWLRL + 'intersectionListRoot',
+  OWLRL + 'keyListRoot',
+  OWLRL + 'propertyChainRoot',
   OWLRL + 'listMember',
   OWLRL + 'listPair',
   OWLRL + 'left',
@@ -264,7 +267,7 @@ export function parseRdfOrMessages(source: string, options: Record<string, unkno
   const messageQuads = raw.filter((item) => isMessageQuad(item));
 
   if (messageQuads.length > 0) {
-    const messages = toMessages(messageQuads as any[]).map((message: Iterable<Quad>) => Array.from(message));
+    const messages = toMessages(messageQuads as any[]).map((message) => Array.from(message as Iterable<Quad>));
     return {
       isMessages: true,
       quads: messageQuads.map((item: any) => item.quad as Quad),
@@ -286,7 +289,7 @@ export async function writeQuads(quads: Iterable<Quad>, prefixes: Record<string,
   writer.addQuads(quads);
 
   return new Promise<string>((resolve, reject) => {
-    writer.end((error: Error | null, result?: string) => error ? reject(error) : resolve(result ?? ''));
+    writer.end((error?: Error | null, result?: string) => error ? reject(error) : resolve(result ?? ''));
   });
 }
 
@@ -297,7 +300,7 @@ export async function writeMessages(messages: Iterable<Iterable<Quad>>, prefixes
   }
 
   return new Promise<string>((resolve, reject) => {
-    writer.end((error: Error | null, result?: string) => error ? reject(error) : resolve(result ?? ''));
+    writer.end((error?: Error | null, result?: string) => error ? reject(error) : resolve(result ?? ''));
   });
 }
 
