@@ -389,6 +389,7 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
     parsedQuadCount: 0,
     processedMessageCount: 0,
     inferredCount: 0,
+    inconsistencyComments: [],
     lastStatusAt: 0,
     writer: null,
   };
@@ -420,16 +421,18 @@ async function finishStreamingState(state) {
     if (state.writer) {
       await endWriter(state.writer);
     }
-    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + statefulStoreSummary(state) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+    appendInconsistencyComments(state.inconsistencyComments);
+    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
     return;
   }
 
   const total = state.ordinaryQuads.length;
   self.postMessage({ type: 'status', message: 'Parsed ' + total + ' input quad(s). Running inference…' });
-  const inferred = Array.from(state.reasoner.infer(state.ordinaryQuads));
-  self.postMessage({ type: 'status', message: 'Processed ' + total + ' input quad(s). Serializing ' + inferred.length + ' inferred quad(s)…' });
-  const output = await state.api.writeQuads(inferred, outputPrefixes());
-  self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inferred.length + ' quad(s). Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+  const inference = state.reasoner.inferWithDiagnostics(state.ordinaryQuads);
+  const comments = formatInconsistencyComments(inference.inconsistencies);
+  self.postMessage({ type: 'status', message: 'Processed ' + total + ' input quad(s). Serializing ' + inference.quads.length + ' inferred quad(s)…' });
+  const output = await state.api.writeQuads(inference.quads, outputPrefixes());
+  self.postMessage({ type: 'result', output: comments + output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inference.quads.length + ' quad(s)' + diagnosticStatusSuffix(comments) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
 }
 
 async function processCurrentMessage(state) {
@@ -439,16 +442,17 @@ async function processCurrentMessage(state) {
   const started = performance.now();
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
-  const output = state.statefulMaterialization
-    ? await state.reasoner.inferAsync(state.currentMessage, {
+  const inference = state.statefulMaterialization
+    ? await state.reasoner.inferAsyncWithDiagnostics(state.currentMessage, {
         store: {
           name: state.statefulStoreName,
           clear: state.processedMessageCount === 0,
         },
       })
-    : Array.from(state.reasoner.infer(state.currentMessage));
-  state.writer.addMessage(output);
-  state.inferredCount += output.length;
+    : state.reasoner.inferWithDiagnostics(state.currentMessage);
+  state.inconsistencyComments.push(formatInconsistencyComments(inference.inconsistencies, 'message ' + messageNumber));
+  state.writer.addMessage(inference.quads);
+  state.inferredCount += inference.quads.length;
   state.processedMessageCount += 1;
   postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + statefulStoreSummary(state) + '…');
 }
@@ -495,6 +499,93 @@ function endWriter(writer) {
   return new Promise((resolve, reject) => {
     writer.end((error) => error ? reject(error) : resolve());
   });
+}
+
+function appendInconsistencyComments(comments) {
+  const text = comments.filter(Boolean).join('');
+  if (text) {
+    self.postMessage({ type: 'append', chunk: text });
+  }
+}
+
+function diagnosticStatusSuffix(comments) {
+  const text = Array.isArray(comments) ? comments.join('') : comments;
+  const count = (text.match(/^# Inconsistency detected/gm) || []).length;
+  return count > 0 ? ', found ' + count + ' inconsistency diagnostic(s)' : '';
+}
+
+function formatInconsistencyComments(reports, context) {
+  if (!reports || reports.length === 0) {
+    return '';
+  }
+  const prefix = context ? ' in ' + context : '';
+  const visible = reports.slice(0, 20);
+  const lines = visible.map((report) => {
+    const rule = report.rule ? shortIri(report.rule) : 'unknown rule';
+    const description = describeInconsistencyRule(rule);
+    const terms = report.terms && report.terms.length > 0
+      ? ': ' + report.terms.map((term, index) => 'term' + (index + 1) + ' ' + termToComment(term)).join('; ')
+      : '.';
+    return '# Inconsistency detected' + prefix + ' (' + rule + (description ? ': ' + description : '') + ')' + terms;
+  });
+  if (reports.length > visible.length) {
+    lines.push('# ... ' + (reports.length - visible.length) + ' more inconsistency diagnostic(s) omitted.');
+  }
+  return lines.map(commentLine).join('\\n') + '\\n\\n';
+}
+
+function commentLine(value) {
+  return String(value).replace(/[\\r\\n]+/g, ' ');
+}
+
+function shortIri(value) {
+  const match = String(value).match(/[\/#]([^\/#]+)$/);
+  return match ? match[1] : String(value);
+}
+
+function describeInconsistencyRule(rule) {
+  return {
+    'eq-diff1': 'same individual is also differentFrom',
+    'eq-diff2': 'AllDifferent members are sameAs',
+    'eq-diff3': 'AllDifferent distinctMembers are sameAs',
+    'prp-irp': 'irreflexive property used reflexively',
+    'prp-asyp': 'asymmetric property used in both directions',
+    'prp-pdw': 'disjoint properties share a subject/object pair',
+    'prp-adp': 'AllDisjointProperties members share a subject/object pair',
+    'prp-npa1': 'negative object property assertion is contradicted',
+    'prp-npa2': 'negative data property assertion is contradicted',
+    'cls-nothing2': 'resource is typed as owl:Nothing',
+    'cls-com': 'complement classes share an instance',
+    'cls-maxc1': 'maxCardinality 0 restriction has a value',
+    'cls-maxqc1': 'qualified maxCardinality 0 restriction has a value of the qualified class',
+    'cls-maxqc2': 'qualified maxCardinality 0 restriction has a value',
+    'cls-maxqd1': 'qualified maxCardinality 0 data restriction has a typed value',
+    'cax-dw': 'disjoint classes share an instance',
+    'cax-adc': 'AllDisjointClasses members share an instance',
+    'dt-not-type': 'literal is not valid for its datatype',
+  }[rule] || '';
+}
+
+function termToComment(term) {
+  if (!term) {
+    return 'unknown';
+  }
+  if (term.termType === 'NamedNode') {
+    return '<' + term.value + '>';
+  }
+  if (term.termType === 'BlankNode') {
+    return '_:' + term.value;
+  }
+  if (term.termType === 'Literal') {
+    let literal = JSON.stringify(term.value);
+    if (term.language) {
+      literal += '@' + term.language;
+    } else if (term.datatype && term.datatype.value !== 'http://www.w3.org/2001/XMLSchema#string') {
+      literal += '^^<' + term.datatype.value + '>';
+    }
+    return literal;
+  }
+  return term.termType + ':' + term.value;
 }
 
 function progressMessage(state, prefix) {

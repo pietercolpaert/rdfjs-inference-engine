@@ -6,8 +6,10 @@ import { DataFactory as RdfParserDataFactory } from 'rdf-parser-ts';
 import { reasonStream, runAsync, type RdfJsQuad } from 'eyeling';
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
+const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const OWLRL = 'https://example.org/owlrl-n3#';
+const OWLRL_INCONSISTENCY = OWLRL + 'Inconsistency';
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
   OWLRL + 'intersectionListRoot',
@@ -84,6 +86,18 @@ export interface RuntimeCompilerInput {
 
 export type RuntimeCompiler = (input: RuntimeCompilerInput) => string;
 
+export interface InconsistencyReport {
+  id: string;
+  rule?: string;
+  terms: Term[];
+  quads: Quad[];
+}
+
+export interface InferenceResult {
+  quads: Quad[];
+  inconsistencies: InconsistencyReport[];
+}
+
 export interface SaveOptions {
   path: string;
 }
@@ -114,6 +128,10 @@ export class InferenceEngine {
   public getStaticClosure(options: InferenceOptions = {}): Quad[] {
     const outputMode = options.outputMode ?? this.outputMode;
     return this.staticClosure.filter((quad) => shouldEmitQuad(quad, outputMode));
+  }
+
+  public getStaticInconsistencies(): InconsistencyReport[] {
+    return collectInconsistencyReports(this.staticClosure);
   }
 
   public load(vocabulary: VocabularyDataset, options?: LoadOptions): string;
@@ -174,6 +192,38 @@ export class InferenceEngine {
     yield* derived;
   }
 
+  public inferWithDiagnostics(data: Quad[], options: InferenceOptions = {}): InferenceResult {
+    this.assertLoaded();
+    const derived: Quad[] = [];
+    const diagnostics: Quad[] = [];
+    const seen = new Set<string>();
+    const outputMode = options.outputMode ?? this.outputMode;
+
+    reasonStream({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      rdfjs: true,
+      dataFactory: this.dataFactory as any,
+      skipUnsupportedRdfJs: true,
+      onDerived: (item) => {
+        if (item.quad) {
+          const quad = item.quad as Quad;
+          diagnostics.push(quad);
+          addDerived(derived, seen, quad, outputMode);
+        }
+        if (item.quads) {
+          for (const quad of item.quads as Quad[]) {
+            diagnostics.push(quad);
+            addDerived(derived, seen, quad, outputMode);
+          }
+        }
+      },
+    });
+
+    return {
+      quads: derived,
+      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics]),
+    };
+  }
+
   public async inferAsync(data: Quad[], options: InferenceOptions = {}): Promise<Quad[]> {
     this.assertLoaded();
     if (!options.store && !options.storePath && !options.storeClear) {
@@ -207,6 +257,48 @@ export class InferenceEngine {
     }
 
     return derived;
+  }
+
+  public async inferAsyncWithDiagnostics(data: Quad[], options: InferenceOptions = {}): Promise<InferenceResult> {
+    this.assertLoaded();
+    if (!options.store && !options.storePath && !options.storeClear) {
+      return this.inferWithDiagnostics(data, options);
+    }
+
+    const derived: Quad[] = [];
+    const diagnostics: Quad[] = [];
+    const seen = new Set<string>();
+    const outputMode = options.outputMode ?? this.outputMode;
+    const result = await runAsync({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      rdfjs: true,
+      dataFactory: this.dataFactory as any,
+      skipUnsupportedRdfJs: true,
+      store: options.store,
+      storePath: options.storePath,
+      storeClear: options.storeClear,
+      onDerived: (item) => {
+        if (item.quad) {
+          const quad = item.quad as Quad;
+          diagnostics.push(quad);
+          addDerived(derived, seen, quad, outputMode);
+        }
+        if (item.quads) {
+          for (const quad of item.quads as Quad[]) {
+            diagnostics.push(quad);
+            addDerived(derived, seen, quad, outputMode);
+          }
+        }
+      },
+    });
+
+    if (result.store && typeof result.store.close === 'function') {
+      await result.store.close();
+    }
+
+    return {
+      quads: derived,
+      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics]),
+    };
   }
 
   public createInferenceStream(): Transform {
@@ -473,6 +565,52 @@ function isReflexiveSameAs(quad: Quad): boolean {
 function isInternalHelperQuad(quad: Quad): boolean {
   return quad.predicate.termType === 'NamedNode'
     && INTERNAL_HELPER_PREDICATES.has(quad.predicate.value);
+}
+
+function collectInconsistencyReports(quads: Iterable<Quad>): InconsistencyReport[] {
+  const byId = new Map<string, { quads: Quad[]; rule?: string; terms: Map<number, Term> }>();
+
+  for (const quad of quads) {
+    if (!isInconsistencyDiagnosticQuad(quad)) {
+      continue;
+    }
+
+    const id = termKey(quad.subject as Term);
+    const report = byId.get(id) ?? { quads: [], terms: new Map<number, Term>() };
+    report.quads.push(quad);
+
+    if (quad.predicate.value === OWLRL + 'rule') {
+      report.rule = quad.object.value;
+    } else if (quad.predicate.value.startsWith(OWLRL + 'term')) {
+      const index = Number.parseInt(quad.predicate.value.slice((OWLRL + 'term').length), 10);
+      if (Number.isInteger(index)) {
+        report.terms.set(index, quad.object as Term);
+      }
+    }
+
+    byId.set(id, report);
+  }
+
+  return Array.from(byId.entries()).map(([id, report]) => ({
+    id,
+    rule: report.rule,
+    terms: Array.from(report.terms.entries())
+      .sort(([left], [right]) => left - right)
+      .map(([, term]) => term),
+    quads: report.quads,
+  }));
+}
+
+function isInconsistencyDiagnosticQuad(quad: Quad): boolean {
+  if (quad.predicate.termType !== 'NamedNode') {
+    return false;
+  }
+
+  return (quad.predicate.value === RDF_TYPE
+    && quad.object.termType === 'NamedNode'
+    && quad.object.value === OWLRL_INCONSISTENCY)
+    || quad.predicate.value === OWLRL + 'rule'
+    || /^https:\/\/example\.org\/owlrl-n3#term[1-5]$/.test(quad.predicate.value);
 }
 
 function hasLiteralSubject(quad: Quad): boolean {

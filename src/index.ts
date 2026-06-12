@@ -2,6 +2,8 @@ export { InferenceEngine, defaultRuntimeCompiler, loadDefaultRuleProfiles, seria
 export type {
   InferenceEngineOptions,
   InferenceStoreOptions,
+  InferenceResult,
+  InconsistencyReport,
   LoadedRuleProfile,
   LoadOptions,
   RuleProfile,
