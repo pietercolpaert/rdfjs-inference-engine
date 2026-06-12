@@ -1,0 +1,430 @@
+@prefix :      <http://example.org/ns#> .
+@prefix list:  <http://www.w3.org/2000/10/swap/list#> .
+@prefix log:   <http://www.w3.org/2000/10/swap/log#> .
+@prefix eymsg: <https://eyereasoner.github.io/eyeling/vocab/message#> .
+@prefix string:<http://www.w3.org/2000/10/swap/string#> .
+@prefix math:  <http://www.w3.org/2000/10/swap/math#> .
+@prefix marc:  <https://codeberg.org/phochste/marcattacks#> .
+
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+:marc-source-ontology
+    a owl:Ontology ;
+    rdfs:label "Ontology for MARC records represented as RDF lists" ;
+    rdfs:comment """
+    This ontology describes the source structure used in the Alma MARC RDF
+    messages after the RDF Message envelope has been selected away. The source
+    shape is:
+
+        ?X :record ?Record .
+
+    ?Record is an RDF list of MARC field rows. Each MARC field row is itself
+    an RDF list of the form:
+
+        (tag ind1 ind2 code value code value ...)
+
+    The ontology classifies record carriers, field rows, MARC tag-specific
+    fields, subfield-code cells, and extractability patterns such as 001,
+    245$a, 650$a, and 920$a.
+
+    Because the source uses RDF Collections whose rdf:first values may be
+    either resources or literals, this ontology is intended for OWL/RDF,
+    OWL Full, or rule-oriented OWL/RDFS processing rather than strict OWL 2 DL.
+    """ .
+
+#################################################################
+# Source record structure
+#################################################################
+
+:record
+    a owl:ObjectProperty ;
+    rdfs:label "MARC record list" ;
+    rdfs:comment "Connects a source node to its raw MARC record represented as an RDF list." ;
+    rdfs:domain marc:RecordCarrier ;
+    rdfs:range marc:RecordList .
+
+marc:RecordCarrier
+    a owl:Class ;
+    rdfs:label "record carrier" ;
+    rdfs:comment "A source node that carries a raw MARC record through :record." .
+
+marc:RecordList
+    a owl:Class ;
+    rdfs:label "MARC record list" ;
+    rdfs:comment "The outer RDF list whose members are MARC field rows." .
+
+marc:Field
+    a owl:Class ;
+    rdfs:label "MARC field row" ;
+    rdfs:comment "An inner RDF list representing one MARC field: tag, indicators, then subfield code/value pairs." .
+
+#################################################################
+# Traversal of the outer record list
+#################################################################
+
+marc:tail
+    a owl:ObjectProperty , owl:TransitiveProperty ;
+    rdfs:label "list tail" ;
+    rdfs:comment "Transitive superproperty of rdf:rest, used to walk RDF lists." .
+
+rdf:rest
+    rdfs:subPropertyOf marc:tail .
+
+marc:hasField
+    a owl:ObjectProperty ;
+    rdfs:label "has MARC field" ;
+    rdfs:comment "Relates a record carrier to one MARC field row in its :record list." ;
+    rdfs:domain marc:RecordCarrier ;
+    rdfs:range marc:Field .
+
+marc:hasFirstField
+    a owl:ObjectProperty ;
+    owl:propertyChainAxiom ( :record rdf:first ) ;
+    rdfs:subPropertyOf marc:hasField ;
+    rdfs:label "has first MARC field" .
+
+marc:hasFollowingField
+    a owl:ObjectProperty ;
+    owl:propertyChainAxiom ( :record marc:tail rdf:first ) ;
+    rdfs:subPropertyOf marc:hasField ;
+    rdfs:label "has following MARC field" .
+
+#################################################################
+# MARC field tag classes
+#################################################################
+
+marc:ControlNumberField
+    a owl:Class ;
+    rdfs:label "MARC 001 control number field" ;
+    rdfs:comment "A MARC field row whose tag is 001." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:Field
+            [
+                a owl:Restriction ;
+                owl:onProperty rdf:first ;
+                owl:hasValue "001"
+            ]
+        )
+    ] .
+
+marc:TitleStatementField
+    a owl:Class ;
+    rdfs:label "MARC 245 title statement field" ;
+    rdfs:comment "A MARC field row whose tag is 245." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:Field
+            [
+                a owl:Restriction ;
+                owl:onProperty rdf:first ;
+                owl:hasValue "245"
+            ]
+        )
+    ] .
+
+marc:TopicalSubjectField
+    a owl:Class ;
+    rdfs:label "MARC 650 topical subject field" ;
+    rdfs:comment "A MARC field row whose tag is 650." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:Field
+            [
+                a owl:Restriction ;
+                owl:onProperty rdf:first ;
+                owl:hasValue "650"
+            ]
+        )
+    ] .
+
+marc:LocalTypeField
+    a owl:Class ;
+    rdfs:label "MARC 920 local type field" ;
+    rdfs:comment "A MARC field row whose tag is 920." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:Field
+            [
+                a owl:Restriction ;
+                owl:onProperty rdf:first ;
+                owl:hasValue "920"
+            ]
+        )
+    ] .
+
+#################################################################
+# Traversal of subfield code/value pairs inside a field row
+#################################################################
+
+marc:fieldDataStart
+    a owl:ObjectProperty ;
+    owl:propertyChainAxiom ( rdf:rest rdf:rest rdf:rest ) ;
+    rdfs:label "field data start" ;
+    rdfs:comment "From the start of a MARC field row, reaches the first subfield-code cell after tag and two indicators." .
+
+marc:nextSubfieldCodeCell
+    a owl:ObjectProperty ;
+    owl:propertyChainAxiom ( rdf:rest rdf:rest ) ;
+    rdfs:label "next subfield-code cell" ;
+    rdfs:comment "Moves from one subfield-code cell to the next, skipping the value cell." .
+
+marc:subfieldCodeTail
+    a owl:ObjectProperty , owl:TransitiveProperty ;
+    rdfs:label "subfield-code tail" ;
+    rdfs:comment "Transitive closure over repeated subfield code/value pairs." .
+
+marc:nextSubfieldCodeCell
+    rdfs:subPropertyOf marc:subfieldCodeTail .
+
+marc:hasSubfieldCodeCell
+    a owl:ObjectProperty ;
+    rdfs:label "has subfield-code cell" ;
+    rdfs:comment "Relates a MARC field row to one of its subfield-code cells." .
+
+marc:fieldDataStart
+    rdfs:subPropertyOf marc:hasSubfieldCodeCell .
+
+marc:hasFollowingSubfieldCodeCell
+    a owl:ObjectProperty ;
+    owl:propertyChainAxiom ( marc:fieldDataStart marc:subfieldCodeTail ) ;
+    rdfs:subPropertyOf marc:hasSubfieldCodeCell ;
+    rdfs:label "has following subfield-code cell" .
+
+marc:SubfieldCodeCell
+    a owl:Class ;
+    rdfs:label "subfield-code cell" ;
+    rdfs:comment "An RDF-list cell interpreted as a MARC subfield-code cell when reached through marc:hasSubfieldCodeCell from a marc:Field." .
+
+marc:SubfieldACell
+    a owl:Class ;
+    rdfs:label "subfield a cell" ;
+    rdfs:comment "An RDF-list cell whose rdf:first value is the MARC subfield code a." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:SubfieldCodeCell
+            [
+                a owl:Restriction ;
+                owl:onProperty rdf:first ;
+                owl:hasValue "a"
+            ]
+        )
+    ] .
+
+marc:hasSubfieldCodeCell
+    rdfs:range marc:SubfieldCodeCell .
+
+marc:FieldWithSubfieldA
+    a owl:Class ;
+    rdfs:label "field with subfield a" ;
+    rdfs:comment "A MARC field row with at least one subfield code a." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:Field
+            [
+                a owl:Restriction ;
+                owl:onProperty marc:hasSubfieldCodeCell ;
+                owl:someValuesFrom marc:SubfieldACell
+            ]
+        )
+    ] .
+
+#################################################################
+# Extractability patterns corresponding to the N3 extraction rules
+#################################################################
+
+marc:TitleStatementAField
+    a owl:Class ;
+    rdfs:label "MARC 245$a title field" ;
+    rdfs:comment "A 245 title statement field with subfield a, matching the source pattern used for :title extraction." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:TitleStatementField
+            marc:FieldWithSubfieldA
+        )
+    ] ;
+    marc:sourceTag "245" ;
+    marc:sourceSubfield "a" ;
+    marc:targetProperty :title .
+
+marc:TopicalSubjectAField
+    a owl:Class ;
+    rdfs:label "MARC 650$a topical subject field" ;
+    rdfs:comment "A 650 topical subject field with subfield a, matching the source pattern used for :subject extraction." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:TopicalSubjectField
+            marc:FieldWithSubfieldA
+        )
+    ] ;
+    marc:sourceTag "650" ;
+    marc:sourceSubfield "a" ;
+    marc:targetProperty :subject .
+
+marc:LocalTypeAField
+    a owl:Class ;
+    rdfs:label "MARC 920$a type field" ;
+    rdfs:comment "A 920 local type field with subfield a, matching the source pattern used for :type extraction." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:LocalTypeField
+            marc:FieldWithSubfieldA
+        )
+    ] ;
+    marc:sourceTag "920" ;
+    marc:sourceSubfield "a" ;
+    marc:targetProperty :type .
+
+#################################################################
+# Record-level derived classes
+#################################################################
+
+marc:IdentifiableRecord
+    a owl:Class ;
+    rdfs:label "record with MARC 001 field" ;
+    rdfs:comment "A record carrier whose field list contains a MARC 001 control number field." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:RecordCarrier
+            [
+                a owl:Restriction ;
+                owl:onProperty marc:hasField ;
+                owl:someValuesFrom marc:ControlNumberField
+            ]
+        )
+    ] .
+
+marc:RecordWithExtractableTitle
+    a owl:Class ;
+    rdfs:label "record with extractable 245$a title" ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:RecordCarrier
+            [
+                a owl:Restriction ;
+                owl:onProperty marc:hasField ;
+                owl:someValuesFrom marc:TitleStatementAField
+            ]
+        )
+    ] .
+
+marc:RecordWithExtractableSubject
+    a owl:Class ;
+    rdfs:label "record with extractable 650$a subject" ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:RecordCarrier
+            [
+                a owl:Restriction ;
+                owl:onProperty marc:hasField ;
+                owl:someValuesFrom marc:TopicalSubjectAField
+            ]
+        )
+    ] .
+
+marc:RecordWithExtractableType
+    a owl:Class ;
+    rdfs:label "record with extractable 920$a type" ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:RecordCarrier
+            [
+                a owl:Restriction ;
+                owl:onProperty marc:hasField ;
+                owl:someValuesFrom marc:LocalTypeAField
+            ]
+        )
+    ] .
+
+marc:RecordReadyForBasicExtraction
+    a owl:Class ;
+    rdfs:label "record ready for basic extraction" ;
+    rdfs:comment "A record carrier with a MARC 001 control number field and a 245$a title field." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:IdentifiableRecord
+            marc:RecordWithExtractableTitle
+        )
+    ] .
+
+marc:RecordWithAllConfiguredExtractionTargets
+    a owl:Class ;
+    rdfs:label "record with all configured extraction targets" ;
+    rdfs:comment "A record carrier with the source structures used by the configured title, subject, and type extraction rules." ;
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            marc:IdentifiableRecord
+            marc:RecordWithExtractableTitle
+            marc:RecordWithExtractableSubject
+            marc:RecordWithExtractableType
+        )
+    ] .
+
+#################################################################
+# Mapping annotations
+#################################################################
+
+marc:sourceTag
+    a owl:AnnotationProperty ;
+    rdfs:label "source MARC tag" .
+
+marc:sourceSubfield
+    a owl:AnnotationProperty ;
+    rdfs:label "source MARC subfield" .
+
+marc:targetProperty
+    a owl:AnnotationProperty ;
+    rdfs:label "target RDF property" .
+
+#################################################################
+# Target properties produced by the existing N3 extraction rules
+#################################################################
+
+:title
+    a owl:DatatypeProperty ;
+    rdfs:label "title" ;
+    rdfs:comment "Extraction target for values joined from MARC 245$a." ;
+    marc:sourceTag "245" ;
+    marc:sourceSubfield "a" .
+
+:subject
+    a owl:DatatypeProperty ;
+    rdfs:label "subject" ;
+    rdfs:comment "Extraction target for values joined from MARC 650$a." ;
+    marc:sourceTag "650" ;
+    marc:sourceSubfield "a" .
+
+:type
+    a owl:DatatypeProperty ;
+    rdfs:label "type" ;
+    rdfs:comment "Extraction target for values joined from MARC 920$a." ;
+    marc:sourceTag "920" ;
+    marc:sourceSubfield "a" .
+
+#################################################################
+# Example competency questions supported after materialization
+#################################################################
+
+marc:RecordCarrier
+    rdfs:comment "Useful query: SELECT ?x WHERE { ?x a marc:RecordReadyForBasicExtraction . }" .
+
+marc:Field
+    rdfs:comment "Useful query: SELECT ?field WHERE { ?field a marc:TitleStatementAField . }" .
