@@ -389,9 +389,9 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
     parsedQuadCount: 0,
     processedMessageCount: 0,
     inferredCount: 0,
-    inconsistencyComments: [],
+    inconsistencyCount: 0,
+    messageOutputStarted: false,
     lastStatusAt: 0,
-    writer: null,
   };
 }
 
@@ -418,11 +418,7 @@ async function handleParsedItems(state, items) {
 async function finishStreamingState(state) {
   if (state.messagesMode) {
     await processCurrentMessage(state);
-    if (state.writer) {
-      await endWriter(state.writer);
-    }
-    appendInconsistencyComments(state.inconsistencyComments);
-    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + diagnosticStatusSuffix(state.inconsistencyCount) + statefulStoreSummary(state) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
     return;
   }
 
@@ -436,9 +432,10 @@ async function finishStreamingState(state) {
 }
 
 async function processCurrentMessage(state) {
-  if (!state.writer) {
-    state.writer = createMessageWriter(state.api);
+  if (state.currentMessage.length === 0 && state.processedMessageCount > 0) {
+    return;
   }
+
   const started = performance.now();
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
@@ -450,11 +447,12 @@ async function processCurrentMessage(state) {
         },
       })
     : state.reasoner.inferWithDiagnostics(state.currentMessage);
-  state.inconsistencyComments.push(formatInconsistencyComments(inference.inconsistencies, 'message ' + messageNumber));
-  state.writer.addMessage(inference.quads);
+  await appendMessageOutput(state, inference.quads);
+  appendInconsistencyComments(formatInconsistencyComments(inference.inconsistencies, 'message ' + messageNumber));
+  state.inconsistencyCount += inference.inconsistencies.length;
   state.inferredCount += inference.quads.length;
   state.processedMessageCount += 1;
-  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + statefulStoreSummary(state) + '…');
+  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + diagnosticStatusSuffix(state.inconsistencyCount) + statefulStoreSummary(state) + '…', inference.inconsistencies.length > 0);
 }
 
 function statefulStoreSummary(state) {
@@ -483,35 +481,36 @@ function formatWorkerDuration(ms) {
   return minutes + ' min ' + wholeSeconds + ' s';
 }
 
-function createMessageWriter(api) {
-  return new api.Writer({
-    write(chunk, _encoding, callback) {
-      self.postMessage({ type: 'append', chunk });
-      callback?.(null);
-    },
-    end(callback) {
-      callback?.(null, '');
-    },
-  }, { prefixes: outputPrefixes(), rdfMessages: true });
-}
+async function appendMessageOutput(state, quads) {
+  if (!state.messageOutputStarted) {
+    self.postMessage({ type: 'append', chunk: '@version "1.2-messages" .\\n' });
+    state.messageOutputStarted = true;
+  } else {
+    self.postMessage({ type: 'append', chunk: '\\n@message .\\n' });
+  }
 
-function endWriter(writer) {
-  return new Promise((resolve, reject) => {
-    writer.end((error) => error ? reject(error) : resolve());
-  });
+  const output = await state.api.writeQuads(quads, outputPrefixes());
+  if (output) {
+    self.postMessage({ type: 'append', chunk: output.endsWith('\\n') ? output : output + '\\n' });
+  }
 }
 
 function appendInconsistencyComments(comments) {
-  const text = comments.filter(Boolean).join('');
+  const text = Array.isArray(comments) ? comments.filter(Boolean).join('') : String(comments || '');
   if (text) {
-    self.postMessage({ type: 'append', chunk: text });
+    self.postMessage({ type: 'append', chunk: text.startsWith('\\n') ? text : '\\n' + text });
   }
 }
 
 function diagnosticStatusSuffix(comments) {
-  const text = Array.isArray(comments) ? comments.join('') : comments;
-  const count = (text.match(/^# Inconsistency detected/gm) || []).length;
+  const count = typeof comments === 'number'
+    ? comments
+    : countInconsistencyComments(Array.isArray(comments) ? comments.join('') : comments);
   return count > 0 ? ', found ' + count + ' inconsistency diagnostic(s)' : '';
+}
+
+function countInconsistencyComments(text) {
+  return (String(text || '').match(/^# Inconsistency detected/gm) || []).length;
 }
 
 function formatInconsistencyComments(reports, context) {
