@@ -1,6 +1,6 @@
 {
   "name": "rdfjs-inference-engine",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "RDF-JS inference engine for generated Eyeling runtimes and N3 rule profiles.",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -53,7 +53,9 @@
     "test:owl": "npm run test:owl:mobibench && npm run test:owl:official",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run test:default-rules && npm run test:marc-list-ontology && npm run test:skos && npm run test:owl"
+    "test": "npm run test:default-rules && npm run test:marc-list-ontology && npm run test:skos && npm run test:owl",
+    "perf": "npm run build:node --silent && node dist/perf/run.js",
+    "perf:list": "npm run build:node --silent && node dist/perf/run.js --list"
   },
   "repository": {
     "type": "git",

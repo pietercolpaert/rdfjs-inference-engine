@@ -12,5 +12,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "examples/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "examples/**/*.ts", "tests/**/*.ts", "perf/**/*.ts"]
 }
