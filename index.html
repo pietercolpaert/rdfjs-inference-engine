@@ -351,7 +351,8 @@
   <div class="page">
     <header>
       <h1>RDF-JS inference engine playground</h1>
-      <p class="meta">Run generated-runtime inference in the browser with the bundled OWL 2 RL and SKOS Core rule profiles. Use ordinary RDF input or RDF Messages logs.</p>
+      <p class="meta">Run generated-runtime inference in the browser with the bundled OWL 2 RL and SKOS Core rule profiles.</p>
+      <p class"meta">Use this in your own projects with the <a href="">NPM library</a> or find the code on <a href="">Github</a>.</p>
     </header>
     <main class="grid">
       <section class="card">
@@ -398,7 +399,7 @@
           <input id="statefulMaterialization" type="checkbox">
           <div class="option-copy">
             <label for="statefulMaterialization">Stateful materialization for RDF Messages</label>
-            <span class="hint">Use a named Eyeling persistent fact store per playground dataset, then reason over that store plus each next message.</span>
+            <span class="hint">Use a named Eyeling persistent fact store per playground dataset, then reason over that store plus each next message. Checking this box means you tell the engine that each message is universally true, which is not the default behaviour. Check this box with care.</span>
           </div>
         </div>
         <div id="dataUrlPanel" class="uri-input-row">
