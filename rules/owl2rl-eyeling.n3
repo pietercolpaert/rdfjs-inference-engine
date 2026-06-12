@@ -32,6 +32,7 @@
 owlrl:Inconsistency a rdfs:Class .
 owlrl:listRoot a rdf:Property .
 owlrl:intersectionListRoot a rdf:Property .
+owlrl:longIntersectionListRoot a rdf:Property .
 owlrl:keyListRoot a rdf:Property .
 owlrl:propertyChainRoot a rdf:Property .
 owlrl:listMember a rdf:Property .
@@ -139,12 +140,34 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 # Mark OWL/RDF list roots that this ruleset needs to inspect.  This keeps
 # builtins such as rdf:first/rdf:rest called with a bound list term in Eyeling.
 { ?x owl:intersectionOf ?list . } => { ?list owlrl:listRoot true ; owlrl:intersectionListRoot true . } .
+
+# Short intersections are handled directly.  Mark only intersections of length
+# >= 5 for the recursive allListClassTypes helper and propagate that mark to
+# their tails so the helper can build suffix states.
+{ ?x owl:intersectionOf ?list .
+  ?list rdf:rest ?tail1 .
+  ?tail1 rdf:rest ?tail2 .
+  ?tail2 rdf:rest ?tail3 .
+  ?tail3 rdf:rest ?tail4 .
+  ?tail4 rdf:first ?class5 . }
+=> { ?list owlrl:longIntersectionListRoot true . } .
+
 { ?x owl:unionOf ?list . }        => { ?list owlrl:listRoot true . } .
 { ?x owl:oneOf ?list . }          => { ?list owlrl:listRoot true . } .
 { ?x owl:members ?list . }        => { ?list owlrl:listRoot true . } .
 { ?x owl:distinctMembers ?list . }=> { ?list owlrl:listRoot true . } .
 { ?x owl:hasKey ?list . }         => { ?list owlrl:listRoot true ; owlrl:keyListRoot true . } .
-{ ?x owl:propertyChainAxiom ?list . } => { ?list owlrl:listRoot true ; owlrl:propertyChainRoot true . } .
+{ ?x owl:propertyChainAxiom ?list . } => { ?list owlrl:listRoot true . } .
+
+# The common short property-chain cases are handled directly below.  Mark only
+# chains of length >= 4 for the generic recursive helper, otherwise list-heavy
+# data with many rdf:rest triples pays the helper cost for no benefit.
+{ ?x owl:propertyChainAxiom ?list .
+  ?list rdf:rest ?tail1 .
+  ?tail1 rdf:rest ?tail2 .
+  ?tail2 rdf:rest ?tail3 .
+  ?tail3 rdf:first ?p4 . }
+=> { ?list owlrl:propertyChainRoot true . } .
 
 # Propagate list-root status to non-empty tails.
 { ?list owlrl:listRoot true .
@@ -156,6 +179,11 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
 => { ?tail owlrl:intersectionListRoot true . } .
+
+{ ?list owlrl:longIntersectionListRoot true .
+  ?list rdf:rest ?tail .
+  ?tail rdf:first ?head . }
+=> { ?tail owlrl:longIntersectionListRoot true . } .
 
 { ?list owlrl:keyListRoot true .
   ?list rdf:rest ?tail .
@@ -194,7 +222,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 
 # allListClassTypes: tuple (?individual ?list) is true iff the individual
 # is rdf:type every class in the non-empty RDF list.
-{ ?list owlrl:intersectionListRoot true .
+{ ?list owlrl:longIntersectionListRoot true .
   ?list rdf:first ?class .
   ?list rdf:rest rdf:nil .
   ?individual rdf:type ?class .
@@ -203,7 +231,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
            owlrl:pathSubject ?individual ;
            owlrl:pathObject ?list . } .
 
-{ ?list owlrl:intersectionListRoot true .
+{ ?list owlrl:longIntersectionListRoot true .
   ?list rdf:first ?class .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
@@ -268,11 +296,11 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 # 4. Equality rules (eq-*)
 #################################################################
 
-# eq-ref
-{ ?s ?p ?o . }
-=> { ?s owl:sameAs ?s .
-     ?p owl:sameAs ?p .
-     ?o owl:sameAs ?o . } .
+# eq-ref is intentionally not materialized as a rule. Reflexive owl:sameAs
+# triples are filtered from application output and can be added by conformance
+# harnesses when required; deriving them for every term makes list- and
+# literal-heavy data much more expensive without affecting non-reflexive
+# equality substitution.
 
 # eq-sym
 { ?x owl:sameAs ?y . }
@@ -402,7 +430,36 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?x ?p1 ?y . }
 => { ?x ?p2 ?y . } .
 
-# prp-spo2: property chain, via the recursive owlrl:propertyChainHolds helper above.
+# prp-spo2: property chains.  Most practical OWL 2 RL chains are short, so
+# length 1-3 chains are materialized directly without helper path nodes.
+{ ?p owl:propertyChainAxiom ?chain .
+  ?chain rdf:first ?p1 .
+  ?chain rdf:rest rdf:nil .
+  ?x ?p1 ?y . }
+=> { ?x ?p ?y . } .
+
+{ ?p owl:propertyChainAxiom ?chain .
+  ?chain rdf:first ?p1 .
+  ?chain rdf:rest ?tail1 .
+  ?tail1 rdf:first ?p2 .
+  ?tail1 rdf:rest rdf:nil .
+  ?x ?p1 ?z .
+  ?z ?p2 ?y . }
+=> { ?x ?p ?y . } .
+
+{ ?p owl:propertyChainAxiom ?chain .
+  ?chain rdf:first ?p1 .
+  ?chain rdf:rest ?tail1 .
+  ?tail1 rdf:first ?p2 .
+  ?tail1 rdf:rest ?tail2 .
+  ?tail2 rdf:first ?p3 .
+  ?tail2 rdf:rest rdf:nil .
+  ?x ?p1 ?z1 .
+  ?z1 ?p2 ?z2 .
+  ?z2 ?p3 ?y . }
+=> { ?x ?p ?y . } .
+
+# Longer property chains use the recursive owlrl:propertyChainHolds helper above.
 { ?p owl:propertyChainAxiom ?chain .
   ?path owlrl:propertyChainHolds true ;
         owlrl:pathChain ?chain ;
@@ -587,7 +644,51 @@ owl:Nothing rdf:type owl:Class .
           owlrl:rule owlrl:cls-nothing2 ;
           owlrl:term1 ?x . } .
 
-# cls-int1
+# cls-int1.  Common short intersections are materialized directly to avoid
+# recursive helper joins over every typed individual in list-heavy data.
+{ ?c owl:intersectionOf ?list .
+  ?list rdf:first ?c1 .
+  ?list rdf:rest rdf:nil .
+  ?y rdf:type ?c1 . }
+=> { ?y rdf:type ?c . } .
+
+{ ?c owl:intersectionOf ?list .
+  ?list rdf:first ?c1 .
+  ?list rdf:rest ?tail1 .
+  ?tail1 rdf:first ?c2 .
+  ?tail1 rdf:rest rdf:nil .
+  ?y rdf:type ?c1 .
+  ?y rdf:type ?c2 . }
+=> { ?y rdf:type ?c . } .
+
+{ ?c owl:intersectionOf ?list .
+  ?list rdf:first ?c1 .
+  ?list rdf:rest ?tail1 .
+  ?tail1 rdf:first ?c2 .
+  ?tail1 rdf:rest ?tail2 .
+  ?tail2 rdf:first ?c3 .
+  ?tail2 rdf:rest rdf:nil .
+  ?y rdf:type ?c1 .
+  ?y rdf:type ?c2 .
+  ?y rdf:type ?c3 . }
+=> { ?y rdf:type ?c . } .
+
+{ ?c owl:intersectionOf ?list .
+  ?list rdf:first ?c1 .
+  ?list rdf:rest ?tail1 .
+  ?tail1 rdf:first ?c2 .
+  ?tail1 rdf:rest ?tail2 .
+  ?tail2 rdf:first ?c3 .
+  ?tail2 rdf:rest ?tail3 .
+  ?tail3 rdf:first ?c4 .
+  ?tail3 rdf:rest rdf:nil .
+  ?y rdf:type ?c1 .
+  ?y rdf:type ?c2 .
+  ?y rdf:type ?c3 .
+  ?y rdf:type ?c4 . }
+=> { ?y rdf:type ?c . } .
+
+# Longer intersections use the recursive allListClassTypes helper above.
 { ?c owl:intersectionOf ?list .
   ?state owlrl:allListClassTypes true ;
          owlrl:pathSubject ?y ;
@@ -854,8 +955,23 @@ owl:Nothing rdf:type owl:Class .
 
 { ?s ?p ?lt .
   ?lt dt:datatype ?datatype .
+  ?datatype log:notEqualTo xsd:string .
+  ?datatype log:notEqualTo rdf:langString .
   (owlrl:literal ?lt) log:skolem ?litNode . }
 => { ?litNode owlrl:term ?lt . } .
+
+# Plain strings and language-tagged strings are very common in labels,
+# comments, and record values. Materialize their basic datatype membership
+# directly without indexing them into the quadratic literal comparison helpers.
+{ ?s ?p ?lt .
+  ?lt dt:datatype xsd:string . }
+=> { ?lt rdf:type xsd:string ;
+         rdf:type rdfs:Literal . } .
+
+{ ?s ?p ?lt .
+  ?lt dt:datatype rdf:langString . }
+=> { ?lt rdf:type rdf:langString ;
+         rdf:type rdfs:Literal . } .
 
 # dt-type2
 { ?litNode owlrl:term ?lt .

@@ -11,6 +11,7 @@ const OWLRL = 'https://example.org/owlrl-n3#';
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
   OWLRL + 'intersectionListRoot',
+  OWLRL + 'longIntersectionListRoot',
   OWLRL + 'keyListRoot',
   OWLRL + 'propertyChainRoot',
   OWLRL + 'listMember',
