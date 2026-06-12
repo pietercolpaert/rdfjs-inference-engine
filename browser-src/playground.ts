@@ -51,6 +51,7 @@ type WorkerRequest = {
   backgroundSource: string;
   dataMode: InputMode;
   statefulMaterialization: boolean;
+  statefulStoreName?: string;
   dataSource?: string;
   dataUrl?: string;
 };
@@ -185,6 +186,9 @@ async function runInference(): Promise<void> {
       backgroundSource,
       dataMode,
       statefulMaterialization: controls.statefulMaterialization.checked,
+      statefulStoreName: controls.statefulMaterialization.checked
+        ? createStatefulStoreName(backgroundSource, dataMode === 'url' ? dataUrl ?? '' : dataSource ?? '')
+        : undefined,
       dataSource,
       dataUrl,
     });
@@ -253,6 +257,24 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
   });
 }
 
+function createStatefulStoreName(backgroundSource: string, dataKey: string): string {
+  const projectKey = [window.location.origin, window.location.pathname, backgroundSource, dataKey].join('\0');
+  return `rdfjs-inference-engine:playground:${stableHash(projectKey)}`;
+}
+
+function stableHash(value: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return `${(h2 >>> 0).toString(36)}${(h1 >>> 0).toString(36)}`;
+}
+
 function createInferenceWorker(): Worker {
   const source = `
 self.onmessage = async (event) => {
@@ -294,9 +316,9 @@ async function processInputData(api, reasoner, request, compiledAt, started) {
 
 async function processTextInput(api, reasoner, source, compiledAt, started) {
   self.postMessage({ type: 'status', message: 'Parsing text input…' });
-  const state = createStreamingState(api, reasoner, compiledAt, started, 'text input', requestStatefulMaterialization());
-  handleParsedItems(state, state.parser.write(source));
-  handleParsedItems(state, state.parser.end());
+  const state = createStreamingState(api, reasoner, compiledAt, started, 'text input', requestStatefulMaterialization(), requestStatefulStoreName());
+  await handleParsedItems(state, state.parser.write(source));
+  await handleParsedItems(state, state.parser.end());
   await finishStreamingState(state);
 }
 
@@ -316,7 +338,7 @@ async function processUrlInput(api, reasoner, url, compiledAt, started) {
     return;
   }
 
-  const state = createStreamingState(api, reasoner, compiledAt, started, url, requestStatefulMaterialization());
+  const state = createStreamingState(api, reasoner, compiledAt, started, url, requestStatefulMaterialization(), requestStatefulStoreName());
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let bytes = 0;
@@ -328,15 +350,15 @@ async function processUrlInput(api, reasoner, url, compiledAt, started) {
     }
     bytes += read.value.byteLength;
     const text = decoder.decode(read.value, { stream: true });
-    handleParsedItems(state, state.parser.write(text));
+    await handleParsedItems(state, state.parser.write(text));
     postProgressStatus(state, progressMessage(state, 'Streaming input: read ' + Math.round(bytes / 1024) + ' KiB'));
   }
 
   const tail = decoder.decode();
   if (tail) {
-    handleParsedItems(state, state.parser.write(tail));
+    await handleParsedItems(state, state.parser.write(tail));
   }
-  handleParsedItems(state, state.parser.end());
+  await handleParsedItems(state, state.parser.end());
   await finishStreamingState(state);
 }
 
@@ -344,7 +366,13 @@ function requestStatefulMaterialization() {
   return Boolean(self.currentWorkerRequest && self.currentWorkerRequest.statefulMaterialization);
 }
 
-function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization) {
+function requestStatefulStoreName() {
+  return self.currentWorkerRequest && self.currentWorkerRequest.statefulStoreName
+    ? String(self.currentWorkerRequest.statefulStoreName)
+    : 'rdfjs-inference-engine:playground:default';
+}
+
+function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization, statefulStoreName) {
   return {
     api,
     reasoner,
@@ -353,8 +381,7 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
     compiledAt,
     started,
     statefulMaterialization,
-    materializedState: [],
-    materializedStateKeys: new Set(),
+    statefulStoreName,
     messagesMode: false,
     ordinaryQuads: [],
     currentMessage: [],
@@ -367,12 +394,12 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
   };
 }
 
-function handleParsedItems(state, items) {
+async function handleParsedItems(state, items) {
   for (const item of items) {
     if (state.api.isMessageQuad(item)) {
       state.messagesMode = true;
       while (state.currentMessageCounter < item.messageCounter) {
-        processCurrentMessage(state);
+        await processCurrentMessage(state);
         state.currentMessageCounter += 1;
         state.currentMessage = [];
       }
@@ -389,11 +416,11 @@ function handleParsedItems(state, items) {
 
 async function finishStreamingState(state) {
   if (state.messagesMode) {
-    processCurrentMessage(state);
+    await processCurrentMessage(state);
     if (state.writer) {
       await endWriter(state.writer);
     }
-    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + (state.statefulMaterialization ? ', state ' + state.materializedState.length + ' quad(s)' : '') + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + statefulStoreSummary(state) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
     return;
   }
 
@@ -405,49 +432,29 @@ async function finishStreamingState(state) {
   self.postMessage({ type: 'result', output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inferred.length + ' quad(s). Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
 }
 
-function processCurrentMessage(state) {
+async function processCurrentMessage(state) {
   if (!state.writer) {
     state.writer = createMessageWriter(state.api);
   }
   const started = performance.now();
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
-  const inferenceInput = state.statefulMaterialization
-    ? state.materializedState.concat(state.currentMessage)
-    : state.currentMessage;
-  const inferred = Array.from(state.reasoner.infer(inferenceInput));
   const output = state.statefulMaterialization
-    ? inferred.filter((quad) => !state.materializedStateKeys.has(quadKey(quad)))
-    : inferred;
-  if (state.statefulMaterialization) {
-    rememberAll(state, state.currentMessage);
-    rememberAll(state, inferred);
-  }
+    ? await state.reasoner.inferAsync(state.currentMessage, {
+        store: {
+          name: state.statefulStoreName,
+          clear: state.processedMessageCount === 0,
+        },
+      })
+    : Array.from(state.reasoner.infer(state.currentMessage));
   state.writer.addMessage(output);
   state.inferredCount += output.length;
   state.processedMessageCount += 1;
-  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + (state.statefulMaterialization ? ', state ' + state.materializedState.length + ' quad(s)' : '') + '…');
+  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + statefulStoreSummary(state) + '…');
 }
 
-function rememberAll(state, quads) {
-  for (const quad of quads) {
-    const key = quadKey(quad);
-    if (!state.materializedStateKeys.has(key)) {
-      state.materializedStateKeys.add(key);
-      state.materializedState.push(quad);
-    }
-  }
-}
-
-function quadKey(quad) {
-  return [quad.subject, quad.predicate, quad.object, quad.graph].map(termKey).join(' ');
-}
-
-function termKey(term) {
-  if (term.termType === 'Literal') {
-    return '"' + term.value + '"@' + term.language + '^^' + term.datatype.value;
-  }
-  return term.termType + ':' + term.value;
+function statefulStoreSummary(state) {
+  return state.statefulMaterialization ? ', persistent store ' + state.statefulStoreName : '';
 }
 
 function postProgressStatus(state, message, force = false) {

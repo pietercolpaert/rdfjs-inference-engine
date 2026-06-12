@@ -29,7 +29,7 @@ npm run build
 
 `npm run build` now builds both the Node package output and the committed browser bundles in `browser/`.
 
-## How it works
+## Using it
 
 The core idea is:
 
@@ -80,6 +80,7 @@ function parseToQuads(source: string): Quad[] {
 - `load(profileOrProfiles, vocabularyDataset, { runtimeCompiler })` to provide custom compilation for a specific rule profile or ontology language;
 - `saveRuntime(path)` to save that runtime as an N3 file;
 - `infer(quads)` to infer over an array of RDF-JS quads and return a generator of inferred RDF-JS quads;
+- `inferAsync(quads, { store })` to infer with Eyeling's async runner and an optional named persistent fact store;
 - `createInferenceStream()` / `stream()` to create an object-mode transform stream where each incoming iterable of quads produces one array of inferred quads.
 
 ### N3 rules as profiles
@@ -118,22 +119,17 @@ const inferred = Array.from(reasoner.infer(data));
 
 You can still pass one profile or an array of profiles explicitly if you want to override the default.
 
+### Browser bundle
 
-### Browser bundle and playground
-
-The browser build creates a minified global bundle:
-
-```text
-browser/rdfjs-inference-engine.min.js
-```
-
-Include it directly in a web page:
+The browser build creates a minified global bundle. Include it directly in a web page:
 
 ```html
-<script src="browser/rdfjs-inference-engine.min.js"></script>
+<script src="https://www.pieter.pm/rdfjs-inference-engine/browser/rdfjs-inference-engine.min.js"></script>
 ```
 
 The bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `Parser`, `Writer`, `DataFactory`, `parseRdfOrMessages()`, `writeQuads()`, and `writeMessages()`.
+
+### The Playground
 
 The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile, so the playground currently runs the OWL 2 RL and SKOS Core profiles together. It also bundles the self-contained examples from `examples/` into an example picker. The page provides syntax-highlighted RDF editors for:
 
@@ -143,7 +139,7 @@ The root `index.html` file is a browser playground. At browser-build time, it bu
 
 It uses `rdf-parser-ts` message detection. Ordinary RDF input is passed to `infer()`. RDF Messages input is processed message by message and serialized as nicely formatted RDF Messages/TriG, using `@version "1.2-messages" .`, prefixes, compact Turtle statements, and `@message .` delimiters. When the data source is an RDF Messages URL, the playground parses the response stream incrementally and appends inferred output while the input stream is still being read instead of loading the whole data file first. The playground stores editable state in the URL hash so examples can be shared as links.
 
-The playground also includes a **Stateful materialization for RDF Messages** checkbox. When enabled, each message's asserted triples and inferred delta are kept in a local materialized state graph and reused while processing the next message. The stateful materialization example uses this to infer that `:alice a :Mother` only after the second message supplies the parent relationship that combines with the first message's female assertion.
+The playground also includes a **Stateful materialization for RDF Messages** checkbox. When enabled, each message is processed with Eyeling's named persistent fact store instead of a single in-memory state array. The store name is derived from the playground URL plus the selected background and input data, so different projects/datasets do not share one global store. The store is cleared at the start of each playground run for repeatable output, then reused message by message while that run is active. The stateful materialization example uses this to infer that `:alice a :Mother` only after the second message supplies the parent relationship that combines with the first message's female assertion.
 
 Build only the browser artifacts with:
 
@@ -151,9 +147,7 @@ Build only the browser artifacts with:
 npm run build:browser
 ```
 
-Git hooks are tracked in `.githooks/`. `npm install` or `npm run hooks:install` configures the repository to use them. The pre-commit hook regenerates and stages the browser bundles; the pre-push hook regenerates them again and blocks the push if the generated files differ from what is committed.
-
-## Examples
+## Tests and examples
 
 All examples are self-contained folders under `examples/`. Each runnable example keeps its own `README.md`, `run.ts`, ontology/background file, input file, and expected output fixture. Shared example utilities live in `examples/util.ts`; there is no separate `examples/src/` folder.
 
@@ -170,7 +164,9 @@ Run all example output checks from the repository root with:
 npm run test:examples
 ```
 
-## MobiBench OWL 2 RL tests
+We also have a couple of test harnesses:
+
+### MobiBench OWL 2 RL tests
 
 The repository includes a MobiBench harness for the OWL 2 RL RDF-based test-suite archive:
 
@@ -203,7 +199,7 @@ npm run build --silent && node dist/tests/run-mobibench-owl2rl.js --all
 
 The `--all` mode is intentionally stricter and currently exposes unsupported areas such as list-heavy rules and some datatype edge cases.
 
-## Official OWL 2 RL tests
+### Official OWL 2 RL tests
 
 The repository includes a harness for the W3C OWL 2 Test Case Repository. The harness downloads and caches these RDF/XML manifests:
 
@@ -261,7 +257,7 @@ npm run build --silent && node dist/tests/run-official-owl2rl.js --manifests=/20
 
 The `--all` mode is intentionally stricter and may expose unsupported or currently failing areas of the implementation.
 
-## SKOS Core entailment tests
+### SKOS Core entailment tests
 
 The repository includes a local SKOS Core test harness for `rules/skos-entailment.n3`:
 
@@ -337,7 +333,7 @@ A typical ingest-time architecture looks like this:
 
 ```text
 RDF input
-   -> Eyeling with generated/<example>-runtime.n3
+  -> Eyeling with generated/<example>-runtime.n3
   -> derived triples
   -> deduplication / validation / persistence
   -> SPARQL endpoint, event bus, cache, or materialized RDF store

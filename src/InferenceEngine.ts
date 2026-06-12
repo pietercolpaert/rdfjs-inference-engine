@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { DataFactory as RdfParserDataFactory } from 'rdf-parser-ts';
-import { reasonStream, type RdfJsQuad } from 'eyeling';
+import { reasonStream, runAsync, type RdfJsQuad } from 'eyeling';
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
@@ -51,6 +51,17 @@ export type InferenceOutputMode = 'application' | 'conformance';
 
 export interface InferenceOptions {
   outputMode?: InferenceOutputMode;
+  store?: string | InferenceStoreOptions;
+  storePath?: string;
+  storeClear?: boolean;
+}
+
+export interface InferenceStoreOptions {
+  name: string;
+  clear?: boolean;
+  path?: string;
+  type?: 'memory' | 'persistent';
+  backend?: 'memory' | 'level' | 'indexeddb';
 }
 
 export interface LoadOptions {
@@ -157,6 +168,41 @@ export class InferenceEngine {
     });
 
     yield* derived;
+  }
+
+  public async inferAsync(data: Quad[], options: InferenceOptions = {}): Promise<Quad[]> {
+    this.assertLoaded();
+    if (!options.store && !options.storePath && !options.storeClear) {
+      return Array.from(this.infer(data, options));
+    }
+
+    const derived: Quad[] = [];
+    const seen = new Set<string>();
+    const outputMode = options.outputMode ?? this.outputMode;
+    const result = await runAsync({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      rdfjs: true,
+      dataFactory: this.dataFactory as any,
+      skipUnsupportedRdfJs: true,
+      store: options.store,
+      storePath: options.storePath,
+      storeClear: options.storeClear,
+      onDerived: (item) => {
+        if (item.quad) {
+          addDerived(derived, seen, item.quad as Quad, outputMode);
+        }
+        if (item.quads) {
+          for (const quad of item.quads as Quad[]) {
+            addDerived(derived, seen, quad, outputMode);
+          }
+        }
+      },
+    });
+
+    if (result.store && typeof result.store.close === 'function') {
+      await result.store.close();
+    }
+
+    return derived;
   }
 
   public createInferenceStream(): Transform {

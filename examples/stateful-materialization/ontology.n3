@@ -8,6 +8,7 @@
 :Female a owl:Class .
 :Parent a owl:Class .
 :Mother a owl:Class ;
+## Added to show more OWL functionality here
   owl:equivalentClass :FemaleParent .
 
 :FemaleParent owl:intersectionOf ( :Female :Parent ) .

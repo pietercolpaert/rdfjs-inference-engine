@@ -9,7 +9,9 @@ The ontology says that a `:Mother` is equivalent to the intersection of `:Female
 
 Without stateful materialization, the second message can infer only that `:alice a :Parent`; it cannot also infer `:alice a :Mother`, because the `:Female` assertion was in a previous message.
 
-With `--stateful-materialization`, the runner stores each asserted message and each inferred delta in a local materialized state graph, then reasons over that state plus the next message. The second message can then infer that `:alice a :Mother`.
+With `--stateful-materialization`, the runner uses Eyeling's named persistent fact store. Each message's asserted facts and inferred delta are persisted in that store, and the next message reasons over the stored state plus its new facts. The second message can then infer that `:alice a :Mother`.
+
+The default storage path is `.cache/eyeling-stores`. The default storage name is derived from the current project path plus this example's ontology and input file, so different projects/datasets do not share one store. For repeatable example output, the store is cleared at the start of each run unless `--resume-storage` is passed.
 
 ## Files
 
@@ -25,6 +27,19 @@ From the repository root, run the stateful version:
 
 ```bash
 npm run example:stateful-materialization
+```
+
+Use an explicit storage name when you want to pin state to a project or dataset:
+
+```bash
+npm run build --silent
+node dist/examples/stateful-materialization/run.js --stateful-materialization --storage-name my-project-my-dataset
+```
+
+Resume an existing store across process runs with:
+
+```bash
+node dist/examples/stateful-materialization/run.js --stateful-materialization --storage-name my-project-my-dataset --resume-storage
 ```
 
 To run the stateless version directly:

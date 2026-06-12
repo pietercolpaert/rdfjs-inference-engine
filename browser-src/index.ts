@@ -35,6 +35,7 @@ const INTERNAL_HELPER_PREDICATES = new Set([
 ]);
 
 const reasonStream = (eyeling as any).reasonStream;
+const runAsync = (eyeling as any).runAsync;
 
 export type RuleProfile = string | { n3?: string; text?: string; label?: string; baseIri?: string };
 export type VocabularyDataset = DatasetCore | Iterable<Quad>;
@@ -56,6 +57,17 @@ export type InferenceOutputMode = 'application' | 'conformance';
 
 export interface InferenceOptions {
   outputMode?: InferenceOutputMode;
+  store?: string | InferenceStoreOptions;
+  storePath?: string;
+  storeClear?: boolean;
+}
+
+export interface InferenceStoreOptions {
+  name: string;
+  clear?: boolean;
+  path?: string;
+  type?: 'memory' | 'persistent';
+  backend?: 'memory' | 'level' | 'indexeddb';
 }
 
 export interface LoadOptions {
@@ -156,6 +168,41 @@ export class InferenceEngine {
     });
 
     yield* derived;
+  }
+
+  public async inferAsync(data: Quad[], options: InferenceOptions = {}): Promise<Quad[]> {
+    this.assertLoaded();
+    if (!options.store && !options.storePath && !options.storeClear) {
+      return Array.from(this.infer(data, options));
+    }
+
+    const derived: Quad[] = [];
+    const seen = new Set<string>();
+    const outputMode = options.outputMode ?? this.outputMode;
+    const result = await runAsync({ n3: this.runtime, quads: data }, {
+      rdfjs: true,
+      dataFactory: this.dataFactory as any,
+      skipUnsupportedRdfJs: true,
+      store: options.store,
+      storePath: options.storePath,
+      storeClear: options.storeClear,
+      onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+        if (item.quad) {
+          addDerived(derived, seen, item.quad, outputMode);
+        }
+        if (item.quads) {
+          for (const quad of item.quads) {
+            addDerived(derived, seen, quad, outputMode);
+          }
+        }
+      },
+    });
+
+    if (result.store && typeof result.store.close === 'function') {
+      await result.store.close();
+    }
+
+    return derived;
   }
 
   public createInferenceStream(): BrowserInferenceStream {
