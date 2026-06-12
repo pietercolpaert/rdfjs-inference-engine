@@ -165,6 +165,7 @@ async function runInference(): Promise<void> {
   try {
     setRunning(true);
     controls.runtimeStats.textContent = '';
+    controls.runtimeStats.hidden = true;
     clearOutputAppendBuffer();
     startElapsedCounter(run);
     editors.outputText.setValue('');
@@ -298,7 +299,7 @@ self.onmessage = async (event) => {
       : undefined;
     const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core profiles' }, background.quads, loadOptions);
     const compiledAt = performance.now();
-    self.postMessage({ type: 'runtime', message: background.quads.length + ' background quads, ' + request.bundledRuleCount + ' rule file(s), runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
+    self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
     await processInputData(api, reasoner, request, compiledAt, started);
   } catch (error) {
@@ -425,7 +426,7 @@ async function finishStreamingState(state) {
       await endWriter(state.writer);
     }
     appendInconsistencyComments(state.inconsistencyComments);
-    self.postMessage({ type: 'result', status: 'Done. Streamed ' + state.parsedQuadCount + ' RDF Messages quad(s) in ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+    self.postMessage({ type: 'result', status: 'Done · RDF Messages: ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' quad(s), ' + state.inferredCount + ' inferred' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state) });
     return;
   }
 
@@ -435,14 +436,13 @@ async function finishStreamingState(state) {
   const comments = formatInconsistencyComments(inference.inconsistencies);
   self.postMessage({ type: 'status', message: 'Processed ' + total + ' input quad(s). Serializing ' + inference.quads.length + ' inferred quad(s)…' });
   const output = await state.api.writeQuads(inference.quads, outputPrefixes());
-  self.postMessage({ type: 'result', output: comments + output, status: 'Done. Processed ' + total + ' input quad(s), inferred ' + inference.quads.length + ' quad(s)' + diagnosticStatusSuffix(comments) + '. Compile ' + (state.compiledAt - state.started).toFixed(0) + ' ms, infer ' + (performance.now() - state.compiledAt).toFixed(0) + ' ms.' });
+  self.postMessage({ type: 'result', output: comments + output, status: 'Done · RDF input: ' + total + ' quad(s), ' + inference.quads.length + ' inferred' + diagnosticStatusSuffix(comments) });
 }
 
 async function processCurrentMessage(state) {
   if (!state.writer) {
     state.writer = createMessageWriter(state.api);
   }
-  const started = performance.now();
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
   const inference = state.statefulMaterialization
@@ -457,11 +457,15 @@ async function processCurrentMessage(state) {
   state.writer.addMessage(inference.quads);
   state.inferredCount += inference.quads.length;
   state.processedMessageCount += 1;
-  postProgressStatus(state, 'Processed message ' + messageNumber + ' in ' + formatWorkerDuration(performance.now() - started) + '; processed ' + state.processedMessageCount + ' message(s), emitted ' + state.inferredCount + ' inferred quad(s)' + statefulStoreSummary(state) + '…');
+  postProgressStatus(state, 'Processed message ' + messageNumber + '; ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' input quad(s), ' + state.inferredCount + ' inferred' + statefulStoreSummary(state) + '…');
 }
 
 function statefulStoreSummary(state) {
-  return state.statefulMaterialization ? ', persistent store ' + state.statefulStoreName : '';
+  return state.statefulMaterialization ? ', stateful store enabled' : '';
+}
+
+function countLabel(count, singular) {
+  return count + ' ' + singular + (count === 1 ? '' : 's');
 }
 
 function postProgressStatus(state, message, force = false) {
@@ -672,12 +676,8 @@ function finishElapsedCounter(run: ActiveRun): void {
 }
 
 function updateElapsedCounter(run: ActiveRun): void {
-  const label = run.finishedAt === undefined ? 'Elapsed' : 'Total elapsed';
-  const parts = [`${label} ${formatDuration(getElapsedMs(run))}`];
-  if (run.runtimeMessage) {
-    parts.push(run.runtimeMessage);
-  }
-  controls.runtimeStats.textContent = parts.join(' · ');
+  controls.runtimeStats.textContent = '';
+  controls.runtimeStats.hidden = true;
   renderRunStatus(run);
 }
 
@@ -686,7 +686,15 @@ function renderRunStatus(run: ActiveRun): void {
     return;
   }
   const label = run.finishedAt === undefined ? 'Elapsed' : 'Total elapsed';
-  setStatus(`${run.statusMessage} ${label} ${formatDuration(getElapsedMs(run))}.`);
+  const parts = [trimDiagnosticSentence(run.statusMessage), `${label} ${formatDuration(getElapsedMs(run))}`];
+  if (run.runtimeMessage) {
+    parts.push(trimDiagnosticSentence(run.runtimeMessage));
+  }
+  setStatus(parts.filter(Boolean).join(' · '));
+}
+
+function trimDiagnosticSentence(value: string): string {
+  return value.trim().replace(/[.。]\s*$/, '');
 }
 
 function appendOutput(chunk: string): void {
