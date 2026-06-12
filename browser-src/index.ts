@@ -12,6 +12,8 @@ import {
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
+const LOG_SKOLEM = 'http://www.w3.org/2000/10/swap/log#skolem';
+const SKOLEM_BASE_IRI = 'https://eyereasoner.github.io/.well-known/genid/';
 const OWLRL = 'https://example.org/owlrl-n3#';
 const OWLRL_INCONSISTENCY = OWLRL + 'Inconsistency';
 const INTERNAL_HELPER_PREDICATES = new Set([
@@ -42,6 +44,7 @@ const INTERNAL_HELPER_PREDICATES = new Set([
 
 const reasonStream = (eyeling as any).reasonStream;
 const runAsync = (eyeling as any).runAsync;
+const unregisterBuiltin = (eyeling as any).unregisterBuiltin;
 
 export type RuleProfile = string | { n3?: string; text?: string; label?: string; baseIri?: string };
 export type VocabularyDataset = DatasetCore | Iterable<Quad>;
@@ -66,6 +69,8 @@ export interface InferenceOptions {
   store?: string | InferenceStoreOptions;
   storePath?: string;
   storeClear?: boolean;
+  deterministicSkolem?: boolean;
+  skolemKey?: string;
 }
 
 export interface InferenceStoreOptions {
@@ -79,6 +84,8 @@ export interface InferenceStoreOptions {
 export interface LoadOptions {
   runtimeCompiler?: RuntimeCompiler;
   includeStaticClosure?: boolean;
+  deterministicSkolem?: boolean;
+  skolemKey?: string;
 }
 
 export interface RuntimeCompilerInput {
@@ -146,11 +153,18 @@ export class InferenceEngine {
     const normalizedProfiles = normalizeProfiles(profiles);
     const profileN3 = normalizedProfiles.map((profile) => profile.n3).join('\n\n');
     const vocabularyQuads = quadsFromVocabulary(vocabulary);
-    const closure = reasonStream({ n3: profileN3, quads: vocabularyQuads }, {
-      rdfjs: true,
-      dataFactory: this.dataFactory as any,
-      skipUnsupportedRdfJs: true,
-    });
+    const deterministicSkolem = createDeterministicSkolemBuiltin(options);
+    let closure: any;
+    try {
+      closure = reasonStream({ n3: profileN3, quads: vocabularyQuads }, {
+        rdfjs: true,
+        dataFactory: this.dataFactory as any,
+        skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
+      });
+    } finally {
+      unregisterDeterministicSkolemBuiltin(deterministicSkolem);
+    }
 
     this.staticClosure = (closure.closureQuads ?? []) as Quad[];
 
@@ -172,22 +186,28 @@ export class InferenceEngine {
     const derived: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
+    const deterministicSkolem = createDeterministicSkolemBuiltin(options);
 
-    reasonStream({ n3: this.runtime, quads: data }, {
-      rdfjs: true,
-      dataFactory: this.dataFactory as any,
-      skipUnsupportedRdfJs: true,
-      onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
-        if (item.quad) {
-          addDerived(derived, seen, item.quad, outputMode);
-        }
-        if (item.quads) {
-          for (const quad of item.quads) {
-            addDerived(derived, seen, quad, outputMode);
+    try {
+      reasonStream({ n3: this.runtime, quads: data }, {
+        rdfjs: true,
+        dataFactory: this.dataFactory as any,
+        skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+          if (item.quad) {
+            addDerived(derived, seen, item.quad, outputMode);
           }
-        }
-      },
-    });
+          if (item.quads) {
+            for (const quad of item.quads) {
+              addDerived(derived, seen, quad, outputMode);
+            }
+          }
+        },
+      });
+    } finally {
+      unregisterDeterministicSkolemBuiltin(deterministicSkolem);
+    }
 
     yield* derived;
   }
@@ -198,24 +218,30 @@ export class InferenceEngine {
     const diagnostics: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
+    const deterministicSkolem = createDeterministicSkolemBuiltin(options);
 
-    reasonStream({ n3: this.runtime, quads: data }, {
-      rdfjs: true,
-      dataFactory: this.dataFactory as any,
-      skipUnsupportedRdfJs: true,
-      onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
-        if (item.quad) {
-          diagnostics.push(item.quad);
-          addDerived(derived, seen, item.quad, outputMode);
-        }
-        if (item.quads) {
-          for (const quad of item.quads) {
-            diagnostics.push(quad);
-            addDerived(derived, seen, quad, outputMode);
+    try {
+      reasonStream({ n3: this.runtime, quads: data }, {
+        rdfjs: true,
+        dataFactory: this.dataFactory as any,
+        skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+          if (item.quad) {
+            diagnostics.push(item.quad);
+            addDerived(derived, seen, item.quad, outputMode);
           }
-        }
-      },
-    });
+          if (item.quads) {
+            for (const quad of item.quads) {
+              diagnostics.push(quad);
+              addDerived(derived, seen, quad, outputMode);
+            }
+          }
+        },
+      });
+    } finally {
+      unregisterDeterministicSkolemBuiltin(deterministicSkolem);
+    }
 
     return {
       quads: derived,
@@ -232,24 +258,31 @@ export class InferenceEngine {
     const derived: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
-    const result = await runAsync({ n3: this.runtime, quads: data }, {
-      rdfjs: true,
-      dataFactory: this.dataFactory as any,
-      skipUnsupportedRdfJs: true,
-      store: options.store,
-      storePath: options.storePath,
-      storeClear: options.storeClear,
-      onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
-        if (item.quad) {
-          addDerived(derived, seen, item.quad, outputMode);
-        }
-        if (item.quads) {
-          for (const quad of item.quads) {
-            addDerived(derived, seen, quad, outputMode);
+    const deterministicSkolem = createDeterministicSkolemBuiltin(options);
+    let result: any;
+    try {
+      result = await runAsync({ n3: this.runtime, quads: data }, {
+        rdfjs: true,
+        dataFactory: this.dataFactory as any,
+        skipUnsupportedRdfJs: true,
+        store: options.store,
+        storePath: options.storePath,
+        storeClear: options.storeClear,
+        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+          if (item.quad) {
+            addDerived(derived, seen, item.quad, outputMode);
           }
-        }
-      },
-    });
+          if (item.quads) {
+            for (const quad of item.quads) {
+              addDerived(derived, seen, quad, outputMode);
+            }
+          }
+        },
+      });
+    } finally {
+      unregisterDeterministicSkolemBuiltin(deterministicSkolem);
+    }
 
     if (result.store && typeof result.store.close === 'function') {
       await result.store.close();
@@ -268,26 +301,33 @@ export class InferenceEngine {
     const diagnostics: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
-    const result = await runAsync({ n3: this.runtime, quads: data }, {
-      rdfjs: true,
-      dataFactory: this.dataFactory as any,
-      skipUnsupportedRdfJs: true,
-      store: options.store,
-      storePath: options.storePath,
-      storeClear: options.storeClear,
-      onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
-        if (item.quad) {
-          diagnostics.push(item.quad);
-          addDerived(derived, seen, item.quad, outputMode);
-        }
-        if (item.quads) {
-          for (const quad of item.quads) {
-            diagnostics.push(quad);
-            addDerived(derived, seen, quad, outputMode);
+    const deterministicSkolem = createDeterministicSkolemBuiltin(options);
+    let result: any;
+    try {
+      result = await runAsync({ n3: this.runtime, quads: data }, {
+        rdfjs: true,
+        dataFactory: this.dataFactory as any,
+        skipUnsupportedRdfJs: true,
+        store: options.store,
+        storePath: options.storePath,
+        storeClear: options.storeClear,
+        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+          if (item.quad) {
+            diagnostics.push(item.quad);
+            addDerived(derived, seen, item.quad, outputMode);
           }
-        }
-      },
-    });
+          if (item.quads) {
+            for (const quad of item.quads) {
+              diagnostics.push(quad);
+              addDerived(derived, seen, quad, outputMode);
+            }
+          }
+        },
+      });
+    } finally {
+      unregisterDeterministicSkolemBuiltin(deterministicSkolem);
+    }
 
     if (result.store && typeof result.store.close === 'function') {
       await result.store.close();
@@ -624,6 +664,92 @@ function termKey(term: Term): string {
     return `"${term.value}"@${term.language}^^${term.datatype.value}`;
   }
   return `${term.termType}:${term.value}`;
+}
+
+type DeterministicSkolemOptions = Pick<InferenceOptions, 'deterministicSkolem' | 'skolemKey' | 'store' | 'storePath' | 'storeClear'>;
+type DeterministicSkolemBuiltin = ((api: any) => void) | undefined;
+
+function createDeterministicSkolemBuiltin(options: DeterministicSkolemOptions): DeterministicSkolemBuiltin {
+  if (!shouldUseDeterministicSkolem(options)) {
+    return undefined;
+  }
+
+  const scopeKey = deterministicSkolemScopeKey(options);
+  return ({ registerBuiltin, internIri, unifyTerm, isGroundTerm, termToN3, terms }: any) => {
+    const Var = terms?.Var;
+    registerBuiltin(LOG_SKOLEM, ({ goal, subst }: any) => {
+      if (!isGroundTerm(goal.s)) {
+        return [];
+      }
+
+      const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
+      const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
+      if (Var && goal.o instanceof Var) {
+        return [{ ...subst, [goal.o.name]: node }];
+      }
+
+      const next = unifyTerm(goal.o, node, subst);
+      return next !== null ? [next] : [];
+    });
+  };
+}
+
+function unregisterDeterministicSkolemBuiltin(deterministicSkolem: DeterministicSkolemBuiltin): void {
+  if (deterministicSkolem && typeof unregisterBuiltin === 'function') {
+    unregisterBuiltin(LOG_SKOLEM);
+  }
+}
+
+function shouldUseDeterministicSkolem(options: DeterministicSkolemOptions): boolean {
+  return options.deterministicSkolem
+    ?? Boolean(options.skolemKey || options.store || options.storePath || options.storeClear);
+}
+
+function deterministicSkolemScopeKey(options: DeterministicSkolemOptions): string {
+  if (options.skolemKey) {
+    return `key:${options.skolemKey}`;
+  }
+
+  const store = options.store;
+  if (typeof store === 'string') {
+    return `store:${store}\0path:${options.storePath ?? ''}`;
+  }
+  if (store && typeof store === 'object') {
+    return [
+      'store',
+      store.name,
+      store.path ?? options.storePath ?? '',
+      store.type ?? '',
+      store.backend ?? '',
+    ].join('\0');
+  }
+
+  return `storePath:${options.storePath ?? ''}`;
+}
+
+function deterministicSkolemIdFromKey(key: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x811c9dc5;
+  let h3 = 0x811c9dc5;
+  let h4 = 0x811c9dc5;
+
+  for (let i = 0; i < key.length; i += 1) {
+    const code = key.charCodeAt(i);
+    h1 ^= code;
+    h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 ^= code + 1;
+    h2 = Math.imul(h2, 0x01000193) >>> 0;
+    h3 ^= code + 2;
+    h3 = Math.imul(h3, 0x01000193) >>> 0;
+    h4 ^= code + 3;
+    h4 = Math.imul(h4, 0x01000193) >>> 0;
+  }
+
+  const hex = [h1, h2, h3, h4]
+    .map((value) => value.toString(16).padStart(8, '0'))
+    .join('');
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export {

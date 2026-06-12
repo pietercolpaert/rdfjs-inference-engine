@@ -78,9 +78,10 @@ function parseToQuads(source: string): Quad[] {
 - `load(vocabularyDataset)` to load all bundled `rules/*.n3`, precompute the static background closure, and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset)` to precompute the static background closure and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset, { runtimeCompiler })` to provide custom compilation for a specific rule profile or ontology language;
+- `load(..., { skolemKey })` to make static closure `log:skolem` IRIs deterministic for a project/store key;
 - `saveRuntime(path)` to save that runtime as an N3 file;
 - `infer(quads)` to infer over an array of RDF-JS quads and return a generator of inferred RDF-JS quads;
-- `inferAsync(quads, { store })` to infer with Eyeling's async runner and an optional named persistent fact store;
+- `inferAsync(quads, { store })` to infer with Eyeling's async runner and an optional named persistent fact store. Stateful runs use deterministic `log:skolem` IRIs scoped by the store/project key so repeated messages do not remint the same helper closure;
 - `createInferenceStream()` / `stream()` to create an object-mode transform stream where each incoming iterable of quads produces one array of inferred quads.
 
 ### N3 rules as profiles
@@ -139,7 +140,7 @@ The root `index.html` file is a browser playground. At browser-build time, it bu
 
 It uses `rdf-parser-ts` message detection. Ordinary RDF input is passed to `infer()`. RDF Messages input is processed message by message and serialized as nicely formatted RDF Messages/TriG, using `@version "1.2-messages" .`, prefixes, compact Turtle statements, and `@message .` delimiters. When the data source is an RDF Messages URL, the playground parses the response stream incrementally and appends inferred output while the input stream is still being read instead of loading the whole data file first. The playground stores editable state in the URL hash so examples can be shared as links.
 
-The playground also includes a **Stateful materialization for RDF Messages** checkbox. When enabled, each message is processed with Eyeling's named persistent fact store instead of a single in-memory state array. The store name is derived from the playground URL plus the selected background and input data, so different projects/datasets do not share one global store. The store is cleared at the start of each playground run for repeatable output, then reused message by message while that run is active. The stateful materialization example uses this to infer that `:alice a :Mother` only after the second message supplies the parent relationship that combines with the first message's female assertion.
+The playground also includes a **Stateful materialization for RDF Messages** checkbox. When enabled, each message is processed with Eyeling's named persistent fact store instead of a single in-memory state array. The store name is derived from the playground URL plus the selected background and input data, so different projects/datasets do not share one global store. That store/project key is also used to scope deterministic `log:skolem` IRIs, preventing empty or repeated messages from reminting equivalent helper nodes. The store is cleared at the start of each playground run for repeatable output, then reused message by message while that run is active. The stateful materialization example uses this to infer that `:alice a :Mother` only after the second message supplies the parent relationship that combines with the first message's female assertion.
 
 Build only the browser artifacts with:
 

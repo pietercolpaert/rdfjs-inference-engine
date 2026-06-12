@@ -293,7 +293,10 @@ self.onmessage = async (event) => {
 
     const reasoner = new api.InferenceEngine();
     const started = performance.now();
-    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core profiles' }, background.quads);
+    const loadOptions = request.statefulMaterialization
+      ? { skolemKey: request.statefulStoreName || 'rdfjs-inference-engine:playground:default' }
+      : undefined;
+    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core profiles' }, background.quads, loadOptions);
     const compiledAt = performance.now();
     self.postMessage({ type: 'runtime', message: background.quads.length + ' background quads, ' + request.bundledRuleCount + ' rule file(s), runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
