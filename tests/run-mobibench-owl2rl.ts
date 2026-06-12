@@ -124,7 +124,9 @@ async function main(): Promise<void> {
     try {
       const premise = parseRdf(test.premise ?? test.graph ?? '');
       const reasoner = new InferenceEngine({ runtime, outputMode });
-      const rawClosure = [...staticClosure, ...premise, ...reasoner.infer(premise, { outputMode })];
+      const inference = reasoner.inferWithDiagnostics(premise, { outputMode });
+      const diagnosticQuads = inference.inconsistencies.flatMap((report) => report.quads);
+      const rawClosure = [...staticClosure, ...premise, ...inference.quads, ...diagnosticQuads];
       const closure = outputMode === 'conformance' ? addReflexiveSameAsClosure(rawClosure) : rawClosure;
       const ok = evaluateTest(test, closure);
 

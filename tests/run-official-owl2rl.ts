@@ -138,7 +138,9 @@ async function main(): Promise<void> {
       );
       const inferenceOutputMode = outputMode === 'conformance' ? 'application' : outputMode;
       const reasoner = new InferenceEngine({ runtime, outputMode: inferenceOutputMode });
-      const rawClosure = [...staticClosure, ...premise, ...reasoner.infer(premise, { outputMode: inferenceOutputMode })];
+      const inference = reasoner.inferWithDiagnostics(premise, { outputMode: inferenceOutputMode });
+      const diagnosticQuads = inference.inconsistencies.flatMap((report) => report.quads);
+      const rawClosure = [...staticClosure, ...premise, ...inference.quads, ...diagnosticQuads];
       const closure = outputMode === 'conformance' ? addReflexiveSameAsClosure(rawClosure) : rawClosure;
 
       const ok = await evaluateTest(test, closure);

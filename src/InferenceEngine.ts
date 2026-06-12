@@ -593,6 +593,9 @@ function shouldEmitQuad(quad: Quad, outputMode: InferenceOutputMode): boolean {
   if (isReflexiveSameAs(quad)) {
     return false;
   }
+  if (outputMode !== 'conformance' && hasGeneratedSkolemTerm(quad)) {
+    return false;
+  }
 
   return outputMode === 'conformance'
     || !hasLiteralSubject(quad);
@@ -607,6 +610,11 @@ function isReflexiveSameAs(quad: Quad): boolean {
 function isInternalHelperQuad(quad: Quad): boolean {
   return quad.predicate.termType === 'NamedNode'
     && INTERNAL_HELPER_PREDICATES.has(quad.predicate.value);
+}
+
+function hasGeneratedSkolemTerm(quad: Quad): boolean {
+  return [quad.subject, quad.predicate, quad.object, quad.graph].some((term) => term.termType === 'NamedNode'
+    && term.value.startsWith(SKOLEM_BASE_IRI));
 }
 
 function collectInconsistencyReports(quads: Iterable<Quad>): InconsistencyReport[] {

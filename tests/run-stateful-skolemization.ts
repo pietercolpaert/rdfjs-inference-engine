@@ -79,6 +79,7 @@ function parseMessages(source: string): Quad[][] {
 
 async function firstMessageSkolemTerms(storeName: string): Promise<string[]> {
   const quads = await reasoner.inferAsync(messages[0], {
+    outputMode: 'conformance',
     store: {
       name: storeName,
       path: storePath,
