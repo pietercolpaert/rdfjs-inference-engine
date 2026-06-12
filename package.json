@@ -72,7 +72,7 @@
   "dependencies": {
     "@rdfjs/types": "^2.0.1",
     "eyeling": "^1.29.0",
-    "rdf-parser-ts": "^0.2.4"
+    "rdf-parser-ts": "^0.2.5"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",
