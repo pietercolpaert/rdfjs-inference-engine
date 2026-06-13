@@ -16,6 +16,7 @@ type Editor = {
 };
 
 type PlaygroundState = {
+  example?: string;
   backgroundMode?: InputMode;
   dataMode?: InputMode;
   statefulMaterialization?: boolean;
@@ -1038,6 +1039,15 @@ function populateExamples(): void {
 function loadBundledExample(id: string): void {
   const example = findExample(id) ?? defaultExample();
   suppressStateUpdate = true;
+  applyBundledExample(example);
+  suppressStateUpdate = false;
+  applyModeVisibility();
+  updateHashNow();
+  setStatus(`Loaded ${example.label} from ${example.backgroundFile} and ${example.dataFile}.`);
+}
+
+function applyBundledExample(example: BundledExample): void {
+  controls.exampleSelect.value = example.id;
   controls.backgroundMode.value = 'text';
   controls.dataMode.value = 'text';
   controls.statefulMaterialization.checked = shouldEnableStatefulMaterialization(example.id);
@@ -1046,10 +1056,6 @@ function loadBundledExample(id: string): void {
   editors.backgroundText.setValue(example.background);
   editors.dataText.setValue(example.data);
   editors.outputText.setValue('');
-  suppressStateUpdate = false;
-  applyModeVisibility();
-  updateHashNow();
-  setStatus(`Loaded ${example.label} from ${example.backgroundFile} and ${example.dataFile}.`);
 }
 
 function shouldEnableStatefulMaterialization(exampleId: string): boolean {
@@ -1066,6 +1072,11 @@ function findExample(id: string): BundledExample | undefined {
 }
 
 function collectState(): PlaygroundState {
+  const selectedExample = findExample(controls.exampleSelect.value);
+  if (selectedExample && isUntouchedExample(selectedExample)) {
+    return selectedExample.id === defaultExample().id ? {} : { example: selectedExample.id };
+  }
+
   const state: PlaygroundState = {
     backgroundMode: getMode('background') === defaultState.backgroundMode ? undefined : getMode('background'),
     dataMode: getMode('data') === defaultState.dataMode ? undefined : getMode('data'),
@@ -1087,7 +1098,28 @@ function collectState(): PlaygroundState {
   return state;
 }
 
+function isUntouchedExample(example: BundledExample): boolean {
+  return getMode('background') === 'text'
+    && getMode('data') === 'text'
+    && controls.statefulMaterialization.checked === shouldEnableStatefulMaterialization(example.id)
+    && controls.backgroundUrl.value.trim() === ''
+    && controls.dataUrl.value.trim() === ''
+    && editors.backgroundText.getValue() === example.background
+    && editors.dataText.getValue() === example.data;
+}
+
 function loadStateFromHash(): void {
+  const exampleId = decodeExample(window.location.hash);
+  if (exampleId) {
+    const example = findExample(exampleId);
+    if (example) {
+      suppressStateUpdate = true;
+      applyBundledExample(example);
+      suppressStateUpdate = false;
+      return;
+    }
+  }
+
   const state = decodeState(window.location.hash);
   if (!state) {
     return;
@@ -1118,16 +1150,31 @@ function scheduleStateUpdate(): void {
 
 function updateHashNow(): void {
   const encoded = encodeState(collectState());
-  const nextUrl = `${window.location.pathname}${window.location.search}${encoded ? `#state=${encoded}` : ''}`;
+  const nextUrl = `${window.location.pathname}${window.location.search}${encoded ? `#${encoded}` : ''}`;
   window.history.replaceState(null, '', nextUrl);
 }
 
 function encodeState(state: PlaygroundState): string {
+  if (state.example && Object.keys(state).length === 1) {
+    return `example=${encodeURIComponent(state.example)}`;
+  }
+
   const json = JSON.stringify(state);
   if (json === '{}') {
     return '';
   }
-  return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return `state=${btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')}`;
+}
+
+function decodeExample(hash: string): string {
+  if (!hash.startsWith('#example=')) {
+    return '';
+  }
+  try {
+    return decodeURIComponent(hash.slice('#example='.length));
+  } catch {
+    return '';
+  }
 }
 
 function decodeState(hash: string): PlaygroundState | null {
