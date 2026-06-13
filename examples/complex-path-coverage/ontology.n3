@@ -1,0 +1,51 @@
+# Background ontology, SKOS taxonomy, and SHACL shape for the complex-path coverage example.
+
+@prefix :     <https://example.org/coverage#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+:Asset a owl:Class .
+:CatalogRecord a owl:Class .
+:ReviewedCatalogRecord a owl:Class .
+:QualityCheckedRecord rdfs:subClassOf :ReviewedCatalogRecord .
+
+:describes a owl:ObjectProperty ;
+  rdfs:domain :CatalogRecord ;
+  rdfs:range :Asset .
+
+:theme a owl:ObjectProperty ;
+  rdfs:domain :Asset ;
+  rdfs:range skos:Concept ;
+  owl:propertyChainAxiom ( :theme skos:broaderTransitive ) .
+
+:scheme a skos:ConceptScheme .
+
+:vehicle a skos:Concept, :RequiredCoverageConcept ;
+  skos:prefLabel "Vehicles" ;
+  skos:topConceptOf :scheme .
+
+:bus a skos:Concept ;
+  skos:prefLabel "Buses" ;
+  skos:broader :vehicle ;
+  skos:inScheme :scheme .
+
+:electricBus a skos:Concept ;
+  skos:prefLabel "Electric buses" ;
+  skos:broader :bus ;
+  skos:inScheme :scheme .
+
+:dieselBus a skos:Concept ;
+  skos:prefLabel "Diesel buses" ;
+  skos:broader :bus ;
+  skos:inScheme :scheme .
+
+# From the required broad concept, walk backwards over inferred asset themes and
+# then backwards again to the catalog records that describe those assets:
+#   :vehicle <- :theme - ?asset <- :describes - ?record
+:VehicleReviewShape a sh:NodeShape ;
+  sh:targetNode :vehicle ;
+  sh:path ( [ sh:inversePath :theme ] [ sh:inversePath :describes ] ) ;
+  sh:class :ReviewedCatalogRecord .

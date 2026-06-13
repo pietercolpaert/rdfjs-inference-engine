@@ -1,0 +1,15 @@
+@prefix : <https://example.org/coverage#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix sh: <http://www.w3.org/ns/shacl#>.
+@prefix skos: <http://www.w3.org/2004/02/skos/core#>.
+@prefix gen: <https://eyereasoner.github.io/.well-known/genid/>.
+
+:bus-42 :theme :bus, :vehicle.
+:bus-77 :theme :bus, :vehicle.
+:electric-bus-card a :ReviewedCatalogRecord.
+gen:94544e34-1dc5-4ad3-14b3-cdee5288f22d a sh:ValidationResult;
+    sh:focusNode :vehicle;
+    sh:resultSeverity sh:Violation;
+    sh:sourceConstraintComponent sh:ClassConstraintComponent;
+    sh:sourceShape :VehicleReviewShape;
+    sh:value :diesel-bus-draft.

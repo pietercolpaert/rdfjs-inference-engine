@@ -89,6 +89,7 @@ function humanizeExampleId(id) {
     'shipment-logistics': 'Shipment logistics (OWL 2 RL)',
     'skos-taxonomy': 'SKOS taxonomy (SKOS Core)',
     'owl-skos-catalog': 'Catalog topics (OWL 2 RL + SKOS Core)',
+    'complex-path-coverage': 'Coverage audit (OWL 2 RL + SKOS + SHACL paths)',
     'shacl-validation': 'SHACL validation (SHACL Core)',
     'inconsistency-diagnostics': 'Inconsistency diagnostics (OWL 2 RL)',
     'transit-messages': 'Transit stream (RDF Messages)',

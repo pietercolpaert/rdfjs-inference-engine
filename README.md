@@ -160,6 +160,7 @@ All examples are self-contained folders under `examples/`. Each runnable example
 - [examples/shipment-logistics/README.md](examples/shipment-logistics/README.md) — broader OWL 2 RL materialization features.
 - [examples/skos-taxonomy/README.md](examples/skos-taxonomy/README.md) — SKOS Core taxonomy materialization.
 - [examples/owl-skos-catalog/README.md](examples/owl-skos-catalog/README.md) — combined OWL 2 RL + SKOS Core reasoning.
+- [examples/complex-path-coverage/README.md](examples/complex-path-coverage/README.md) — SHACL complex paths over OWL 2 RL + SKOS materialization.
 - [examples/shacl-validation/README.md](examples/shacl-validation/README.md) — SHACL Core validation results.
 - [examples/inconsistency-diagnostics/README.md](examples/inconsistency-diagnostics/README.md) — playground-focused OWL 2 RL inconsistency diagnostics.
 - [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
@@ -302,7 +303,7 @@ The example output checks are kept separately:
 npm run test:examples
 ```
 
-This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, SHACL validation, RDF Messages, and stateful materialization examples.
+This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, complex-path coverage, SHACL validation, RDF Messages, and stateful materialization examples.
 
 ## Preprocessing and generated runtimes
 
