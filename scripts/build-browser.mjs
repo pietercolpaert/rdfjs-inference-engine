@@ -51,7 +51,9 @@ const bundledExamplesPlugin = {
 
         const dir = join('examples', entry.name);
         const files = await readdir(dir);
-        if (!files.includes('ontology.n3')) {
+        const backgroundFile = ['ontology.n3', 'shapes.n3']
+          .find((candidate) => files.includes(candidate));
+        if (!backgroundFile) {
           continue;
         }
 
@@ -64,9 +66,9 @@ const bundledExamplesPlugin = {
         examples.push({
           id: entry.name,
           label: humanizeExampleId(entry.name),
-          backgroundFile: `examples/${entry.name}/ontology.n3`,
+          backgroundFile: `examples/${entry.name}/${backgroundFile}`,
           dataFile: `examples/${entry.name}/${inputFile}`,
-          background: await readFile(join(dir, 'ontology.n3'), 'utf8'),
+          background: await readFile(join(dir, backgroundFile), 'utf8'),
           data: await readFile(join(dir, inputFile), 'utf8'),
         });
       }
@@ -87,6 +89,7 @@ function humanizeExampleId(id) {
     'shipment-logistics': 'Shipment logistics (OWL 2 RL)',
     'skos-taxonomy': 'SKOS taxonomy (SKOS Core)',
     'owl-skos-catalog': 'Catalog topics (OWL 2 RL + SKOS Core)',
+    'shacl-validation': 'SHACL validation (SHACL Core)',
     'inconsistency-diagnostics': 'Inconsistency diagnostics (OWL 2 RL)',
     'transit-messages': 'Transit stream (RDF Messages)',
     'stateful-materialization': 'Stateful materialization (RDF Messages)',

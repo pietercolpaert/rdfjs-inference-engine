@@ -1,0 +1,12 @@
+# RDF data for the SHACL validation example.
+
+PREFIX ex: <https://example.org/shacl#>
+
+ex:Alice a ex:Person ;
+  ex:name "Alice" ;
+  ex:age 42 ;
+  ex:email "alice@example.org" .
+
+ex:Bob a ex:Person ;
+  ex:age -1 ;
+  ex:email "not-an-email", "bob@example.org" .

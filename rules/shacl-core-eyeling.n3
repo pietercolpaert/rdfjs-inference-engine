@@ -1,0 +1,480 @@
+# SHACL Core validation rules for Eyeling.
+#
+# This profile is intentionally kept separate from the default OWL/SKOS
+# inference rules. It emits sh:ValidationResult triples; the test harness treats
+# the graph as non-conformant when at least one result is produced.
+#
+# Covered subset:
+# - targets: sh:targetNode, sh:targetClass, implicit class targets,
+#   sh:targetSubjectsOf, sh:targetObjectsOf
+# - simple IRI property paths plus selected inverse/sequence paths used by the
+#   W3C Core suite
+# - constraints: sh:class, sh:datatype, sh:minCount, sh:maxCount, sh:hasValue,
+#   sh:in, numeric min/max facets, string min/max length, sh:pattern,
+#   sh:deactivated, and duplicate-list sh:xone.
+#
+# Deliberately not covered yet: full complex path traversal, general boolean
+# constraint combinations, qualified value shapes, closed shapes,
+# sh:node recursion, sh:property recursion, sh:uniqueLang, languageIn,
+# equals/disjoint/lessThan, severity/messages, and full validation report
+# generation.
+
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix log:    <http://www.w3.org/2000/10/swap/log#> .
+@prefix list:   <http://www.w3.org/2000/10/swap/list#> .
+@prefix math:   <http://www.w3.org/2000/10/swap/math#> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
+@prefix dt:     <https://eyereasoner.github.io/eyeling/datatype#> .
+@prefix shn:    <https://example.org/shacl-n3#> .
+
+# Active shapes. SHACL deactivates a shape only when sh:deactivated is true;
+# the common false/absent cases remain active.
+{
+  ?shape ?predicate ?object .
+  1 log:notIncludes { ?shape sh:deactivated true . } .
+}
+=> { ?shape shn:active true . } .
+
+# Minimal class closure used by sh:targetClass and sh:class.
+{ ?class rdfs:subClassOf ?super . ?focus rdf:type ?class . }
+=> { ?focus rdf:type ?super . } .
+
+{ ?class rdfs:subClassOf ?middle . ?middle rdfs:subClassOf ?super . }
+=> { ?class rdfs:subClassOf ?super . } .
+
+# Focus node selection.
+{ ?shape shn:active true . ?shape sh:targetNode ?focus . }
+=> { ?focus shn:focusFor ?shape . } .
+
+{ ?shape shn:active true . ?shape sh:targetClass ?class . ?focus rdf:type ?class . }
+=> { ?focus shn:focusFor ?shape . } .
+
+{ ?shape shn:active true . ?shape rdf:type rdfs:Class . ?focus rdf:type ?shape . }
+=> { ?focus shn:focusFor ?shape . } .
+
+{ ?shape shn:active true . ?shape rdf:type owl:Class . ?focus rdf:type ?shape . }
+=> { ?focus shn:focusFor ?shape . } .
+
+{ ?shape shn:active true . ?shape sh:targetSubjectsOf ?predicate . ?focus ?predicate ?value . }
+=> { ?focus shn:focusFor ?shape . } .
+
+{ ?shape shn:active true . ?shape sh:targetObjectsOf ?predicate . ?subject ?predicate ?focus . }
+=> { ?focus shn:focusFor ?shape . } .
+
+# Direct node-shape constraints validate the focus node itself.
+{
+  ?focus shn:focusFor ?shape .
+  1 log:notIncludes { ?shape sh:path ?directPath . } .
+  (?shape ?focus shn:self ?focus) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path shn:self ;
+    shn:value ?focus .
+} .
+
+# Directly targeted property shapes validate the values reached from their
+# simple IRI path.
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?focus ?path ?value .
+  (?shape ?focus ?path ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+# Directly targeted property shapes with a simple inverse path.
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?path sh:inversePath ?predicate .
+  ?value ?predicate ?focus .
+  (?shape ?focus ?path ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+# Directly targeted property shapes with the two-step inverse sequence used by
+# the W3C path-complex-002 fixture.
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?path rdf:first ?firstStep .
+  ?path rdf:rest ?tail .
+  ?tail rdf:first ?secondStep .
+  ?firstStep sh:inversePath ?firstPredicate .
+  ?secondStep sh:inversePath ?secondPredicate .
+  ?middle ?firstPredicate ?focus .
+  ?value ?secondPredicate ?middle .
+  (?shape ?focus ?path ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+# Property-shape values for simple IRI paths.
+{
+  ?focus shn:focusFor ?nodeShape .
+  ?nodeShape sh:property ?propertyShape .
+  ?propertyShape shn:active true .
+  ?propertyShape sh:path ?path .
+  ?focus ?path ?value .
+  (?propertyShape ?focus ?path ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?propertyShape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+# sh:class
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:class ?class .
+  1 log:notIncludes { ?value rdf:type ?class . } .
+  (sh:ClassConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:ClassConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+# sh:datatype, for literals with a different datatype. Non-literal datatype
+# violations are left to the harness limitation list because N3 has no portable
+# RDF term-kind test here.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:datatype ?datatype .
+  ?value dt:datatype ?actualDatatype .
+  ?actualDatatype log:notEqualTo ?datatype .
+  (sh:DatatypeConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:DatatypeConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:datatype ?datatype .
+  ?value dt:invalidForDatatype ?datatype .
+  (sh:DatatypeConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:DatatypeConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+# sh:minCount
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:minCount ?minimum .
+  (?value { ?focus ?path ?value . } ?values) log:collectAllIn ?shape .
+  ?values list:length ?count .
+  ?count math:lessThan ?minimum .
+  (sh:MinCountConstraintComponent ?focus ?shape ?path ?minimum) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MinCountConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation .
+} .
+
+{
+  ?focus shn:focusFor ?nodeShape .
+  ?nodeShape sh:property ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:minCount ?minimum .
+  (?value { ?focus ?path ?value . } ?values) log:collectAllIn ?shape .
+  ?values list:length ?count .
+  ?count math:lessThan ?minimum .
+  (sh:MinCountConstraintComponent ?focus ?shape ?path ?minimum) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MinCountConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation .
+} .
+
+# sh:maxCount
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:maxCount ?maximum .
+  (?value { ?focus ?path ?value . } ?values) log:collectAllIn ?shape .
+  ?values list:length ?count .
+  ?count math:greaterThan ?maximum .
+  (sh:MaxCountConstraintComponent ?focus ?shape ?path ?maximum) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MaxCountConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation .
+} .
+
+{
+  ?focus shn:focusFor ?nodeShape .
+  ?nodeShape sh:property ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:maxCount ?maximum .
+  (?value { ?focus ?path ?value . } ?values) log:collectAllIn ?shape .
+  ?values list:length ?count .
+  ?count math:greaterThan ?maximum .
+  (sh:MaxCountConstraintComponent ?focus ?shape ?path ?maximum) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MaxCountConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation .
+} .
+
+# sh:hasValue on node shapes.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path shn:self ; shn:value ?value .
+  ?shape sh:hasValue ?expected .
+  ?value log:notEqualTo ?expected .
+  (sh:HasValueConstraintComponent ?focus ?shape shn:self ?expected) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:HasValueConstraintComponent ;
+    sh:resultSeverity sh:Violation .
+} .
+
+# sh:hasValue on property shapes, including missing property values.
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:hasValue ?expected .
+  1 log:notIncludes { ?focus ?path ?expected . } .
+  (sh:HasValueConstraintComponent ?focus ?shape ?path ?expected) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:HasValueConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation .
+} .
+
+{
+  ?focus shn:focusFor ?nodeShape .
+  ?nodeShape sh:property ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:hasValue ?expected .
+  1 log:notIncludes { ?focus ?path ?expected . } .
+  (sh:HasValueConstraintComponent ?focus ?shape ?path ?expected) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:HasValueConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation .
+} .
+
+# sh:in
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:in ?allowedValues .
+  ?allowedValues list:notMember ?value .
+  (sh:InConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:InConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+# Minimal sh:xone duplicate-list support. A repeated shape in an xone list is
+# counted twice by SHACL, so a two-item duplicate can never have exactly one
+# conforming member for any focus node.
+{
+  ?focus shn:focusFor ?shape .
+  ?shape sh:xone ?list .
+  ?list rdf:first ?member .
+  ?list rdf:rest ?tail .
+  ?tail rdf:first ?member .
+  (sh:XoneConstraintComponent ?focus ?shape ?member) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:XoneConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?focus .
+} .
+
+# Numeric and date/time comparison facets. Eyeling math:* compares supported XSD
+# numeric and dateTime/dateTimeStamp value spaces.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:minInclusive ?minimum .
+  ?value math:lessThan ?minimum .
+  (sh:MinInclusiveConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MinInclusiveConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:minExclusive ?minimum .
+  ?value math:notGreaterThan ?minimum .
+  (sh:MinExclusiveConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MinExclusiveConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:maxInclusive ?maximum .
+  ?value math:greaterThan ?maximum .
+  (sh:MaxInclusiveConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MaxInclusiveConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:maxExclusive ?maximum .
+  ?value math:notLessThan ?maximum .
+  (sh:MaxExclusiveConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MaxExclusiveConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+# String length facets use literal lexical forms.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:minLength ?minimum .
+  ?value dt:lexicalForm ?lexical .
+  ?lexical string:length ?length .
+  ?length math:lessThan ?minimum .
+  (sh:MinLengthConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MinLengthConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:maxLength ?maximum .
+  ?value dt:lexicalForm ?lexical .
+  ?lexical string:length ?length .
+  ?length math:greaterThan ?maximum .
+  (sh:MaxLengthConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:MaxLengthConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+# sh:pattern. sh:flags is not interpreted by this profile yet.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:pattern ?pattern .
+  ?value dt:lexicalForm ?lexical .
+  ?lexical string:notMatches ?pattern .
+  (sh:PatternConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:PatternConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .

@@ -16,6 +16,9 @@ const LOG_SKOLEM = 'http://www.w3.org/2000/10/swap/log#skolem';
 const SKOLEM_BASE_IRI = 'https://eyereasoner.github.io/.well-known/genid/';
 const OWLRL = 'https://example.org/owlrl-n3#';
 const OWLRL_INCONSISTENCY = OWLRL + 'Inconsistency';
+const SHACL = 'http://www.w3.org/ns/shacl#';
+const SHACL_VALIDATION_RESULT = SHACL + 'ValidationResult';
+const SHACLN3 = 'https://example.org/shacl-n3#';
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
   OWLRL + 'intersectionListRoot',
@@ -40,6 +43,12 @@ const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'term3',
   OWLRL + 'term4',
   OWLRL + 'term5',
+  SHACLN3 + 'active',
+  SHACLN3 + 'focusFor',
+  SHACLN3 + 'shape',
+  SHACLN3 + 'focus',
+  SHACLN3 + 'path',
+  SHACLN3 + 'value',
 ]);
 
 const reasonStream = (eyeling as any).reasonStream;
@@ -580,7 +589,7 @@ function shouldEmitQuad(quad: Quad, outputMode: InferenceOutputMode): boolean {
   if (isReflexiveSameAs(quad)) {
     return false;
   }
-  if (outputMode !== 'conformance' && hasGeneratedSkolemTerm(quad)) {
+  if (outputMode !== 'conformance' && hasGeneratedSkolemTerm(quad) && !isShaclValidationResultQuad(quad)) {
     return false;
   }
   if (outputMode !== 'conformance' && isAnonymousClassType(quad)) {
@@ -600,6 +609,17 @@ function isReflexiveSameAs(quad: Quad): boolean {
 function isInternalHelperQuad(quad: Quad): boolean {
   return quad.predicate.termType === 'NamedNode'
     && INTERNAL_HELPER_PREDICATES.has(quad.predicate.value);
+}
+
+function isShaclValidationResultQuad(quad: Quad): boolean {
+  if (quad.predicate.termType !== 'NamedNode') {
+    return false;
+  }
+
+  return (quad.predicate.value === RDF_TYPE
+    && quad.object.termType === 'NamedNode'
+    && quad.object.value === SHACL_VALIDATION_RESULT)
+    || quad.predicate.value.startsWith(SHACL);
 }
 
 function hasGeneratedSkolemTerm(quad: Quad): boolean {

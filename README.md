@@ -2,7 +2,7 @@
 
 This repository contains a small TypeScript library for doing **generated-runtime materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
 
-The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder.
+The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL, SKOS Core, and the experimental SHACL Core validation profile.
 
 ## Install
 
@@ -33,7 +33,7 @@ npm run build
 
 The core idea is:
 
-1. load all bundled N3 rule profiles from `rules/` by default, or pass explicit profiles when you need a smaller/custom ruleset;
+1. load the default bundled N3 rule profiles from `rules/`, or pass explicit profiles when you need a smaller/custom ruleset;
 2. load RDF-JS background vocabulary, ontology, taxonomy, or configuration quads;
 3. precompute the static background closure once;
 4. create a generated runtime N3 file with either the default generic compiler or a caller-provided compiler;
@@ -86,7 +86,7 @@ function parseToQuads(source: string): Quad[] {
 
 ### N3 rules as profiles
 
-The idea is to use one or all of the N3 files shipped with this package. In Node.js, calling `reasoner.load(background)` loads all `.n3` files from the package `rules/` directory by default. The browser playground does the same at build time by bundling every `.n3` file from `rules/`.
+The idea is to use one or more of the N3 files shipped with this package. In Node.js, calling `reasoner.load(background)` loads all `.n3` files from the package `rules/` directory by default. The browser playground does the same at build time by bundling every `.n3` file from `rules/`.
 
 #### rules/owl2rl-eyeling.n3
 
@@ -104,6 +104,10 @@ It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expre
 #### rules/skos-entailment.n3
 
 This is a SKOS Core profile. It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
+
+#### rules/shacl-core-eyeling.n3
+
+This is an experimental SHACL Core validation profile. It is loaded by default together with OWL 2 RL and SKOS Core. It emits `sh:ValidationResult` triples for a closed-world validation subset that now matches every W3C SHACL Core test-suite file by the partial `sh:conforms` criterion. The current rules cover basic targets, directly targeted property shapes, simple IRI paths, selected inverse/sequence paths used by the suite, deactivation, `sh:class`, `sh:datatype` including ill-formed literals, `sh:minCount`, `sh:maxCount`, `sh:hasValue`, `sh:in`, numeric/date comparison facets, string length facets, `sh:pattern`, and a duplicate-list `sh:xone` case. Full validation report isomorphism and complete general SHACL semantics are still future work.
 
 The bundled rulesets are meant to be loaded as rule profiles. In normal projects, keep any additional rule profiles vendored/versioned and pass your own background quads to `load()`.
 
@@ -132,7 +136,7 @@ The bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `
 
 ### The Playground
 
-The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile, so the playground currently runs the OWL 2 RL and SKOS Core profiles together. It also bundles the self-contained examples from `examples/` into an example picker. The page provides syntax-highlighted RDF editors for:
+The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile, so the playground currently runs the OWL 2 RL, SKOS Core, and SHACL Core profiles together. It also bundles the self-contained examples from `examples/` into an example picker. The page provides syntax-highlighted RDF editors for:
 
 - ontology/background RDF used to generate the runtime, selected as either a URL or text input;
 - ordinary RDF input or an RDF Messages log, selected as either a URL or text input;
@@ -156,6 +160,7 @@ All examples are self-contained folders under `examples/`. Each runnable example
 - [examples/shipment-logistics/README.md](examples/shipment-logistics/README.md) — broader OWL 2 RL materialization features.
 - [examples/skos-taxonomy/README.md](examples/skos-taxonomy/README.md) — SKOS Core taxonomy materialization.
 - [examples/owl-skos-catalog/README.md](examples/owl-skos-catalog/README.md) — combined OWL 2 RL + SKOS Core reasoning.
+- [examples/shacl-validation/README.md](examples/shacl-validation/README.md) — SHACL Core validation results.
 - [examples/inconsistency-diagnostics/README.md](examples/inconsistency-diagnostics/README.md) — playground-focused OWL 2 RL inconsistency diagnostics.
 - [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
 - [examples/stateful-materialization/README.md](examples/stateful-materialization/README.md) — stateful RDF Messages materialization across messages.
@@ -269,6 +274,16 @@ npm run test:skos
 
 The tests are derived from positive entailments and explicit non-entailments in W3C SKOS Reference sections 3-10. They cover concept schemes, labels, notes, semantic relations, ordered collections, mapping properties, `skos:exactMatch` transitivity, and guards against overreaching rules such as transitive `skos:broader`, transitive `skos:closeMatch`, or automatic concept-scheme containment across semantic relations.
 
+### SHACL Core validation tests
+
+The repository includes a W3C data-shapes test-suite harness for the SHACL Core profile:
+
+```bash
+npm run test:shacl
+```
+
+The harness downloads and caches W3C SHACL Core fixtures under `.cache/shacl-test-suite/`, runs all Core manifests against `rules/shacl-core-eyeling.n3` by default, and compares partial compliance via the expected `sh:conforms` boolean. Use `npm run build:node --silent && node dist/tests/run-shacl-core.js --selected` to run the historical curated subset while debugging, or `--known-limitations` to print areas where the boolean result passes but full report/semantic coverage remains incomplete.
+
 The default test command runs the SKOS Core tests plus both compatible OWL 2 RL subsets:
 
 ```bash
@@ -287,7 +302,7 @@ The example output checks are kept separately:
 npm run test:examples
 ```
 
-This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, RDF Messages, and stateful materialization examples.
+This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, SHACL validation, RDF Messages, and stateful materialization examples.
 
 ## Preprocessing and generated runtimes
 

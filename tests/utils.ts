@@ -14,6 +14,12 @@ export function parseRdf(source: string): Quad[] {
   return Array.from(parsed as Iterable<unknown>, (item) => (isMessageQuad(item) ? item.quad : item) as Quad);
 }
 
+export function parseRdfWithBase(source: string, baseIRI: string): Quad[] {
+  const parser = new Parser({ factory: DataFactory, baseIRI, relax: true });
+  const parsed = parser.parse(source.replace(/\]([.;,])/g, '] $1')) ?? [];
+  return Array.from(parsed as Iterable<unknown>, (item) => (isMessageQuad(item) ? item.quad : item) as Quad);
+}
+
 export async function parseRdfXml(source: string, baseIRI: string): Promise<Quad[]> {
   return new Promise<Quad[]>((resolve, reject) => {
     const parser = new RdfXmlParser({

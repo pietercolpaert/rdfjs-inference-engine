@@ -298,7 +298,7 @@ self.onmessage = async (event) => {
     const loadOptions = request.statefulMaterialization
       ? { skolemKey: request.statefulStoreName || 'rdfjs-inference-engine:playground:default' }
       : undefined;
-    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core profiles' }, background.quads, loadOptions);
+    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core + SHACL Core profiles' }, background.quads, loadOptions);
     const compiledAt = performance.now();
     self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
@@ -838,9 +838,13 @@ function outputPrefixes() {
     catalog: 'https://example.org/catalog#',
     family: 'https://example.org/family#',
     test: 'https://example.org/test#',
+    shacl: 'https://example.org/shacl#',
+    gen: 'https://eyereasoner.github.io/.well-known/genid/',
     skos: 'http://www.w3.org/2004/02/skos/core#',
+    sh: 'http://www.w3.org/ns/shacl#',
     rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
     owl: 'http://www.w3.org/2002/07/owl#',
+    xsd: 'http://www.w3.org/2001/XMLSchema#',
   };
 }
 `;
