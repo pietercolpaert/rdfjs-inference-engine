@@ -1,0 +1,6 @@
+# RDF input for the inconsistency diagnostics playground example.
+
+PREFIX : <https://example.org/test#>
+
+:x a :A .
+:x a :B .
