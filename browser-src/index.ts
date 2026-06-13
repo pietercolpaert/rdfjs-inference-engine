@@ -145,8 +145,9 @@ export class InferenceEngine {
     return this.staticClosure.filter((quad) => shouldEmitQuad(quad, outputMode));
   }
 
-  public getStaticInconsistencies(): InconsistencyReport[] {
-    return collectInconsistencyReports(this.staticClosure);
+  public getStaticInconsistencies(options: InferenceOptions = {}): InconsistencyReport[] {
+    const outputMode = options.outputMode ?? this.outputMode;
+    return collectInconsistencyReports(this.staticClosure, outputMode);
   }
 
   public load(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): string {
@@ -245,7 +246,7 @@ export class InferenceEngine {
 
     return {
       quads: derived,
-      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics]),
+      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics], outputMode),
     };
   }
 
@@ -335,7 +336,7 @@ export class InferenceEngine {
 
     return {
       quads: derived,
-      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics]),
+      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics], outputMode),
     };
   }
 
@@ -602,8 +603,12 @@ function isInternalHelperQuad(quad: Quad): boolean {
 }
 
 function hasGeneratedSkolemTerm(quad: Quad): boolean {
-  return [quad.subject, quad.predicate, quad.object, quad.graph].some((term) => term.termType === 'NamedNode'
-    && term.value.startsWith(SKOLEM_BASE_IRI));
+  return [quad.subject, quad.predicate, quad.object, quad.graph].some(isGeneratedSkolemTerm);
+}
+
+function isGeneratedSkolemTerm(term: Term): boolean {
+  return term.termType === 'NamedNode'
+    && term.value.startsWith(SKOLEM_BASE_IRI);
 }
 
 function isAnonymousClassType(quad: Quad): boolean {
@@ -612,7 +617,7 @@ function isAnonymousClassType(quad: Quad): boolean {
     && quad.object.termType === 'BlankNode';
 }
 
-function collectInconsistencyReports(quads: Iterable<Quad>): InconsistencyReport[] {
+function collectInconsistencyReports(quads: Iterable<Quad>, outputMode: InferenceOutputMode): InconsistencyReport[] {
   const byId = new Map<string, { quads: Quad[]; rule?: string; terms: Map<number, Term> }>();
 
   for (const quad of quads) {
@@ -636,14 +641,17 @@ function collectInconsistencyReports(quads: Iterable<Quad>): InconsistencyReport
     byId.set(id, report);
   }
 
-  return Array.from(byId.entries()).map(([id, report]) => ({
-    id,
-    rule: report.rule,
-    terms: Array.from(report.terms.entries())
-      .sort(([left], [right]) => left - right)
-      .map(([, term]) => term),
-    quads: report.quads,
-  }));
+  return Array.from(byId.entries())
+    .map(([id, report]) => ({
+      id,
+      rule: report.rule,
+      terms: Array.from(report.terms.entries())
+        .sort(([left], [right]) => left - right)
+        .map(([, term]) => term),
+      quads: report.quads,
+    }))
+    .filter((report) => outputMode === 'conformance'
+      || !report.terms.some(isGeneratedSkolemTerm));
 }
 
 function isInconsistencyDiagnosticQuad(quad: Quad): boolean {

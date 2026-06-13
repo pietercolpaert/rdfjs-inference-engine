@@ -521,24 +521,233 @@ function diagnosticStatusSuffix(comments) {
   return count > 0 ? ', found ' + count + ' inconsistency diagnostic(s)' : '';
 }
 
+const RDF_TYPE_IRI = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+const OWL_SAME_AS_IRI = 'http://www.w3.org/2002/07/owl#sameAs';
+const OWL_DIFFERENT_FROM_IRI = 'http://www.w3.org/2002/07/owl#differentFrom';
+const OWL_ALL_DIFFERENT_IRI = 'http://www.w3.org/2002/07/owl#AllDifferent';
+const OWL_ALL_DISJOINT_CLASSES_IRI = 'http://www.w3.org/2002/07/owl#AllDisjointClasses';
+const OWL_ALL_DISJOINT_PROPERTIES_IRI = 'http://www.w3.org/2002/07/owl#AllDisjointProperties';
+const OWL_IRREFLEXIVE_PROPERTY_IRI = 'http://www.w3.org/2002/07/owl#IrreflexiveProperty';
+const OWL_ASYMMETRIC_PROPERTY_IRI = 'http://www.w3.org/2002/07/owl#AsymmetricProperty';
+const OWL_PROPERTY_DISJOINT_WITH_IRI = 'http://www.w3.org/2002/07/owl#propertyDisjointWith';
+const OWL_SOURCE_INDIVIDUAL_IRI = 'http://www.w3.org/2002/07/owl#sourceIndividual';
+const OWL_ASSERTION_PROPERTY_IRI = 'http://www.w3.org/2002/07/owl#assertionProperty';
+const OWL_TARGET_INDIVIDUAL_IRI = 'http://www.w3.org/2002/07/owl#targetIndividual';
+const OWL_TARGET_VALUE_IRI = 'http://www.w3.org/2002/07/owl#targetValue';
+const OWL_NOTHING_IRI = 'http://www.w3.org/2002/07/owl#Nothing';
+const OWL_THING_IRI = 'http://www.w3.org/2002/07/owl#Thing';
+const OWL_COMPLEMENT_OF_IRI = 'http://www.w3.org/2002/07/owl#complementOf';
+const OWL_MAX_CARDINALITY_IRI = 'http://www.w3.org/2002/07/owl#maxCardinality';
+const OWL_MAX_QUALIFIED_CARDINALITY_IRI = 'http://www.w3.org/2002/07/owl#maxQualifiedCardinality';
+const OWL_ON_PROPERTY_IRI = 'http://www.w3.org/2002/07/owl#onProperty';
+const OWL_ON_CLASS_IRI = 'http://www.w3.org/2002/07/owl#onClass';
+const OWL_ON_DATA_RANGE_IRI = 'http://www.w3.org/2002/07/owl#onDataRange';
+const XSD_STRING_IRI = 'http://www.w3.org/2001/XMLSchema#string';
+const XSD_NON_NEGATIVE_INTEGER_IRI = 'http://www.w3.org/2001/XMLSchema#nonNegativeInteger';
+const GENERATED_SKOLEM_IRI_PREFIX = 'https://eyereasoner.github.io/.well-known/genid/';
+
 function formatInconsistencyComments(reports, context) {
   if (!reports || reports.length === 0) {
     return '';
   }
   const prefix = context ? ' in ' + context : '';
   const visible = reports.slice(0, 20);
-  const lines = visible.map((report) => {
+  const lines = [];
+  visible.forEach((report, index) => {
     const rule = report.rule ? shortIri(report.rule) : 'unknown rule';
     const description = describeInconsistencyRule(rule);
-    const terms = report.terms && report.terms.length > 0
-      ? ': ' + report.terms.map((term, index) => 'term' + (index + 1) + ' ' + termToComment(term)).join('; ')
-      : '.';
-    return '# Inconsistency detected' + prefix + ' (' + rule + (description ? ': ' + description : '') + ')' + terms;
+    lines.push('# Inconsistency detected' + prefix + ': ' + summarizeInconsistency(report, rule, description));
+    lines.push('#   Rule: ' + rule + (description ? ' — ' + description : ''));
+    const evidence = externalEvidenceForReport(report, rule);
+    if (evidence.length > 0) {
+      lines.push('#   Why this fails (public evidence):');
+      evidence.forEach((item, itemIndex) => lines.push('#     ' + (itemIndex + 1) + '. ' + item));
+    } else {
+      const publicTerms = publicDiagnosticTerms(report.terms || []);
+      if (publicTerms.length > 0) {
+        lines.push('#   Public terms: ' + publicTerms.map(termToComment).join(', '));
+      }
+      lines.push('#   Why this fails: no public triple-only explanation is available for this rule.');
+    }
+    if (hasHiddenDiagnosticTerms(report.terms || [])) {
+      lines.push('#   Internal OWL helper terms were hidden from this explanation.');
+    }
+    if (index < visible.length - 1) {
+      lines.push('#');
+    }
   });
   if (reports.length > visible.length) {
     lines.push('# ... ' + (reports.length - visible.length) + ' more inconsistency diagnostic(s) omitted.');
   }
   return lines.map(commentLine).join('\\n') + '\\n\\n';
+}
+
+function summarizeInconsistency(report, rule, fallbackDescription) {
+  const terms = report.terms || [];
+  if (rule === 'eq-diff1') {
+    return safeTermLabel(terms[0]) + ' is asserted as both owl:sameAs and owl:differentFrom ' + safeTermLabel(terms[1]) + '.';
+  }
+  if (rule === 'eq-diff2' || rule === 'eq-diff3') {
+    return safeTermLabel(terms[1]) + ' and ' + safeTermLabel(terms[2]) + ' are listed as different but are also owl:sameAs.';
+  }
+  if (rule === 'prp-irp') {
+    return safeTermLabel(terms[1]) + ' uses irreflexive property ' + safeTermLabel(terms[0]) + ' on itself.';
+  }
+  if (rule === 'prp-asyp') {
+    return safeTermLabel(terms[0]) + ' is asymmetric, but it relates ' + safeTermLabel(terms[1]) + ' to ' + safeTermLabel(terms[2]) + ' in both directions.';
+  }
+  if (rule === 'prp-pdw') {
+    return safeTermLabel(terms[0]) + ' and ' + safeTermLabel(terms[1]) + ' are disjoint properties used for the same subject/object pair.';
+  }
+  if (rule === 'prp-adp') {
+    return safeTermLabel(terms[1]) + ' and ' + safeTermLabel(terms[2]) + ' are all-disjoint properties used for the same subject/object pair.';
+  }
+  if (rule === 'prp-npa1' || rule === 'prp-npa2') {
+    return 'a negative property assertion is contradicted by an actual property value.';
+  }
+  if (rule === 'cls-nothing2') {
+    return safeTermLabel(terms[0]) + ' is typed as owl:Nothing.';
+  }
+  if (rule === 'cls-com') {
+    return safeTermLabel(terms[2]) + ' is typed as both a class and its complement.';
+  }
+  if (rule === 'cls-maxc1' || rule === 'cls-maxqc1' || rule === 'cls-maxqc2' || rule === 'cls-maxqd1') {
+    return safeTermLabel(terms[1]) + ' has a value for ' + safeTermLabel(terms[2]) + ' although a maximum-cardinality 0 restriction applies.';
+  }
+  if (rule === 'cax-dw') {
+    return safeTermLabel(terms[2]) + ' is typed as both disjoint classes ' + safeTermLabel(terms[0]) + ' and ' + safeTermLabel(terms[1]) + '.';
+  }
+  if (rule === 'cax-adc') {
+    return safeTermLabel(terms[3]) + ' is typed as two classes from an owl:AllDisjointClasses axiom.';
+  }
+  if (rule === 'dt-not-type') {
+    return safeTermLabel(terms[0]) + ' is not a valid value for datatype ' + safeTermLabel(terms[1]) + '.';
+  }
+  return fallbackDescription ? fallbackDescription + '.' : 'an OWL 2 RL contradiction was derived.';
+}
+
+function externalEvidenceForReport(report, rule) {
+  const terms = report.terms || [];
+  const evidence = [];
+  if (rule === 'eq-diff1') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_SAME_AS_IRI), terms[1]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_DIFFERENT_FROM_IRI), terms[1]);
+  } else if (rule === 'eq-diff2') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_ALL_DIFFERENT_IRI));
+    addEvidenceText(evidence, [terms[0], terms[1], terms[2]], 'The owl:members list of ' + termToComment(terms[0]) + ' contains ' + termToComment(terms[1]) + ' and ' + termToComment(terms[2]) + '.');
+    addEvidenceTriple(evidence, terms[1], namedTerm(OWL_SAME_AS_IRI), terms[2]);
+  } else if (rule === 'eq-diff3') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_ALL_DIFFERENT_IRI));
+    addEvidenceText(evidence, [terms[0], terms[1], terms[2]], 'The owl:distinctMembers list of ' + termToComment(terms[0]) + ' contains ' + termToComment(terms[1]) + ' and ' + termToComment(terms[2]) + '.');
+    addEvidenceTriple(evidence, terms[1], namedTerm(OWL_SAME_AS_IRI), terms[2]);
+  } else if (rule === 'prp-irp') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_IRREFLEXIVE_PROPERTY_IRI));
+    addEvidenceTriple(evidence, terms[1], terms[0], terms[1]);
+  } else if (rule === 'prp-asyp') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_ASYMMETRIC_PROPERTY_IRI));
+    addEvidenceTriple(evidence, terms[1], terms[0], terms[2]);
+    addEvidenceTriple(evidence, terms[2], terms[0], terms[1]);
+  } else if (rule === 'prp-pdw') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_PROPERTY_DISJOINT_WITH_IRI), terms[1]);
+    addEvidenceTriple(evidence, terms[2], terms[0], terms[3]);
+    addEvidenceTriple(evidence, terms[2], terms[1], terms[3]);
+  } else if (rule === 'prp-adp') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_ALL_DISJOINT_PROPERTIES_IRI));
+    addEvidenceText(evidence, [terms[0], terms[1], terms[2]], 'The owl:members list of ' + termToComment(terms[0]) + ' contains properties ' + termToComment(terms[1]) + ' and ' + termToComment(terms[2]) + '.');
+    addEvidenceTriple(evidence, terms[3], terms[1], terms[4]);
+    addEvidenceTriple(evidence, terms[3], terms[2], terms[4]);
+  } else if (rule === 'prp-npa1') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_SOURCE_INDIVIDUAL_IRI), terms[1]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ASSERTION_PROPERTY_IRI), terms[2]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_TARGET_INDIVIDUAL_IRI), terms[3]);
+    addEvidenceTriple(evidence, terms[1], terms[2], terms[3]);
+  } else if (rule === 'prp-npa2') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_SOURCE_INDIVIDUAL_IRI), terms[1]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ASSERTION_PROPERTY_IRI), terms[2]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_TARGET_VALUE_IRI), terms[3]);
+    addEvidenceTriple(evidence, terms[1], terms[2], terms[3]);
+  } else if (rule === 'cls-nothing2') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_NOTHING_IRI));
+  } else if (rule === 'cls-com') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_COMPLEMENT_OF_IRI), terms[1]);
+    addEvidenceTriple(evidence, terms[2], namedTerm(RDF_TYPE_IRI), terms[0]);
+    addEvidenceTriple(evidence, terms[2], namedTerm(RDF_TYPE_IRI), terms[1]);
+  } else if (rule === 'cls-maxc1') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_MAX_CARDINALITY_IRI), cardinalityZeroTerm());
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_PROPERTY_IRI), terms[2]);
+    addEvidenceTriple(evidence, terms[1], namedTerm(RDF_TYPE_IRI), terms[0]);
+    addEvidenceTriple(evidence, terms[1], terms[2], terms[3]);
+  } else if (rule === 'cls-maxqc1') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_MAX_QUALIFIED_CARDINALITY_IRI), cardinalityZeroTerm());
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_PROPERTY_IRI), terms[2]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_CLASS_IRI), terms[4]);
+    addEvidenceTriple(evidence, terms[1], namedTerm(RDF_TYPE_IRI), terms[0]);
+    addEvidenceTriple(evidence, terms[1], terms[2], terms[3]);
+    addEvidenceTriple(evidence, terms[3], namedTerm(RDF_TYPE_IRI), terms[4]);
+  } else if (rule === 'cls-maxqc2') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_MAX_QUALIFIED_CARDINALITY_IRI), cardinalityZeroTerm());
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_PROPERTY_IRI), terms[2]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_CLASS_IRI), namedTerm(OWL_THING_IRI));
+    addEvidenceTriple(evidence, terms[1], namedTerm(RDF_TYPE_IRI), terms[0]);
+    addEvidenceTriple(evidence, terms[1], terms[2], terms[3]);
+  } else if (rule === 'cls-maxqd1') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_MAX_QUALIFIED_CARDINALITY_IRI), cardinalityZeroTerm());
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_PROPERTY_IRI), terms[2]);
+    addEvidenceTriple(evidence, terms[0], namedTerm(OWL_ON_DATA_RANGE_IRI), terms[4]);
+    addEvidenceTriple(evidence, terms[1], namedTerm(RDF_TYPE_IRI), terms[0]);
+    addEvidenceTriple(evidence, terms[1], terms[2], terms[3]);
+    addEvidenceTriple(evidence, terms[3], namedTerm(RDF_TYPE_IRI), terms[4]);
+  } else if (rule === 'cax-dw') {
+    addEvidenceTriple(evidence, terms[0], namedTerm('http://www.w3.org/2002/07/owl#disjointWith'), terms[1]);
+    addEvidenceTriple(evidence, terms[2], namedTerm(RDF_TYPE_IRI), terms[0]);
+    addEvidenceTriple(evidence, terms[2], namedTerm(RDF_TYPE_IRI), terms[1]);
+  } else if (rule === 'cax-adc') {
+    addEvidenceTriple(evidence, terms[0], namedTerm(RDF_TYPE_IRI), namedTerm(OWL_ALL_DISJOINT_CLASSES_IRI));
+    addEvidenceText(evidence, [terms[0], terms[1], terms[2]], 'The owl:members list of ' + termToComment(terms[0]) + ' contains classes ' + termToComment(terms[1]) + ' and ' + termToComment(terms[2]) + '.');
+    addEvidenceTriple(evidence, terms[3], namedTerm(RDF_TYPE_IRI), terms[1]);
+    addEvidenceTriple(evidence, terms[3], namedTerm(RDF_TYPE_IRI), terms[2]);
+  } else if (rule === 'dt-not-type') {
+    addEvidenceText(evidence, [terms[0], terms[1]], termToComment(terms[0]) + ' is explicitly typed as ' + termToComment(terms[1]) + ', but the lexical value is not valid for that datatype.');
+  }
+  return evidence;
+}
+
+function addEvidenceTriple(target, subject, predicate, object) {
+  if (!subject || !predicate || !object || subject.termType === 'Literal' || hasHiddenDiagnosticTerms([subject, predicate, object])) {
+    return;
+  }
+  target.push(termToComment(subject) + ' ' + termToComment(predicate) + ' ' + termToComment(object) + ' .');
+}
+
+function addEvidenceText(target, terms, text) {
+  if (hasHiddenDiagnosticTerms(terms)) {
+    return;
+  }
+  target.push(text);
+}
+
+function publicDiagnosticTerms(terms) {
+  return terms.filter((term) => term && !isHiddenDiagnosticTerm(term));
+}
+
+function hasHiddenDiagnosticTerms(terms) {
+  return terms.some(isHiddenDiagnosticTerm);
+}
+
+function isHiddenDiagnosticTerm(term) {
+  return Boolean(term && term.termType === 'NamedNode' && term.value.indexOf(GENERATED_SKOLEM_IRI_PREFIX) === 0);
+}
+
+function safeTermLabel(term) {
+  return term && !isHiddenDiagnosticTerm(term) ? termToComment(term) : 'a hidden OWL helper node';
+}
+
+function namedTerm(value) {
+  return { termType: 'NamedNode', value };
+}
+
+function cardinalityZeroTerm() {
+  return { termType: 'Literal', value: '0', language: '', datatype: namedTerm(XSD_NON_NEGATIVE_INTEGER_IRI) };
 }
 
 function commentLine(value) {
@@ -578,7 +787,7 @@ function termToComment(term) {
     return 'unknown';
   }
   if (term.termType === 'NamedNode') {
-    return '<' + term.value + '>';
+    return prefixedName(term.value) || '<' + term.value + '>';
   }
   if (term.termType === 'BlankNode') {
     return '_:' + term.value;
@@ -587,12 +796,30 @@ function termToComment(term) {
     let literal = JSON.stringify(term.value);
     if (term.language) {
       literal += '@' + term.language;
-    } else if (term.datatype && term.datatype.value !== 'http://www.w3.org/2001/XMLSchema#string') {
-      literal += '^^<' + term.datatype.value + '>';
+    } else if (term.datatype && term.datatype.value !== XSD_STRING_IRI) {
+      literal += '^^' + termToComment(term.datatype);
     }
     return literal;
   }
   return term.termType + ':' + term.value;
+}
+
+function prefixedName(value) {
+  const prefixes = Object.assign({
+    rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    xsd: 'http://www.w3.org/2001/XMLSchema#',
+  }, outputPrefixes());
+  const names = Object.keys(prefixes).sort((left, right) => prefixes[right].length - prefixes[left].length);
+  for (const name of names) {
+    const iri = prefixes[name];
+    if (value.indexOf(iri) === 0) {
+      const local = value.slice(iri.length);
+      if (/^[A-Za-z_][A-Za-z0-9._-]*$/.test(local)) {
+        return name + ':' + local;
+      }
+    }
+  }
+  return '';
 }
 
 function progressMessage(state, prefix) {

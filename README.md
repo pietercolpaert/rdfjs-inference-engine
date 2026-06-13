@@ -156,6 +156,7 @@ All examples are self-contained folders under `examples/`. Each runnable example
 - [examples/shipment-logistics/README.md](examples/shipment-logistics/README.md) — broader OWL 2 RL materialization features.
 - [examples/skos-taxonomy/README.md](examples/skos-taxonomy/README.md) — SKOS Core taxonomy materialization.
 - [examples/owl-skos-catalog/README.md](examples/owl-skos-catalog/README.md) — combined OWL 2 RL + SKOS Core reasoning.
+- [examples/traffic-measurements/README.md](examples/traffic-measurements/README.md) — SSN/SOSA traffic counts with SKOS category inference and explicit aggregation outside OWL/SKOS.
 - [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
 - [examples/stateful-materialization/README.md](examples/stateful-materialization/README.md) — stateful RDF Messages materialization across messages.
 

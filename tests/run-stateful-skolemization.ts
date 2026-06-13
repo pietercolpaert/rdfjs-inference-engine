@@ -24,6 +24,8 @@ async function main(): Promise<void> {
     assert.equal(messages[9].length, 1, 'Expected the final message to type :x as :A.');
 
     const perMessage: Array<{ inputQuads: number; outputQuads: number; inconsistencies: number }> = [];
+    let finalInconsistencyRules: string[] = [];
+    let finalInconsistencyTerms: string[] = [];
     for (let index = 0; index < messages.length; index += 1) {
       const inference = await reasoner.inferAsyncWithDiagnostics(messages[index], {
         store: {
@@ -37,6 +39,10 @@ async function main(): Promise<void> {
         outputQuads: inference.quads.length,
         inconsistencies: inference.inconsistencies.length,
       });
+      if (index === messages.length - 1) {
+        finalInconsistencyRules = inference.inconsistencies.map((report) => report.rule ?? '');
+        finalInconsistencyTerms = inference.inconsistencies.flatMap((report) => report.terms.map((term) => term.value));
+      }
     }
 
     for (let index = 1; index < 9; index += 1) {
@@ -50,7 +56,12 @@ async function main(): Promise<void> {
     const totalOutput = perMessage.reduce((sum, message) => sum + message.outputQuads, 0);
     assert.ok(totalOutput <= 30, `Expected bounded stateful output, got ${totalOutput}: ${JSON.stringify(perMessage)}`);
     assert.ok(perMessage[9].outputQuads <= 10, `Expected bounded final inconsistency output: ${JSON.stringify(perMessage)}`);
-    assert.ok(perMessage[9].inconsistencies > 0, 'Expected the final disjointness message to report an inconsistency.');
+    assert.equal(perMessage[9].inconsistencies, 1, `Expected only the public disjointness inconsistency: ${JSON.stringify(perMessage)}`);
+    assert.deepEqual(finalInconsistencyRules, ['https://example.org/owlrl-n3#cax-dw']);
+    assert.ok(
+      finalInconsistencyTerms.every((value) => !value.startsWith(GENID_PREFIX)),
+      `Expected public inconsistency terms only, got ${JSON.stringify(finalInconsistencyTerms)}`,
+    );
 
     const firstRunSkolems = await firstMessageSkolemTerms('stateful-skolemization-stability');
     const secondRunSkolems = await firstMessageSkolemTerms('stateful-skolemization-stability');
