@@ -1059,8 +1059,7 @@ function applyBundledExample(example: BundledExample): void {
 }
 
 function shouldEnableStatefulMaterialization(exampleId: string): boolean {
-  return exampleId === 'stateful-materialization'
-    || exampleId === 'inconsistency-diagnostics';
+  return exampleId === 'stateful-materialization';
 }
 
 function defaultExample(): BundledExample {

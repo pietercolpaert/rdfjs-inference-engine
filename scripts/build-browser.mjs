@@ -87,7 +87,7 @@ function humanizeExampleId(id) {
     'shipment-logistics': 'Shipment logistics (OWL 2 RL)',
     'skos-taxonomy': 'SKOS taxonomy (SKOS Core)',
     'owl-skos-catalog': 'Catalog topics (OWL 2 RL + SKOS Core)',
-    'inconsistency-diagnostics': 'Inconsistency diagnostics (RDF Messages)',
+    'inconsistency-diagnostics': 'Inconsistency diagnostics (OWL 2 RL)',
     'transit-messages': 'Transit stream (RDF Messages)',
     'stateful-materialization': 'Stateful materialization (RDF Messages)',
   };
