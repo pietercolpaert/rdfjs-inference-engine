@@ -836,6 +836,7 @@ function outputPrefixes() {
     subjects: 'https://example.org/subjects#',
     catalog: 'https://example.org/catalog#',
     family: 'https://example.org/family#',
+    test: 'https://example.org/test#',
     skos: 'http://www.w3.org/2004/02/skos/core#',
     rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
     owl: 'http://www.w3.org/2002/07/owl#',
@@ -1039,7 +1040,7 @@ function loadBundledExample(id: string): void {
   suppressStateUpdate = true;
   controls.backgroundMode.value = 'text';
   controls.dataMode.value = 'text';
-  controls.statefulMaterialization.checked = example.id === 'stateful-materialization';
+  controls.statefulMaterialization.checked = shouldEnableStatefulMaterialization(example.id);
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
   editors.backgroundText.setValue(example.background);
@@ -1049,6 +1050,11 @@ function loadBundledExample(id: string): void {
   applyModeVisibility();
   updateHashNow();
   setStatus(`Loaded ${example.label} from ${example.backgroundFile} and ${example.dataFile}.`);
+}
+
+function shouldEnableStatefulMaterialization(exampleId: string): boolean {
+  return exampleId === 'stateful-materialization'
+    || exampleId === 'inconsistency-diagnostics';
 }
 
 function defaultExample(): BundledExample {

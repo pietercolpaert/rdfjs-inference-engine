@@ -1,0 +1,6 @@
+# Background ontology for the inconsistency diagnostics playground example.
+
+@prefix : <https://example.org/test#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+:A owl:disjointWith :B .
