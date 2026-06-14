@@ -20,16 +20,20 @@ const bundledRulesPlugin = {
     build.onResolve({ filter: /^bundled-rules$/ }, () => ({ path: 'bundled-rules', namespace: 'bundled-rules' }));
     build.onLoad({ filter: /.*/, namespace: 'bundled-rules' }, async () => {
       const files = (await readdir('rules')).filter((file) => file.endsWith('.n3')).sort();
-      const parts = [];
+      const profiles = [];
       for (const file of files) {
         const text = await readFile(join('rules', file), 'utf8');
-        parts.push(`# Source: rules/${file}\n${text.trimEnd()}`);
+        profiles.push({
+          file,
+          n3: `# Source: rules/${file}\n${text.trimEnd()}`,
+        });
       }
 
       return {
         contents: [
           `export const bundledRuleFiles = ${JSON.stringify(files)};`,
-          `export const bundledRules = ${JSON.stringify(parts.join('\n\n'))};`,
+          `export const bundledRuleProfiles = ${JSON.stringify(profiles)};`,
+          `export const bundledRules = bundledRuleProfiles.map((profile) => profile.n3).join(${JSON.stringify('\n\n')});`,
         ].join('\n'),
         loader: 'js',
       };

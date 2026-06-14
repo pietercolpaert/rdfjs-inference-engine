@@ -1,4 +1,4 @@
-import { bundledRuleFiles, bundledRules } from 'bundled-rules';
+import { bundledRuleFiles, bundledRuleProfiles } from 'bundled-rules';
 import { bundledExamples } from 'bundled-examples';
 
 declare const CodeMirror: any;
@@ -20,10 +20,16 @@ type PlaygroundState = {
   backgroundMode?: InputMode;
   dataMode?: InputMode;
   statefulMaterialization?: boolean;
+  disabledRuleFiles?: string[];
   backgroundUrl?: string;
   dataUrl?: string;
   backgroundText?: string;
   dataText?: string;
+};
+
+type BundledRuleProfile = {
+  file: string;
+  n3: string;
 };
 
 type BundledExample = {
@@ -49,6 +55,7 @@ type WorkerRequest = {
   apiScriptUrl: string;
   bundledRules: string;
   bundledRuleCount: number;
+  bundledRuleLabels: string[];
   backgroundSource: string;
   dataMode: InputMode;
   statefulMaterialization: boolean;
@@ -95,6 +102,7 @@ const controls = {
   status: getElement('status'),
   runtimeStats: getElement('runtimeStats'),
   rulesSummary: getOptionalElement('rulesSummary'),
+  ruleProfileList: getOptionalElement('ruleProfileList'),
 };
 
 let suppressStateUpdate = false;
@@ -103,16 +111,14 @@ let activeRun: ActiveRun | null = null;
 let outputAppendBuffer = '';
 let outputAppendTimer = 0;
 
-if (controls.rulesSummary) {
-  controls.rulesSummary.textContent = `Bundled inference profiles: ${bundledRuleFiles.join(', ') || 'none'}`;
-}
 populateExamples();
+populateRuleProfiles();
 loadStateFromHash();
 applyModeVisibility();
 wireControls();
 scheduleStateUpdate();
 setRunning(false);
-setStatus('Ready. Choose an example, URL, or text input, then run OWL 2 RL + SKOS Core inference.');
+setStatus('Ready. Choose an example, URL, or text input, then run inference.');
 
 function createEditor(id: string, value: string): Editor {
   const textarea = document.getElementById(id) as HTMLTextAreaElement | null;
@@ -181,10 +187,16 @@ async function runInference(): Promise<void> {
       throw new Error('Enter a data URL or switch to text input.');
     }
 
+    const selectedProfiles = selectedRuleProfiles();
+    if (selectedProfiles.length === 0) {
+      throw new Error('Select at least one bundled N3 rule file in the advanced rule profile selection.');
+    }
+
     await runWorkerInference(run, {
       apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', window.location.href).href,
-      bundledRules,
-      bundledRuleCount: bundledRuleFiles.length,
+      bundledRules: selectedProfiles.map((profile) => profile.n3).join('\n\n'),
+      bundledRuleCount: selectedProfiles.length,
+      bundledRuleLabels: selectedProfiles.map((profile) => profile.file),
       backgroundSource,
       dataMode,
       statefulMaterialization: controls.statefulMaterialization.checked,
@@ -298,7 +310,10 @@ self.onmessage = async (event) => {
     const loadOptions = request.statefulMaterialization
       ? { skolemKey: request.statefulStoreName || 'rdfjs-inference-engine:playground:default' }
       : undefined;
-    const runtime = reasoner.load({ n3: request.bundledRules, label: 'Bundled OWL 2 RL + SKOS Core + SHACL Core profiles' }, background.quads, loadOptions);
+    const ruleLabel = request.bundledRuleLabels && request.bundledRuleLabels.length
+      ? 'Bundled profiles: ' + request.bundledRuleLabels.join(', ')
+      : 'Bundled N3 rule profiles';
+    const runtime = reasoner.load({ n3: request.bundledRules, label: ruleLabel }, background.quads, loadOptions);
     const compiledAt = performance.now();
     self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
@@ -1020,6 +1035,7 @@ function resetDefaults(): void {
   controls.statefulMaterialization.checked = false;
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
+  setDisabledRuleFiles([]);
   editors.backgroundText.setValue(example.background);
   editors.dataText.setValue(example.data);
   editors.outputText.setValue('');
@@ -1038,6 +1054,111 @@ function populateExamples(): void {
     controls.exampleSelect.appendChild(option);
   }
   controls.exampleSelect.value = defaultExample().id;
+}
+
+function populateRuleProfiles(): void {
+  if (!controls.ruleProfileList) {
+    updateRuleProfileSummary();
+    return;
+  }
+
+  controls.ruleProfileList.textContent = '';
+  for (const profile of bundledRuleProfiles as BundledRuleProfile[]) {
+    const copy = ruleProfileCopy(profile.file);
+    const id = `ruleProfile-${stableHash(profile.file)}`;
+    const option = document.createElement('div');
+    option.className = 'rule-profile-option';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = id;
+    checkbox.checked = true;
+    checkbox.dataset.ruleFile = profile.file;
+    checkbox.addEventListener('change', () => {
+      updateRuleProfileSummary();
+      scheduleStateUpdate();
+    });
+
+    const text = document.createElement('div');
+    text.className = 'rule-profile-copy';
+
+    const label = document.createElement('label');
+    label.htmlFor = id;
+    label.textContent = copy.label;
+
+    const description = document.createElement('span');
+    description.className = 'hint';
+    description.textContent = copy.description;
+
+    text.append(label, description);
+    option.append(checkbox, text);
+    controls.ruleProfileList.appendChild(option);
+  }
+
+  updateRuleProfileSummary();
+}
+
+function ruleProfileCopy(file: string): { label: string; description: string } {
+  const profiles: Record<string, { label: string; description: string }> = {
+    'owl2rl-eyeling.n3': {
+      label: 'OWL 2 RL / RDF rules',
+      description: 'Materializes OWL 2 RL and RDFS-style consequences such as subclass, subproperty, domain/range, equivalence, property chains, selected restrictions, sameAs, and inconsistency diagnostics.',
+    },
+    'skos-entailment.n3': {
+      label: 'SKOS Core entailment rules',
+      description: 'Materializes SKOS Core consequences such as concept-scheme membership, broader/narrower inverses and transitive closures, semantic relation hierarchy, labels, notes, collections, and mapping properties.',
+    },
+    'shacl-core-eyeling.n3': {
+      label: 'SHACL Core validation rules',
+      description: 'Runs the Eyeling-targeted SHACL Core validation profile and emits sh:ValidationResult triples. It passes the W3C SHACL Core suite by the harness sh:conforms criterion.',
+    },
+  };
+  return profiles[file] ?? {
+    label: file,
+    description: 'Additional bundled N3 rule profile loaded from the repository rules folder.',
+  };
+}
+
+function ruleProfileCheckboxes(): HTMLInputElement[] {
+  if (!controls.ruleProfileList) {
+    return [];
+  }
+  return Array.from(controls.ruleProfileList.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-rule-file]'));
+}
+
+function selectedRuleProfiles(): BundledRuleProfile[] {
+  const disabled = new Set(disabledRuleFiles());
+  return (bundledRuleProfiles as BundledRuleProfile[]).filter((profile) => !disabled.has(profile.file));
+}
+
+function disabledRuleFiles(): string[] {
+  return ruleProfileCheckboxes()
+    .filter((checkbox) => !checkbox.checked)
+    .map((checkbox) => checkbox.dataset.ruleFile ?? '')
+    .filter(Boolean)
+    .sort();
+}
+
+function setDisabledRuleFiles(files: string[]): void {
+  const disabled = new Set(files);
+  for (const checkbox of ruleProfileCheckboxes()) {
+    checkbox.checked = !disabled.has(checkbox.dataset.ruleFile ?? '');
+  }
+  updateRuleProfileSummary();
+}
+
+function updateRuleProfileSummary(): void {
+  if (!controls.rulesSummary) {
+    return;
+  }
+  const selected = selectedRuleProfiles().map((profile) => profile.file);
+  if (selected.length === bundledRuleFiles.length) {
+    controls.rulesSummary.textContent = `Rule profiles: all ${selected.length} enabled`;
+  } else if (selected.length === 0) {
+    controls.rulesSummary.textContent = 'Rule profiles: none enabled';
+  } else {
+    controls.rulesSummary.textContent = `Rule profiles: ${selected.length}/${bundledRuleFiles.length} enabled`;
+  }
 }
 
 function loadBundledExample(id: string): void {
@@ -1076,11 +1197,13 @@ function findExample(id: string): BundledExample | undefined {
 
 function collectState(): PlaygroundState {
   const selectedExample = findExample(controls.exampleSelect.value);
-  if (selectedExample && isUntouchedExample(selectedExample)) {
+  const disabledRules = disabledRuleFiles();
+  if (selectedExample && isUntouchedExample(selectedExample) && disabledRules.length === 0) {
     return selectedExample.id === defaultExample().id ? {} : { example: selectedExample.id };
   }
 
   const state: PlaygroundState = {
+    disabledRuleFiles: disabledRules.length > 0 ? disabledRules : undefined,
     backgroundMode: getMode('background') === defaultState.backgroundMode ? undefined : getMode('background'),
     dataMode: getMode('data') === defaultState.dataMode ? undefined : getMode('data'),
     statefulMaterialization: controls.statefulMaterialization.checked || undefined,
@@ -1091,10 +1214,14 @@ function collectState(): PlaygroundState {
   const backgroundText = editors.backgroundText.getValue();
   const dataText = editors.dataText.getValue();
 
-  if (backgroundText !== defaultState.backgroundText) {
+  if (selectedExample && isUntouchedExample(selectedExample) && selectedExample.id !== defaultExample().id) {
+    state.example = selectedExample.id;
+  }
+
+  if (!state.example && backgroundText !== defaultState.backgroundText) {
     state.backgroundText = backgroundText;
   }
-  if (dataText !== defaultState.dataText) {
+  if (!state.example && dataText !== defaultState.dataText) {
     state.dataText = dataText;
   }
 
@@ -1118,6 +1245,7 @@ function loadStateFromHash(): void {
     if (example) {
       suppressStateUpdate = true;
       applyBundledExample(example);
+      setDisabledRuleFiles([]);
       suppressStateUpdate = false;
       return;
     }
@@ -1129,9 +1257,17 @@ function loadStateFromHash(): void {
   }
 
   suppressStateUpdate = true;
+  if (state.example) {
+    const example = findExample(state.example);
+    if (example) {
+      applyBundledExample(example);
+    }
+  }
   controls.backgroundMode.value = state.backgroundMode ?? defaultState.backgroundMode;
   controls.dataMode.value = state.dataMode ?? defaultState.dataMode;
-  controls.statefulMaterialization.checked = state.statefulMaterialization ?? false;
+  if (state.statefulMaterialization !== undefined) {
+    controls.statefulMaterialization.checked = state.statefulMaterialization;
+  }
   controls.backgroundUrl.value = state.backgroundUrl ?? '';
   controls.dataUrl.value = state.dataUrl ?? '';
   if (state.backgroundText !== undefined) {
@@ -1140,6 +1276,7 @@ function loadStateFromHash(): void {
   if (state.dataText !== undefined) {
     editors.dataText.setValue(state.dataText);
   }
+  setDisabledRuleFiles(state.disabledRuleFiles ?? []);
   suppressStateUpdate = false;
 }
 

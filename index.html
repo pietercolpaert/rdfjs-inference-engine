@@ -117,6 +117,61 @@
       font-weight: 600;
     }
 
+    .advanced-panel {
+      margin-top: 0.85rem;
+      border: 1px solid var(--border-soft);
+      border-radius: 0.9rem;
+      background: var(--panel-soft);
+    }
+
+    .advanced-panel summary {
+      cursor: pointer;
+      padding: 0.8rem 0.95rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 650;
+    }
+
+    .advanced-panel-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 0 0.95rem 0.95rem;
+    }
+
+    .rule-profile-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+      gap: 0.65rem;
+    }
+
+    .rule-profile-option {
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+      padding: 0.75rem;
+      border: 1px solid var(--border-soft);
+      border-radius: 0.75rem;
+      background: var(--panel);
+    }
+
+    .rule-profile-option input[type="checkbox"] {
+      width: 1rem;
+      height: 1rem;
+      margin-top: 0.2rem;
+      accent-color: var(--accent);
+    }
+
+    .rule-profile-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .rule-profile-copy label {
+      margin: 0;
+    }
+
     label {
       display: inline-block;
       margin-bottom: 0.35rem;
@@ -359,18 +414,25 @@
   <div class="page">
     <header>
       <h1>RDF-JS inference engine playground</h1>
-      <p class="meta">Run generated-runtime inference in the browser with the bundled OWL 2 RL and SKOS Core rule profiles.</p>
-      <p class"meta">Use this in your own projects with the <a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM library</a> or find the code on <a href="https://github.com/pietercolpaert/rdfjs-inference-engine">Github</a>.</p>
+      <p class="meta">Run generated-runtime inference in the browser with the bundled OWL 2 RL, SKOS Core, and SHACL Core rule profiles.</p>
+      <p class="meta">Use this in your own projects with the <a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM library</a> or find the code on <a href="https://github.com/pietercolpaert/rdfjs-inference-engine">Github</a>.</p>
     </header>
     <main class="grid">
       <section class="card">
         <h2 class="section-title">Bundled example</h2>
-        <p class="meta">Load one of the self-contained examples from the repository examples folder, then run it with both OWL 2 RL and SKOS Core support enabled.</p>
+        <p class="meta">Load one of the self-contained examples from the repository examples folder, then run it with OWL 2 RL, SKOS Core, and SHACL Core support enabled by default.</p>
         <div class="example-row">
           <label for="exampleSelect">Example</label>
           <select id="exampleSelect"></select>
           <span id="rulesSummary" class="rules-summary"></span>
         </div>
+        <details class="advanced-panel">
+          <summary>Advanced rule profile selection</summary>
+          <div class="advanced-panel-body">
+            <p class="meta">All bundled N3 rule files are enabled by default. Turn individual profiles off when you want to isolate one ruleset, compare behavior, or debug which profile derives a result.</p>
+            <div id="ruleProfileList" class="rule-profile-list" aria-label="Bundled N3 rule files"></div>
+          </div>
+        </details>
       </section>
 
       <section class="card half">

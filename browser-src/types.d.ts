@@ -1,5 +1,9 @@
 declare module 'bundled-rules' {
   export const bundledRuleFiles: string[];
+  export const bundledRuleProfiles: Array<{
+    file: string;
+    n3: string;
+  }>;
   export const bundledRules: string;
 }
 
