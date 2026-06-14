@@ -54,6 +54,7 @@
     "test:marc-list-ontology": "npm run build --silent && node dist/tests/run-marc-list-ontology.js",
     "test:skos": "npm run build --silent && node dist/tests/run-skos-entailment.js",
     "test:shacl": "npm run build:node --silent && node dist/tests/run-shacl-core.js",
+    "test:shacl12": "npm run build:node --silent && node dist/tests/run-shacl12-core.js",
     "test:owl:mobibench": "npm run build --silent && node dist/tests/run-mobibench-owl2rl.js",
     "test:owl:official": "npm run build --silent && node dist/tests/run-official-owl2rl.js",
     "test:owl": "npm run test:owl:mobibench && npm run test:owl:official",

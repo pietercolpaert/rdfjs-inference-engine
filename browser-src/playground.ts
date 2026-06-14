@@ -1112,6 +1112,10 @@ function ruleProfileCopy(file: string): { label: string; description: string } {
       label: 'SHACL Core validation rules',
       description: 'Runs the Eyeling-targeted SHACL Core validation profile and emits sh:ValidationResult triples. It passes the W3C SHACL Core suite by the harness sh:conforms criterion.',
     },
+    'shacl12-core-eyeling.n3': {
+      label: 'SHACL 1.2 Core draft additions',
+      description: 'Adds draft SHACL 1.2 Core extensions on top of the SHACL Core profile, including ShapeClass targets, explicit sh:shape targets, constant sh:values/defaultValue, and sh:singleLine.',
+    },
   };
   return profiles[file] ?? {
     label: file,

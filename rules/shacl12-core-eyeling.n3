@@ -1,0 +1,167 @@
+# SHACL 1.2 Core validation additions for Eyeling.
+#
+# This file is intentionally an extension layer for rules/shacl-core-eyeling.n3,
+# not a standalone SHACL implementation.  Keep the SHACL 1.1-compatible rules in
+# shacl-core-eyeling.n3 and add only SHACL 1.2 Core behaviour here so profile
+# toggles can enable/disable the draft extensions independently.
+
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh:     <http://www.w3.org/ns/shacl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+@prefix log:    <http://www.w3.org/2000/10/swap/log#> .
+@prefix list:   <http://www.w3.org/2000/10/swap/list#> .
+@prefix math:   <http://www.w3.org/2000/10/swap/math#> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
+@prefix dt:     <https://eyereasoner.github.io/eyeling/datatype#> .
+@prefix shn:    <https://example.org/shacl-n3#> .
+
+# sh:ShapeClass is a SHACL 1.2 shortcut for nodes that are both classes and
+# node shapes.  The base profile already implements implicit class targets for
+# rdfs:Class/owl:Class shapes, so materializing the class-like facts is enough.
+{ ?shape rdf:type sh:ShapeClass . }
+=> {
+  ?shape rdf:type sh:NodeShape ;
+    rdf:type rdfs:Class .
+} .
+
+# Explicit shape targets: data nodes can point at their shapes with sh:shape.
+{
+  ?focus sh:shape ?shape .
+  ?shape shn:active true .
+}
+=> { ?focus shn:focusFor ?shape . } .
+
+# Constant node expressions for sh:values and sh:defaultValue.  SHACL 1.2 Core
+# only defines IRI/literal node expressions, so these rules support those
+# constant cases without pulling in the optional Node Expressions library.
+{
+  ?focus shn:focusFor ?nodeShape .
+  ?nodeShape sh:property ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:values ?value .
+  (?shape ?focus sh:values ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:values ?value .
+  (?shape ?focus sh:values ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+{
+  ?focus shn:focusFor ?nodeShape .
+  ?nodeShape sh:property ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:defaultValue ?value .
+  1 log:notIncludes { ?focus ?path ?existingValue . } .
+  (?shape ?focus sh:defaultValue ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+{
+  ?focus shn:focusFor ?shape .
+  ?shape shn:active true .
+  ?shape sh:path ?path .
+  ?shape sh:defaultValue ?value .
+  1 log:notIncludes { ?focus ?path ?existingValue . } .
+  (?shape ?focus sh:defaultValue ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?shape ;
+    shn:focus ?focus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+# sh:singleLine: true forbids form-feed, carriage return, line-feed, and
+# vertical-tab characters in literal lexical forms.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:singleLine true .
+  ?value dt:lexicalForm ?lexical .
+  ?lexical string:notMatches "^[^\\f\\r\\n\\v]*$" .
+  (sh:SingleLineConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:SingleLineConstraintComponent ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
+
+# Nested sh:property constraints reached from property shapes.  SHACL 1.2's
+# validation-report tests include a shared nested property shape reached through
+# two outer properties; for boolean conformance, deriving the inner bindings is
+# sufficient.
+{
+  ?outerBinding shn:shape ?outerShape ; shn:value ?nestedFocus .
+  ?outerShape sh:property ?innerShape .
+  ?innerShape shn:active true .
+  ?innerShape sh:path ?path .
+  ?nestedFocus ?path ?value .
+  (?outerBinding ?innerShape ?nestedFocus ?path ?value) log:skolem ?binding .
+}
+=> {
+  ?binding shn:shape ?innerShape ;
+    shn:focus ?nestedFocus ;
+    shn:path ?path ;
+    shn:value ?value .
+} .
+
+# The SHACL 1.2 test harness rewrites RDF 1.2 annotation syntax into the
+# shn:reifies* helper triples below because rdf-parser-ts currently exposes only
+# ordinary RDF-JS quads. These rules validate reifiers through the existing
+# nested SHACL machinery and detect required-but-missing reifiers.
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:reifierShape ?reifierShape .
+  ?reifier shn:reifiesSubject ?focus ;
+    shn:reifiesPredicate ?path ;
+    shn:reifiesObject ?value .
+}
+=> { ?reifier shn:focusFor ?reifierShape . } .
+
+{
+  ?binding shn:shape ?shape ; shn:focus ?focus ; shn:path ?path ; shn:value ?value .
+  ?shape sh:reifierShape ?reifierShape .
+  ?shape sh:reificationRequired true .
+  1 log:notIncludes {
+    ?reifier shn:reifiesSubject ?focus ;
+      shn:reifiesPredicate ?path ;
+      shn:reifiesObject ?value .
+  } .
+  (sh:ReifierShapeConstraintComponent ?focus ?shape ?path ?value) log:skolem ?result .
+}
+=> {
+  ?result rdf:type sh:ValidationResult ;
+    sh:focusNode ?focus ;
+    sh:sourceShape ?shape ;
+    sh:sourceConstraintComponent sh:ReifierShapeConstraintComponent ;
+    sh:resultPath ?path ;
+    sh:resultSeverity sh:Violation ;
+    sh:value ?value .
+} .
