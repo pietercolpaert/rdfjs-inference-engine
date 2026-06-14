@@ -1311,18 +1311,19 @@ function encodeState(state: PlaygroundState): string {
 }
 
 function decodeExample(hash: string): string {
-  if (!hash.startsWith('#example=')) {
+  const value = hashValue(hash, '#example=');
+  if (!value) {
     return '';
   }
   try {
-    return decodeURIComponent(hash.slice('#example='.length));
+    return decodeURIComponent(value);
   } catch {
     return '';
   }
 }
 
 function decodeState(hash: string): PlaygroundState | null {
-  const value = hash.startsWith('#state=') ? hash.slice('#state='.length) : '';
+  const value = hashValue(hash, '#state=');
   if (!value) {
     return null;
   }
@@ -1332,6 +1333,15 @@ function decodeState(hash: string): PlaygroundState | null {
   } catch {
     return null;
   }
+}
+
+function hashValue(hash: string, prefix: string): string {
+  if (!hash.startsWith(prefix)) {
+    return '';
+  }
+  const value = hash.slice(prefix.length);
+  const trackingSuffix = value.indexOf('?');
+  return trackingSuffix === -1 ? value : value.slice(0, trackingSuffix);
 }
 
 function setStatus(message: string): void {
