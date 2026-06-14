@@ -482,3 +482,14 @@
     sh:resultSeverity sh:Violation ;
     sh:value ?value .
 } .
+
+# Report enrichment: every result produced by a property shape should identify
+# the validated path. Some constraint rules are shared by node and property
+# shapes, so this small post-processing rule adds sh:resultPath whenever the
+# source shape is itself a property shape.
+{
+  ?result rdf:type sh:ValidationResult ;
+    sh:sourceShape ?shape .
+  ?shape sh:path ?path .
+}
+=> { ?result sh:resultPath ?path . } .
