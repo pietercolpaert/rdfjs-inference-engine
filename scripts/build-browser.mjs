@@ -95,6 +95,7 @@ function humanizeExampleId(id) {
     'owl-skos-catalog': 'Catalog topics (OWL 2 RL + SKOS Core)',
     'complex-path-coverage': 'Coverage audit (OWL 2 RL + SKOS + SHACL paths)',
     'shacl-validation': 'SHACL validation (SHACL Core)',
+    'shacl12-grandfather': 'Grandfather classification (SHACL 1.2 + OWL RL)',
     'inconsistency-diagnostics': 'Inconsistency diagnostics (OWL 2 RL)',
     'transit-messages': 'Transit stream (RDF Messages)',
     'stateful-materialization': 'Stateful materialization (RDF Messages)',

@@ -32,6 +32,27 @@
 }
 => { ?focus shn:focusFor ?shape . } .
 
+# Minimal sh:targetWhere support for the SHACL 1.2 grandfather example pattern:
+# a where-shape with one property shape requiring sh:hasValue and another
+# property shape requiring at least one value over a two-step sequence path.
+{
+  ?shape shn:active true .
+  ?shape sh:targetWhere ?whereShape .
+  ?whereShape sh:property ?hasValueShape .
+  ?hasValueShape sh:path ?hasValuePath ;
+    sh:hasValue ?requiredValue .
+  ?focus ?hasValuePath ?requiredValue .
+  ?whereShape sh:property ?minCountShape .
+  ?minCountShape sh:path ?sequencePath ;
+    sh:minCount ?minimum .
+  ?sequencePath rdf:first ?firstPredicate ;
+    rdf:rest ?sequenceTail .
+  ?sequenceTail rdf:first ?secondPredicate .
+  ?focus ?firstPredicate ?middle .
+  ?middle ?secondPredicate ?value .
+}
+=> { ?focus shn:focusFor ?shape . } .
+
 # Constant node expressions for sh:values and sh:defaultValue.  SHACL 1.2 Core
 # only defines IRI/literal node expressions, so these rules support those
 # constant cases without pulling in the optional Node Expressions library.

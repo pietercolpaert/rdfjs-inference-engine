@@ -1,0 +1,56 @@
+# SHACL 1.2 targetWhere example based on Holger Knublauch's grandfather shape, but with OWL inferencing example
+# Source: https://www.linkedin.com/pulse/inferencing-support-owl-shacl-12-classification-holger-knublauch-bhjjc/
+
+@prefix ex: <https://example.org/shacl12-grandfather#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix :    <https://example.org/family#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:<http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+ex:Grandfather
+  a owl:Class ;
+  rdfs:subClassOf ex:Person ;
+  owl:equivalentClass [
+    a owl:Class ;
+    owl:intersectionOf (
+      [
+        a owl:Restriction ;
+        owl:onProperty ex:gender ;
+        owl:hasValue "male"
+      ]
+      [
+        a owl:Restriction ;
+        owl:onProperty ex:hasGrandchild ;
+        owl:someValuesFrom owl:Thing
+      ]
+    )
+  ] .
+
+ex:hasGrandchild
+  a owl:ObjectProperty ;
+  owl:propertyChainAxiom ( ex:child ex:child ) .
+
+## Both shapes are enabled by default:
+## - GrandfatherShape1 demonstrates the SHACL 1.2 sh:targetWhere pattern.
+## - GrandfatherShape2 demonstrates the simpler OWL RL symbiosis path, where
+##   sh:targetClass can use the inferred ex:Grandfather classification.
+
+ex:GrandfatherShape2 sh:targetClass ex:Grandfather ; sh:property [ sh:path ex:name ; sh:minCount 1 ] .
+
+ex:GrandfatherShape1
+  a sh:NodeShape ;
+  sh:targetWhere [
+    sh:property [
+      sh:path ex:gender ;
+      sh:hasValue "male" ;
+    ] ;
+    sh:property [
+      sh:path ( ex:child ex:child ) ;
+      sh:minCount 1 ;
+    ] ;
+  ] ;
+  # This constraint makes the targetWhere result visible in the demo:
+  # Grandfathers must have a name
+  sh:property [ sh:path ex:name ; sh:minCount 1 ]  .

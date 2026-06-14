@@ -166,6 +166,7 @@ All examples are self-contained folders under `examples/`. Each runnable example
 - [examples/owl-skos-catalog/README.md](examples/owl-skos-catalog/README.md) — combined OWL 2 RL + SKOS Core reasoning.
 - [examples/complex-path-coverage/README.md](examples/complex-path-coverage/README.md) — SHACL complex paths over OWL 2 RL + SKOS materialization.
 - [examples/shacl-validation/README.md](examples/shacl-validation/README.md) — SHACL Core validation results.
+- [examples/shacl12-grandfather/README.md](examples/shacl12-grandfather/README.md) — SHACL 1.2 validation working with OWL RL classification in the grandfather example.
 - [examples/inconsistency-diagnostics/README.md](examples/inconsistency-diagnostics/README.md) — playground-focused OWL 2 RL inconsistency diagnostics.
 - [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
 - [examples/stateful-materialization/README.md](examples/stateful-materialization/README.md) — stateful RDF Messages materialization across messages.
