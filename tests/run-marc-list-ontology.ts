@@ -7,12 +7,13 @@ const { readFileSync } = require('node:fs');
 const { InferenceEngine } = require('./dist/src');
 const { parseRdf } = require('./dist/tests/utils');
 const { parseRdfOrMessages } = require('./dist/examples/util');
+const owlProfile = { n3: readFileSync('rules/owl2rl-eyeling.n3', 'utf8'), label: 'rules/owl2rl-eyeling.n3' };
 const source = readFileSync('tests/fixtures/marc-list-ontology.n3', 'utf8');
 const quads = parseRdf(source);
 const input = parseRdfOrMessages(readFileSync('tests/fixtures/marc-list-messages.trig', 'utf8'));
 const started = Date.now();
 const reasoner = new InferenceEngine();
-reasoner.load(quads);
+reasoner.load(owlProfile, quads);
 const loadElapsed = Date.now() - started;
 const runtime = reasoner.getRuntime();
 if (!runtime.includes('<https://codeberg.org/phochste/marcattacks#RecordReadyForBasicExtraction>')) {
