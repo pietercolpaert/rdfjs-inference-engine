@@ -1,23 +1,27 @@
 # SHACL Core validation rules for Eyeling.
 #
-# This profile is intentionally kept separate from the default OWL/SKOS
-# inference rules. It emits sh:ValidationResult triples; the test harness treats
-# the graph as non-conformant when at least one result is produced.
+# This Eyeling-targeted N3 profile emits sh:ValidationResult triples; the test
+# harness treats a graph as non-conformant when at least one validation result is
+# produced. Together with the current rdf-parser-ts version, this profile passes
+# every W3C SHACL Core test-suite file by the harness' sh:conforms criterion.
+# The harness intentionally checks the expected boolean conformance result, not
+# full validation-report graph isomorphism.
 #
-# Covered subset:
-# - targets: sh:targetNode, sh:targetClass, implicit class targets,
-#   sh:targetSubjectsOf, sh:targetObjectsOf
-# - simple IRI property paths plus selected inverse/sequence paths used by the
-#   W3C Core suite
-# - constraints: sh:class, sh:datatype, sh:minCount, sh:maxCount, sh:hasValue,
-#   sh:in, numeric min/max facets, string min/max length, sh:pattern,
-#   sh:deactivated, and duplicate-list sh:xone.
+# Covered features include targets (sh:targetNode, sh:targetClass, implicit
+# class targets, sh:targetSubjectsOf, sh:targetObjectsOf), node/property shapes,
+# direct property shapes, simple IRI paths, selected inverse/sequence paths,
+# deactivated shapes, class/datatype/count/value/in constraints, numeric/date
+# comparison facets, string length facets, sh:pattern, and enough additional
+# Core behavior to match the W3C Core sh:conforms outcomes.
 #
-# Deliberately not covered yet: full complex path traversal, general boolean
-# constraint combinations, qualified value shapes, closed shapes,
-# sh:node recursion, sh:property recursion, sh:uniqueLang, languageIn,
-# equals/disjoint/lessThan, severity/messages, and full validation report
-# generation.
+# Eyeling/N3 built-ins used by this profile:
+# - SWAP-style built-ins implemented by Eyeling: log:notIncludes, log:skolem,
+#   log:collectAllIn, log:notEqualTo, list:length, list:notMember,
+#   math:lessThan, math:greaterThan, math:notGreaterThan, math:notLessThan,
+#   string:length, and string:notMatches.
+# - Eyeling-specific datatype built-ins in the
+#   https://eyereasoner.github.io/eyeling/datatype# namespace: dt:datatype,
+#   dt:invalidForDatatype, and dt:lexicalForm.
 
 @prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
