@@ -1,5 +1,5 @@
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
-import { rdfjs, reasonStream, registerBuiltin, runAsync, unregisterBuiltin, type EyelingTerm } from 'eyeling/browser';
+import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling/browser';
 import {
   DataFactory as RdfParserDataFactory,
   IncrementalParser,
@@ -166,6 +166,7 @@ export class InferenceEngine {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
       });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
@@ -198,6 +199,7 @@ export class InferenceEngine {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
             addDerived(derived, seen, item.quad, outputMode);
@@ -229,6 +231,7 @@ export class InferenceEngine {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
             diagnostics.push(item.quad);
@@ -268,6 +271,7 @@ export class InferenceEngine {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
@@ -310,6 +314,7 @@ export class InferenceEngine {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
+        builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
@@ -703,9 +708,17 @@ function termKey(term: Term): string {
 }
 
 type DeterministicSkolemOptions = Pick<InferenceOptions, 'deterministicSkolem' | 'skolemKey' | 'store' | 'storePath' | 'storeClear'>;
-type DeterministicSkolemBuiltin = boolean;
+type BuiltinHandler = (context: { goal: { s: unknown; o: unknown }; subst: Record<string, EyelingTerm> }) => Array<Record<string, EyelingTerm>>;
+type BuiltinModule = (api: DeterministicSkolemApi) => void;
+type BuiltinModuleOption = string[];
+interface DeterministicSkolemBuiltin {
+  module: BuiltinModule;
+  unregister?: (iri: string) => boolean;
+}
 
 interface DeterministicSkolemApi {
+  registerBuiltin(iri: string, handler: BuiltinHandler): BuiltinHandler;
+  unregisterBuiltin(iri: string): boolean;
   internIri(value: string): EyelingTerm;
   unifyTerm(left: unknown, right: unknown, subst: Record<string, EyelingTerm>): Record<string, EyelingTerm> | null;
   isGroundTerm(term: unknown): boolean;
@@ -715,35 +728,44 @@ interface DeterministicSkolemApi {
   };
 }
 
-function createDeterministicSkolemBuiltin(options: DeterministicSkolemOptions): DeterministicSkolemBuiltin {
+function createDeterministicSkolemBuiltin(options: DeterministicSkolemOptions): DeterministicSkolemBuiltin | undefined {
   if (!shouldUseDeterministicSkolem(options)) {
-    return false;
+    return undefined;
   }
 
   const scopeKey = deterministicSkolemScopeKey(options);
-  registerBuiltin(LOG_SKOLEM, ({ goal, subst, api }) => {
-    const { internIri, unifyTerm, isGroundTerm, termToN3, terms } = api as DeterministicSkolemApi;
-    const Var = terms?.Var;
-    if (!isGroundTerm(goal.s)) {
-      return [];
-    }
+  const deterministicSkolem: DeterministicSkolemBuiltin = {
+    module: (api) => {
+      const { registerBuiltin, unregisterBuiltin, internIri, unifyTerm, isGroundTerm, termToN3, terms } = api;
+      const Var = terms?.Var;
+      deterministicSkolem.unregister = unregisterBuiltin;
+      registerBuiltin(LOG_SKOLEM, ({ goal, subst }) => {
+        if (!isGroundTerm(goal.s)) {
+          return [];
+        }
 
-    const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
-    const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
-    if (Var && goal.o instanceof Var) {
-      return [{ ...subst, [goal.o.name]: node }];
-    }
+        const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
+        const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
+        if (Var && goal.o instanceof Var) {
+          return [{ ...subst, [goal.o.name]: node }];
+        }
 
-    const next = unifyTerm(goal.o, node, subst);
-    return next !== null ? [next] : [];
-  });
-  return true;
+        const next = unifyTerm(goal.o, node, subst);
+        return next !== null ? [next] : [];
+      });
+    },
+  };
+  return deterministicSkolem;
 }
 
-function unregisterDeterministicSkolemBuiltin(deterministicSkolem: DeterministicSkolemBuiltin): void {
-  if (deterministicSkolem) {
-    unregisterBuiltin(LOG_SKOLEM);
-  }
+function unregisterDeterministicSkolemBuiltin(deterministicSkolem: DeterministicSkolemBuiltin | undefined): void {
+  deterministicSkolem?.unregister?.(LOG_SKOLEM);
+}
+
+function deterministicSkolemBuiltinModules(deterministicSkolem: DeterministicSkolemBuiltin | undefined): BuiltinModuleOption | undefined {
+  return deterministicSkolem
+    ? [deterministicSkolem.module] as unknown as BuiltinModuleOption
+    : undefined;
 }
 
 function shouldUseDeterministicSkolem(options: DeterministicSkolemOptions): boolean {
