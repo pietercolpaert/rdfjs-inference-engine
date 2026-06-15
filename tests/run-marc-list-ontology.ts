@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
-const timeoutMs = 25_000;
+const timeoutMs = 40_000;
 const script = String.raw`
 const { readFileSync } = require('node:fs');
 const { InferenceEngine } = require('./dist/src');

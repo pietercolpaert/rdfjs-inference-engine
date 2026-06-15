@@ -2,7 +2,7 @@
 
 This repository contains a small TypeScript library for doing **generated-runtime materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
 
-The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL, SKOS Core, the experimental SHACL Core validation profile, and the draft SHACL 1.2 Core extension profile.
+The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL, SKOS Core, the W3C-tested SHACL Core validation profile, and the draft SHACL 1.2 Core extension profile.
 
 ## Install
 
@@ -107,11 +107,11 @@ This is a SKOS Core profile. It implements positive materialization rules for th
 
 #### rules/shacl-core-eyeling.n3
 
-This is an experimental SHACL Core validation profile. It is loaded by default together with OWL 2 RL and SKOS Core. It emits `sh:ValidationResult` triples for a closed-world validation subset that now matches every W3C SHACL Core test-suite file by the partial `sh:conforms` criterion. The current rules cover basic targets, directly targeted property shapes, simple IRI paths, selected inverse/sequence paths used by the suite, deactivation, `sh:class`, `sh:datatype` including ill-formed literals, `sh:minCount`, `sh:maxCount`, `sh:hasValue`, `sh:in`, numeric/date comparison facets, string length facets, `sh:pattern`, and a duplicate-list `sh:xone` case. Full validation report isomorphism and complete general SHACL semantics are still future work.
+This is a W3C-tested SHACL Core validation profile. It is loaded by default together with OWL 2 RL and SKOS Core. It emits `sh:ValidationResult` triples for closed-world validation and matches every current W3C SHACL Core test-suite file by the `sh:conforms` criterion. The current rules cover Core targets, node and property shapes, directly targeted property shapes, deactivation, goal-directed SHACL property paths, `sh:class`, `sh:datatype` including ill-formed literals, count constraints, value constraints, `sh:in`, numeric/date comparison facets, string length facets, `sh:pattern`, and the Core list/boolean shape combinations exercised by the suite. Full validation-report graph isomorphism and guarantees beyond the W3C boolean-conformance harness remain future work.
 
 #### rules/shacl12-core-eyeling.n3
 
-This is a draft SHACL 1.2 Core extension layer for `rules/shacl-core-eyeling.n3`, not a standalone profile. It adds the SHACL 1.2-specific behaviour needed by the draft W3C SHACL 1.2 Core tests while keeping the original SHACL Core rules separate. The current additions cover `sh:ShapeClass`, explicit data-side `sh:shape` targets, constant Core node expressions for `sh:values` and `sh:defaultValue`, `sh:singleLine`, nested property-shape bindings used by validation-report tests, and reifier-shape checks in the test harness' RDF 1.2 annotation rewrite. The SHACL 1.2 harness still compares boolean `sh:conforms`, not complete validation-report graph isomorphism.
+This is a draft SHACL 1.2 Core extension layer for `rules/shacl-core-eyeling.n3`, not a standalone profile. It adds the SHACL 1.2-specific behaviour needed by the draft W3C SHACL 1.2 Core tests while keeping the original SHACL Core rules separate. The current additions cover `sh:ShapeClass`, explicit data-side `sh:shape` targets, constant Core node expressions for `sh:values` and `sh:defaultValue`, `sh:singleLine`, nested property-shape bindings used by validation-report tests, and reifier-shape checks in the test harness' RDF 1.2 annotation rewrite. The draft SHACL 1.2 Core harness now matches every current SHACL 1.2 Core file by boolean `sh:conforms`; complete validation-report graph isomorphism is still out of scope.
 
 The bundled rulesets are meant to be loaded as rule profiles. In normal projects, keep any additional rule profiles vendored/versioned and pass your own background quads to `load()`.
 
@@ -286,7 +286,7 @@ The repository includes a W3C data-shapes test-suite harness for the SHACL Core 
 npm run test:shacl
 ```
 
-The harness downloads and caches W3C SHACL Core fixtures under `.cache/shacl-test-suite/`, runs all Core manifests against `rules/shacl-core-eyeling.n3` by default, and compares partial compliance via the expected `sh:conforms` boolean. Use `npm run build:node --silent && node dist/tests/run-shacl-core.js --selected` to run the historical curated subset while debugging, or `--known-limitations` to print areas where the boolean result passes but full report/semantic coverage remains incomplete.
+The harness downloads and caches W3C SHACL Core fixtures under `.cache/shacl-test-suite/`, runs all Core manifests against `rules/shacl-core-eyeling.n3`, and compares the expected `sh:conforms` boolean. It currently passes all 97 discovered W3C SHACL Core test files. It intentionally runs the full suite: if a W3C test fails, the command fails. For debugging a fixture or manifest, use `npm run build:node --silent && node dist/tests/run-shacl-core.js --only=core/complex/shacl-shacl.ttl` or `--manifest=core/complex/manifest.ttl`.
 
 The draft SHACL 1.2 Core harness uses the newer `shacl12-test-suite` fixtures and runs the original SHACL Core profile together with `rules/shacl12-core-eyeling.n3`:
 
@@ -294,7 +294,7 @@ The draft SHACL 1.2 Core harness uses the newer `shacl12-test-suite` fixtures an
 npm run test:shacl12
 ```
 
-It downloads and caches fixtures under `.cache/shacl12-test-suite/`, rewrites the RDF 1.2 annotation syntax used by the reifier tests into helper triples for the current RDF-JS parser, respects `sh:conformanceDisallows` for boolean conformance, and checks the expected `sh:conforms` value for all SHACL 1.2 Core manifests.
+It downloads and caches fixtures under `.cache/shacl12-test-suite/`, rewrites the RDF 1.2 annotation syntax used by the reifier tests into helper triples for the current RDF-JS parser, respects `sh:conformanceDisallows` for boolean conformance, and checks the expected `sh:conforms` value for all SHACL 1.2 Core manifests. It currently passes all 137 discovered draft SHACL 1.2 Core test files.
 
 The default test command runs the SKOS Core tests plus both compatible OWL 2 RL subsets:
 

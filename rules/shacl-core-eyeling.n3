@@ -82,322 +82,85 @@
     shn:value ?focus .
 } .
 
-# SHACL property path evaluation. It is demand-driven from actual focus nodes
-# instead of precomputing every possible path closure in the graph.
+# SHACL property path evaluation is goal-directed. The direct relation
+# (?focus ?path ?value) shn:pathValue true is deliberately defined with
+# backward rules so closed-world constraints such as sh:minCount query the
+# complete path semantics from a stable scoped snapshot instead of counting
+# helper triples that may still be materializing.
 
-# Top-level path evaluation inputs for directly targeted property shapes.
-{
-  ?focus shn:focusFor ?shape .
-  ?shape shn:active true .
-  ?shape sh:path ?path .
-  (?path ?focus) log:skolem ?pathInput .
-}
-=> {
-  ?pathInput shn:pathInput true ;
-    shn:path ?path ;
-    shn:focus ?focus .
-} .
+{ ?list shn:listMember ?item . }
+<= { ?list rdf:first ?item . } .
 
-# Top-level path evaluation inputs for property shapes nested under node shapes.
-{
-  ?focus shn:focusFor ?nodeShape .
-  ?nodeShape sh:property ?propertyShape .
-  ?propertyShape shn:active true .
-  ?propertyShape sh:path ?path .
-  (?path ?focus) log:skolem ?pathInput .
-}
-=> {
-  ?pathInput shn:pathInput true ;
-    shn:path ?path ;
-    shn:focus ?focus .
-} .
-
-{ ?list rdf:first ?item . }
-=> { ?list shn:listMember ?item . } .
-
-{ ?list rdf:rest ?tail . ?tail shn:listMember ?item . }
-=> { ?list shn:listMember ?item . } .
+{ ?list shn:listMember ?item . }
+<= { ?list rdf:rest ?tail . ?tail shn:listMember ?item . } .
 
 # Predicate paths.
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?focus ?path ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
-} .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= { ?focus ?path ?value . } .
 
-# Simple inverse paths.
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+# Inverse paths, including inverses of complex nested paths.
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path sh:inversePath ?nested .
-  ?value ?nested ?focus .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
-} .
-
-# Inverses of complex nested paths.
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:inversePath ?nested .
-  ?value ?candidatePredicate ?candidateObject .
-  ?candidatePredicate log:notEqualTo shn:pathInput .
-  ?candidatePredicate log:notEqualTo shn:path .
-  ?candidatePredicate log:notEqualTo shn:focus .
-  ?candidatePredicate log:notEqualTo shn:pathValue .
-  ?candidatePredicate log:notEqualTo shn:listMember .
-  ?candidatePredicate log:notEqualTo shn:active .
-  ?candidatePredicate log:notEqualTo shn:focusFor .
-  ?candidatePredicate log:notEqualTo shn:shape .
-  ?candidatePredicate log:notEqualTo shn:value .
-  ?candidatePredicate log:notEqualTo shn:conforms .
-  (?nested ?value) log:skolem ?nestedInput .
-}
-=> {
-  ?nestedInput shn:pathInput true ;
-    shn:path ?nested ;
-    shn:focus ?value .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:inversePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?value ; shn:pathValue ?focus .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
+  (?value ?nested ?focus) shn:pathValue true .
 } .
 
 # Alternative paths.
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path sh:alternativePath ?alternatives .
   ?alternatives shn:listMember ?nested .
-  (?nested ?focus) log:skolem ?nestedInput .
-}
-=> {
-  ?nestedInput shn:pathInput true ;
-    shn:path ?nested ;
-    shn:focus ?focus .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:alternativePath ?alternatives .
-  ?alternatives shn:listMember ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
+  (?focus ?nested ?value) shn:pathValue true .
 } .
 
 # Sequence paths of arbitrary length.
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path rdf:first ?step .
-  (?step ?focus) log:skolem ?stepInput .
-}
-=> {
-  ?stepInput shn:pathInput true ;
-    shn:path ?step ;
-    shn:focus ?focus .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path rdf:first ?step .
   ?path rdf:rest rdf:nil .
-  ?stepValue shn:path ?step ; shn:focus ?focus ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
+  (?focus ?step ?value) shn:pathValue true .
 } .
 
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path rdf:first ?step .
   ?path rdf:rest ?tail .
   ?tail log:notEqualTo rdf:nil .
-  ?stepValue shn:path ?step ; shn:focus ?focus ; shn:pathValue ?intermediate .
-  (?tail ?intermediate) log:skolem ?tailInput .
-}
-=> {
-  ?tailInput shn:pathInput true ;
-    shn:path ?tail ;
-    shn:focus ?intermediate .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path rdf:first ?step .
-  ?path rdf:rest ?tail .
-  ?tail log:notEqualTo rdf:nil .
-  ?stepValue shn:path ?step ; shn:focus ?focus ; shn:pathValue ?intermediate .
-  ?tailValue shn:path ?tail ; shn:focus ?intermediate ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
+  (?focus ?step ?intermediate) shn:pathValue true .
+  (?intermediate ?tail ?value) shn:pathValue true .
 } .
 
 # Zero-or-more, one-or-more, and zero-or-one paths.
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?focus) shn:pathValue true . }
+<= { ?path sh:zeroOrMorePath ?nested . } .
+
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path sh:zeroOrMorePath ?nested .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?focus .
+  (?focus ?nested ?intermediate) shn:pathValue true .
+  (?intermediate ?path ?value) shn:pathValue true .
 } .
 
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:zeroOrMorePath ?nested .
-  (?nested ?focus) log:skolem ?nestedInput .
-}
-=> {
-  ?nestedInput shn:pathInput true ;
-    shn:path ?nested ;
-    shn:focus ?focus .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:zeroOrMorePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:zeroOrMorePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?intermediate .
-  (?path ?intermediate) log:skolem ?pathInputNext .
-}
-=> {
-  ?pathInputNext shn:pathInput true ;
-    shn:path ?path ;
-    shn:focus ?intermediate .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:zeroOrMorePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?intermediate .
-  ?recursiveValue shn:path ?path ; shn:focus ?intermediate ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path sh:oneOrMorePath ?nested .
-  (?nested ?focus) log:skolem ?nestedInput .
-}
-=> {
-  ?nestedInput shn:pathInput true ;
-    shn:path ?nested ;
-    shn:focus ?focus .
+  (?focus ?nested ?value) shn:pathValue true .
 } .
 
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path sh:oneOrMorePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
+  (?focus ?nested ?intermediate) shn:pathValue true .
+  (?intermediate ?path ?value) shn:pathValue true .
 } .
 
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:oneOrMorePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?intermediate .
-  (?path ?intermediate) log:skolem ?pathInputNext .
-}
-=> {
-  ?pathInputNext shn:pathInput true ;
-    shn:path ?path ;
-    shn:focus ?intermediate .
-} .
+{ (?focus ?path ?focus) shn:pathValue true . }
+<= { ?path sh:zeroOrOnePath ?nested . } .
 
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:oneOrMorePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?intermediate .
-  ?recursiveValue shn:path ?path ; shn:focus ?intermediate ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
+{ (?focus ?path ?value) shn:pathValue true . }
+<= {
   ?path sh:zeroOrOnePath ?nested .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?focus .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:zeroOrOnePath ?nested .
-  (?nested ?focus) log:skolem ?nestedInput .
-}
-=> {
-  ?nestedInput shn:pathInput true ;
-    shn:path ?nested ;
-    shn:focus ?focus .
-} .
-
-{
-  ?pathInput shn:pathInput true ; shn:path ?path ; shn:focus ?focus .
-  ?path sh:zeroOrOnePath ?nested .
-  ?nestedValue shn:path ?nested ; shn:focus ?focus ; shn:pathValue ?value .
-  (?focus ?path) log:skolem ?pathValue .
-}
-=> {
-  ?pathValue shn:path ?path ;
-    shn:focus ?focus ;
-    shn:pathValue ?value .
+  (?focus ?nested ?value) shn:pathValue true .
 } .
 
 # Directly targeted property shapes validate the values reached from their path.
@@ -405,7 +168,7 @@
   ?focus shn:focusFor ?shape .
   ?shape shn:active true .
   ?shape sh:path ?path .
-  ?pathValue shn:path ?path ; shn:focus ?focus ; shn:pathValue ?value .
+  (?focus ?path ?value) shn:pathValue true .
   (?shape ?focus ?path ?value) log:skolem ?binding .
 }
 => {
@@ -421,7 +184,7 @@
   ?nodeShape sh:property ?propertyShape .
   ?propertyShape shn:active true .
   ?propertyShape sh:path ?path .
-  ?pathValue shn:path ?path ; shn:focus ?focus ; shn:pathValue ?value .
+  (?focus ?path ?value) shn:pathValue true .
   (?propertyShape ?focus ?path ?value) log:skolem ?binding .
 }
 => {
@@ -487,8 +250,7 @@
   ?shape shn:active true .
   ?shape sh:path ?path .
   ?shape sh:minCount ?minimum .
-  (?focus ?path) log:skolem ?pathValue .
-  (?value { ?pathValue shn:pathValue ?value . } ?values) log:collectAllIn ?shape .
+  (?value { (?focus ?path ?value) shn:pathValue true . } ?values) log:collectAllIn ?shape .
   ?values list:length ?count .
   ?count math:lessThan ?minimum .
   (sh:MinCountConstraintComponent ?focus ?shape ?path ?minimum) log:skolem ?result .
@@ -508,8 +270,7 @@
   ?shape shn:active true .
   ?shape sh:path ?path .
   ?shape sh:minCount ?minimum .
-  (?focus ?path) log:skolem ?pathValue .
-  (?value { ?pathValue shn:pathValue ?value . } ?values) log:collectAllIn ?shape .
+  (?value { (?focus ?path ?value) shn:pathValue true . } ?values) log:collectAllIn ?shape .
   ?values list:length ?count .
   ?count math:lessThan ?minimum .
   (sh:MinCountConstraintComponent ?focus ?shape ?path ?minimum) log:skolem ?result .
@@ -529,8 +290,7 @@
   ?shape shn:active true .
   ?shape sh:path ?path .
   ?shape sh:maxCount ?maximum .
-  (?focus ?path) log:skolem ?pathValue .
-  (?value { ?pathValue shn:pathValue ?value . } ?values) log:collectAllIn ?shape .
+  (?value { (?focus ?path ?value) shn:pathValue true . } ?values) log:collectAllIn ?shape .
   ?values list:length ?count .
   ?count math:greaterThan ?maximum .
   (sh:MaxCountConstraintComponent ?focus ?shape ?path ?maximum) log:skolem ?result .
@@ -550,8 +310,7 @@
   ?shape shn:active true .
   ?shape sh:path ?path .
   ?shape sh:maxCount ?maximum .
-  (?focus ?path) log:skolem ?pathValue .
-  (?value { ?pathValue shn:pathValue ?value . } ?values) log:collectAllIn ?shape .
+  (?value { (?focus ?path ?value) shn:pathValue true . } ?values) log:collectAllIn ?shape .
   ?values list:length ?count .
   ?count math:greaterThan ?maximum .
   (sh:MaxCountConstraintComponent ?focus ?shape ?path ?maximum) log:skolem ?result .
@@ -586,13 +345,7 @@
   ?shape shn:active true .
   ?shape sh:path ?path .
   ?shape sh:hasValue ?expected .
-  1 log:notIncludes { ?path rdf:first ?step . } .
-  1 log:notIncludes { ?path sh:inversePath ?inverse . } .
-  1 log:notIncludes { ?path sh:alternativePath ?alternatives . } .
-  1 log:notIncludes { ?path sh:zeroOrMorePath ?zeroOrMore . } .
-  1 log:notIncludes { ?path sh:oneOrMorePath ?oneOrMore . } .
-  1 log:notIncludes { ?path sh:zeroOrOnePath ?zeroOrOne . } .
-  1 log:notIncludes { ?focus ?path ?expected . } .
+  1 log:notIncludes { (?focus ?path ?expected) shn:pathValue true . } .
   (sh:HasValueConstraintComponent ?focus ?shape ?path ?expected) log:skolem ?result .
 }
 => {
@@ -610,13 +363,7 @@
   ?shape shn:active true .
   ?shape sh:path ?path .
   ?shape sh:hasValue ?expected .
-  1 log:notIncludes { ?path rdf:first ?step . } .
-  1 log:notIncludes { ?path sh:inversePath ?inverse . } .
-  1 log:notIncludes { ?path sh:alternativePath ?alternatives . } .
-  1 log:notIncludes { ?path sh:zeroOrMorePath ?zeroOrMore . } .
-  1 log:notIncludes { ?path sh:oneOrMorePath ?oneOrMore . } .
-  1 log:notIncludes { ?path sh:zeroOrOnePath ?zeroOrOne . } .
-  1 log:notIncludes { ?focus ?path ?expected . } .
+  1 log:notIncludes { (?focus ?path ?expected) shn:pathValue true . } .
   (sh:HasValueConstraintComponent ?focus ?shape ?path ?expected) log:skolem ?result .
 }
 => {

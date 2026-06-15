@@ -10,7 +10,27 @@ const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
 const SHN = 'https://example.org/shacl-n3#';
 
-const rules = readFileSync('rules/shacl-core-eyeling.n3', 'utf8');
+const rules = `${readFileSync('rules/shacl-core-eyeling.n3', 'utf8')}
+
+@prefix : <${EX}> .
+@prefix sh: <${SH}> .
+@prefix shn: <${SHN}> .
+
+# The SHACL profile keeps path evaluation backward/goal-directed, so this
+# manual regression probe materializes reached values only for assertions.
+{
+  :GenericPathShape sh:property ?propertyShape .
+  ?propertyShape sh:path ?path .
+  (:Root ?path ?value) shn:pathValue true .
+}
+=> { :PathProbe shn:pathValue ?value . } .
+
+{
+  :ThreeStepInverseShape sh:path ?path .
+  (:Root ?path ?value) shn:pathValue true .
+}
+=> { :PathProbe shn:pathValue ?value . } .
+`;
 
 const data = parseRdf(`
 @prefix : <${EX}> .
