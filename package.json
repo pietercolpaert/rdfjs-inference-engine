@@ -84,7 +84,7 @@
     "test:shacl-manual": "npm run build:node --silent && npm run test:shacl-manual:run --silent",
     "test:shacl-manual:run": "node dist/tests/run-shacl-manual.js",
     "test:owl:mobibench": "npm run build:node --silent && npm run test:owl:mobibench:run --silent",
-    "test:owl:mobibench:run": "node dist/tests/run-mobibench-owl2rl.js",
+    "test:owl:mobibench:run": "node dist/tests/run-mobibench-owl2rl.js --all",
     "test:owl:official": "npm run build:node --silent && npm run test:owl:official:run --silent",
     "test:owl:official:run": "node dist/tests/run-official-owl2rl.js",
     "test:owl": "npm run build:node --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",

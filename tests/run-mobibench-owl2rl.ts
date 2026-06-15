@@ -10,58 +10,6 @@ const DEFAULT_ARCHIVE_URL = 'https://william-vw.github.io/mobibench/web/res/owl/
 const DEFAULT_CACHE_PATH = '.cache/mobibench/testsuite-owl2-rdfbased.zip';
 const OWL2RL_SUBSUITE_PREFIX = 'testsuite-owl2-rdfbased/subsuites/owl2rl/';
 
-const DEFAULT_SUPPORTED_IDS = new Set([
-  'rdfbased-sem-rdfs-subclass-trans',
-  'rdfbased-sem-rdfs-subprop-trans',
-  'rdfbased-sem-rdfs-domain-cond',
-  'rdfbased-sem-rdfs-range-cond',
-  'rdfbased-sem-rdfsext-domain-superclass',
-  'rdfbased-sem-rdfsext-range-superclass',
-  'rdfbased-sem-eqdis-sameas-subst',
-  'rdfbased-sem-eqdis-eqclass-inst',
-  'rdfbased-sem-eqdis-eqprop-inst',
-  'rdfbased-sem-char-functional-inst',
-  'rdfbased-sem-char-inversefunc-inst',
-  'rdfbased-sem-char-transitive-inst',
-  'rdfbased-sem-char-symmetric-inst',
-  'rdfbased-sem-restrict-somevalues-inst-subj',
-  'rdfbased-sem-restrict-allvalues-inst-obj',
-  'rdfbased-sem-restrict-hasvalue-inst-obj',
-  'rdfbased-sem-restrict-maxcard-inst-obj-one',
-  'rdfbased-sem-bool-complement-inst',
-  'rdfbased-sem-char-asymmetric-inst',
-  'rdfbased-sem-char-irreflexive-inst',
-  'rdfbased-sem-class-nothing-ext',
-  'rdfbased-sem-eqdis-different-sameas',
-  'rdfbased-sem-eqdis-disclass-inst',
-  'rdfbased-sem-eqdis-disprop-inst',
-  'rdfbased-sem-npa-ind-fw',
-  'rdfbased-sem-restrict-maxcard-inst-obj-zero',
-  'rdfbased-dat-crossdtype-diff',
-  'rdfbased-dat-crossdtype-eq',
-  'rdfbased-dat-dtype-boolean-diff',
-  'rdfbased-dat-dtype-boolean-valid',
-  'rdfbased-dat-dtype-byte-eq',
-  'rdfbased-dat-dtype-byte-valid',
-  'rdfbased-dat-dtype-datetime-eq',
-  'rdfbased-dat-dtype-datetimestamp-valid',
-  'rdfbased-dat-dtype-decimal-eq',
-  'rdfbased-dat-dtype-int-eq',
-  'rdfbased-dat-dtype-language-valid',
-  'rdfbased-dat-dtype-string-valid',
-  'rdfbased-dat-dtype-unsignedint-valid',
-  'rdfbased-dat-crossdtype-noinstance',
-  'rdfbased-dat-dtype-boolean-illtyped',
-  'rdfbased-dat-dtype-byte-illtyped-hi',
-  'rdfbased-dat-dtype-datetime-illtyped',
-  'rdfbased-dat-dtype-datetimestamp-illtyped',
-  'rdfbased-dat-dtype-decimal-illtyped',
-  'rdfbased-dat-dtype-int-illtyped-hi',
-  'rdfbased-dat-dtype-nonnegativeinteger-illtyped',
-  'rdfbased-dat-dtype-unsignedint-illtyped-lo',
-  'rdfbased-sem-npa-dat-fw',
-]);
-
 type TestKind = 'positive' | 'inconsistency';
 
 interface MobiBenchCase {
@@ -81,46 +29,36 @@ interface TestResult {
 }
 
 interface ParsedArgs {
-  all: boolean;
   list: boolean;
-  conformance: boolean;
-  ids?: Set<string>;
   archiveUrl: string;
   cachePath: string;
-  kinds?: Set<TestKind>;
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const archive = new AdmZip(await readCachedBinaryUrl(args.archiveUrl, args.cachePath));
   const tests = extractRunnableCases(archive);
-  const listedTests = args.kinds ? tests.filter((test) => args.kinds?.has(test.kind)) : tests;
 
   if (args.list) {
-    for (const test of listedTests) {
+    for (const test of tests) {
       console.log(`${test.kind}\t${test.id}\t${oneLine(test.description)}`);
     }
     return;
   }
 
-  const selectedIds = args.all
-    ? new Set(listedTests.map((test) => test.id))
-    : args.ids ?? DEFAULT_SUPPORTED_IDS;
-  const selected = listedTests.filter((test) => selectedIds.has(test.id));
-
-  if (selected.length === 0) {
-    throw new Error('No MobiBench OWL2 RL tests selected. Use --list to see discovered test identifiers.');
+  if (tests.length === 0) {
+    throw new Error('No runnable MobiBench OWL2 RL tests discovered. Use --list to inspect the archive.');
   }
 
   const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
-  const outputMode = args.conformance || args.all ? 'conformance' : 'application';
+  const outputMode = 'conformance';
   const prepared = new InferenceEngine({ outputMode });
   prepared.load(profile, []);
   const runtime = prepared.getRuntime();
-  const staticClosure = outputMode === 'conformance' ? prepared.getStaticClosure({ outputMode }) : [];
+  const staticClosure = prepared.getStaticClosure({ outputMode });
 
   const results: TestResult[] = [];
-  for (const test of selected) {
+  for (const test of tests) {
     try {
       const premise = parseRdf(test.premise ?? test.graph ?? '');
       const reasoner = new InferenceEngine({ runtime, outputMode });
@@ -144,7 +82,7 @@ async function main(): Promise<void> {
   console.log(`MobiBench OWL2 RL tests: ${passed}/${results.length} passed.`);
 
   if (failed > 0) {
-    throw new Error(`${failed} selected MobiBench OWL2 RL test(s) failed.`);
+    throw new Error(`${failed} MobiBench OWL2 RL test(s) failed.`);
   }
 }
 
@@ -198,28 +136,20 @@ function hasInconsistencyDiagnostic(quads: Quad[]): boolean {
 
 function parseArgs(args: string[]): ParsedArgs {
   const parsed: ParsedArgs = {
-    all: false,
     list: false,
-    conformance: false,
     archiveUrl: process.env.MOBIBENCH_OWL2RL_ARCHIVE_URL ?? DEFAULT_ARCHIVE_URL,
     cachePath: process.env.MOBIBENCH_OWL2RL_CACHE ?? DEFAULT_CACHE_PATH,
   };
 
   for (const arg of args) {
     if (arg === '--all') {
-      parsed.all = true;
-    } else if (arg === '--conformance') {
-      parsed.conformance = true;
+      continue;
     } else if (arg === '--list') {
       parsed.list = true;
-    } else if (arg.startsWith('--ids=')) {
-      parsed.ids = new Set(arg.slice('--ids='.length).split(',').map((id) => id.trim()).filter(Boolean));
     } else if (arg.startsWith('--archive=')) {
       parsed.archiveUrl = arg.slice('--archive='.length);
     } else if (arg.startsWith('--cache=')) {
       parsed.cachePath = arg.slice('--cache='.length);
-    } else if (arg.startsWith('--kinds=')) {
-      parsed.kinds = new Set(arg.slice('--kinds='.length).split(',').map(parseKind));
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -236,14 +166,6 @@ function testKind(value: string | undefined): TestKind | undefined {
     return 'inconsistency';
   }
   return undefined;
-}
-
-function parseKind(value: string): TestKind {
-  const trimmed = value.trim() as TestKind;
-  if (trimmed === 'positive' || trimmed === 'inconsistency') {
-    return trimmed;
-  }
-  throw new Error(`Unknown test kind: ${value}`);
 }
 
 function parseMetadata(source: string): Record<string, string> {

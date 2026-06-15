@@ -187,30 +187,28 @@ The repository includes a MobiBench harness for the OWL 2 RL RDF-based test-suit
 https://william-vw.github.io/mobibench/web/res/owl/conf/testsuite-owl2-rdfbased.zip
 ```
 
-The harness downloads and caches the archive, reads the `owl2rl` subsuite, and evaluates focused Turtle test cases by kind:
+The harness downloads and caches the archive, reads the `owl2rl` subsuite, and evaluates every runnable Turtle test case by kind:
 
 - positive entailment: the conclusion graph must be contained in the materialized closure;
 - inconsistency: the closure must contain an `owlrl:Inconsistency` diagnostic.
 
-Run the default compatible MobiBench subset with:
+Run the full MobiBench OWL 2 RL suite with:
 
 ```bash
 npm run test:owl:mobibench
 ```
 
-The default subset covers RDFS subclass/subproperty/domain/range behavior, equality substitution, equivalent classes/properties, functional/inverse-functional/symmetric/transitive properties, restrictions, datatype equality/validation/inconsistency cases, and inconsistency diagnostics. The harness can also list discovered MobiBench tests:
+The test command runs all discovered OWL 2 RL MobiBench cases in conformance output mode. The harness can also list discovered MobiBench tests:
 
 ```bash
 npm run build --silent && node dist/tests/run-mobibench-owl2rl.js --list
 ```
 
-or run every discovered MobiBench OWL 2 RL test:
+For explicit CLI invocations, `--all` is accepted as the only test-selection option and runs the same full suite:
 
 ```bash
 npm run build --silent && node dist/tests/run-mobibench-owl2rl.js --all
 ```
-
-The `--all` mode is intentionally stricter and currently exposes unsupported areas such as list-heavy rules and some datatype edge cases.
 
 ### Official OWL 2 RL tests
 
