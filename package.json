@@ -81,6 +81,8 @@
     "test:shacl:run": "node dist/tests/run-shacl-core.js",
     "test:shacl12": "npm run build:node --silent && npm run test:shacl12:run --silent",
     "test:shacl12:run": "node dist/tests/run-shacl12-core.js",
+    "test:shacl-manual": "npm run build:node --silent && npm run test:shacl-manual:run --silent",
+    "test:shacl-manual:run": "node dist/tests/run-shacl-manual.js",
     "test:owl:mobibench": "npm run build:node --silent && npm run test:owl:mobibench:run --silent",
     "test:owl:mobibench:run": "node dist/tests/run-mobibench-owl2rl.js",
     "test:owl:official": "npm run build:node --silent && npm run test:owl:official:run --silent",
@@ -88,7 +90,7 @@
     "test:owl": "npm run build:node --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
+    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:shacl-manual:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "perf": "npm run build:node --silent && node dist/perf/run.js",
     "perf:list": "npm run build:node --silent && node dist/perf/run.js --list"
   },
@@ -114,7 +116,6 @@
     "@types/node": "^25.9.2",
     "adm-zip": "^0.5.17",
     "esbuild": "^0.28.0",
-    "rdf-validate-shacl": "^0.6.5",
     "rdfxml-streaming-parser": "^3.2.0",
     "typescript": "^6.0.3"
   }
