@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { Quad, Term } from '@rdfjs/types';
-import { reasonStream, type RdfJsQuad } from 'eyeling';
+import { reasonStream } from 'eyeling';
 import { DataFactory } from 'rdf-parser-ts';
 import { parseRdf, termKey } from './utils';
 
@@ -85,11 +85,10 @@ b""" ;
   :strictCode "abc" .
 `);
 
-const closure = reasonStream({ n3: rules, quads: data as RdfJsQuad[] }, {
+const closure = reasonStream({ n3: rules, quads: data }, {
   rdfjs: true,
-  dataFactory: DataFactory,
   skipUnsupportedRdfJs: true,
-} as any).closureQuads as Quad[] ?? [];
+}).closureQuads ?? [];
 
 const resultSubjects = uniqueTerms(closure
   .filter((quad) => isNamed(quad.predicate as Term, RDF + 'type') && isNamed(quad.object as Term, SH + 'ValidationResult'))

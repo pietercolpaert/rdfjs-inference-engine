@@ -2,8 +2,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
-import { DataFactory as RdfParserDataFactory } from 'rdf-parser-ts';
-import { reasonStream, runAsync, unregisterBuiltin, type RdfJsQuad } from 'eyeling';
+import { rdfjs, reasonStream, registerBuiltin, runAsync, unregisterBuiltin, type EyelingTerm } from 'eyeling';
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
@@ -125,7 +124,7 @@ export class InferenceEngine {
   private readonly outputMode: InferenceOutputMode;
 
   public constructor(options: InferenceEngineOptions = {}) {
-    this.dataFactory = options.dataFactory ?? (RdfParserDataFactory as unknown as DataFactory);
+    this.dataFactory = options.dataFactory ?? rdfjs;
     this.runtimeCompiler = options.runtimeCompiler ?? defaultRuntimeCompiler;
     this.outputMode = options.outputMode ?? 'application';
 
@@ -160,17 +159,16 @@ export class InferenceEngine {
     const deterministicSkolem = createDeterministicSkolemBuiltin(loadOptions);
     let closure: ReturnType<typeof reasonStream>;
     try {
-      closure = reasonStream({ n3: profileN3, quads: vocabularyQuads as RdfJsQuad[] }, {
+      closure = reasonStream({ n3: profileN3, quads: vocabularyQuads }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
-      } as any);
+      });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
 
-    this.staticClosure = (closure.closureQuads ?? []) as Quad[];
+    this.staticClosure = closure.closureQuads ?? [];
 
     const runtimeCompiler = loadOptions.runtimeCompiler ?? this.runtimeCompiler;
     this.runtime = runtimeCompiler({
@@ -198,22 +196,21 @@ export class InferenceEngine {
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
 
     try {
-      reasonStream({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      reasonStream({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
-        onDerived: (item: { quad?: RdfJsQuad; quads?: RdfJsQuad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
-            addDerived(derived, seen, item.quad as Quad, outputMode);
+            addDerived(derived, seen, item.quad, outputMode);
           }
           if (item.quads) {
-            for (const quad of item.quads as Quad[]) {
+            for (const quad of item.quads) {
               addDerived(derived, seen, quad, outputMode);
             }
           }
         },
-      } as any);
+      });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
@@ -230,25 +227,24 @@ export class InferenceEngine {
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
 
     try {
-      reasonStream({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      reasonStream({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
-        onDerived: (item: { quad?: RdfJsQuad; quads?: RdfJsQuad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
-            const quad = item.quad as Quad;
+            const quad = item.quad;
             diagnostics.push(quad);
             addDerived(derived, seen, quad, outputMode);
           }
           if (item.quads) {
-            for (const quad of item.quads as Quad[]) {
+            for (const quad of item.quads) {
               diagnostics.push(quad);
               addDerived(derived, seen, quad, outputMode);
             }
           }
         },
-      } as any);
+      });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
@@ -271,25 +267,24 @@ export class InferenceEngine {
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
     let result: Awaited<ReturnType<typeof runAsync>>;
     try {
-      result = await runAsync({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      result = await runAsync({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
-        onDerived: (item: { quad?: RdfJsQuad; quads?: RdfJsQuad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
-            addDerived(derived, seen, item.quad as Quad, outputMode);
+            addDerived(derived, seen, item.quad, outputMode);
           }
           if (item.quads) {
-            for (const quad of item.quads as Quad[]) {
+            for (const quad of item.quads) {
               addDerived(derived, seen, quad, outputMode);
             }
           }
         },
-      } as any);
+      });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
@@ -313,28 +308,27 @@ export class InferenceEngine {
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
     let result: Awaited<ReturnType<typeof runAsync>>;
     try {
-      result = await runAsync({ n3: this.runtime, quads: data as RdfJsQuad[] }, {
+      result = await runAsync({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
-        onDerived: (item: { quad?: RdfJsQuad; quads?: RdfJsQuad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
-            const quad = item.quad as Quad;
+            const quad = item.quad;
             diagnostics.push(quad);
             addDerived(derived, seen, quad, outputMode);
           }
           if (item.quads) {
-            for (const quad of item.quads as Quad[]) {
+            for (const quad of item.quads) {
               diagnostics.push(quad);
               addDerived(derived, seen, quad, outputMode);
             }
           }
         },
-      } as any);
+      });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
@@ -726,31 +720,41 @@ function termKey(term: Term): string {
 }
 
 type DeterministicSkolemOptions = Pick<InferenceOptions, 'deterministicSkolem' | 'skolemKey' | 'store' | 'storePath' | 'storeClear'>;
-type DeterministicSkolemBuiltin = ((api: any) => void) | undefined;
+type DeterministicSkolemBuiltin = boolean;
+
+interface DeterministicSkolemApi {
+  internIri(value: string): EyelingTerm;
+  unifyTerm(left: unknown, right: unknown, subst: Record<string, EyelingTerm>): Record<string, EyelingTerm> | null;
+  isGroundTerm(term: unknown): boolean;
+  termToN3(term: unknown): string;
+  terms?: {
+    Var?: new (...args: never[]) => { name: string };
+  };
+}
 
 function createDeterministicSkolemBuiltin(options: DeterministicSkolemOptions): DeterministicSkolemBuiltin {
   if (!shouldUseDeterministicSkolem(options)) {
-    return undefined;
+    return false;
   }
 
   const scopeKey = deterministicSkolemScopeKey(options);
-  return ({ registerBuiltin, internIri, unifyTerm, isGroundTerm, termToN3, terms }: any) => {
+  registerBuiltin(LOG_SKOLEM, ({ goal, subst, api }) => {
+    const { internIri, unifyTerm, isGroundTerm, termToN3, terms } = api as DeterministicSkolemApi;
     const Var = terms?.Var;
-    registerBuiltin(LOG_SKOLEM, ({ goal, subst }: any) => {
-      if (!isGroundTerm(goal.s)) {
-        return [];
-      }
+    if (!isGroundTerm(goal.s)) {
+      return [];
+    }
 
-      const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
-      const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
-      if (Var && goal.o instanceof Var) {
-        return [{ ...subst, [goal.o.name]: node }];
-      }
+    const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
+    const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
+    if (Var && goal.o instanceof Var) {
+      return [{ ...subst, [goal.o.name]: node }];
+    }
 
-      const next = unifyTerm(goal.o, node, subst);
-      return next !== null ? [next] : [];
-    });
-  };
+    const next = unifyTerm(goal.o, node, subst);
+    return next !== null ? [next] : [];
+  });
+  return true;
 }
 
 function unregisterDeterministicSkolemBuiltin(deterministicSkolem: DeterministicSkolemBuiltin): void {

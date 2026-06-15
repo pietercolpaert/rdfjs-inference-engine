@@ -108,7 +108,7 @@
   "homepage": "https://github.com/pietercolpaert/rdfjs-inference-engine#readme",
   "dependencies": {
     "@rdfjs/types": "^2.0.1",
-    "eyeling": "^1.29.0",
+    "eyeling": "^1.32.1",
     "rdf-parser-ts": "^0.2.6"
   },
   "devDependencies": {

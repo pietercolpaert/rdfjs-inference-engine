@@ -1,5 +1,5 @@
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
-import eyeling from 'eyeling/browser';
+import { rdfjs, reasonStream, registerBuiltin, runAsync, unregisterBuiltin, type EyelingTerm } from 'eyeling/browser';
 import {
   DataFactory as RdfParserDataFactory,
   IncrementalParser,
@@ -50,10 +50,6 @@ const INTERNAL_HELPER_PREDICATES = new Set([
   SHACLN3 + 'path',
   SHACLN3 + 'value',
 ]);
-
-const reasonStream = (eyeling as any).reasonStream;
-const runAsync = (eyeling as any).runAsync;
-const unregisterBuiltin = (eyeling as any).unregisterBuiltin;
 
 export type RuleProfile = string | { n3?: string; text?: string; label?: string; baseIri?: string };
 export type VocabularyDataset = DatasetCore | Iterable<Quad>;
@@ -136,7 +132,7 @@ export class InferenceEngine {
   private readonly outputMode: InferenceOutputMode;
 
   public constructor(options: InferenceEngineOptions = {}) {
-    this.dataFactory = options.dataFactory ?? (RdfParserDataFactory as unknown as DataFactory);
+    this.dataFactory = options.dataFactory ?? rdfjs;
     this.runtimeCompiler = options.runtimeCompiler ?? defaultRuntimeCompiler;
     this.outputMode = options.outputMode ?? 'application';
 
@@ -164,19 +160,18 @@ export class InferenceEngine {
     const profileN3 = normalizedProfiles.map((profile) => profile.n3).join('\n\n');
     const vocabularyQuads = quadsFromVocabulary(vocabulary);
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
-    let closure: any;
+    let closure: ReturnType<typeof reasonStream>;
     try {
       closure = reasonStream({ n3: profileN3, quads: vocabularyQuads }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
       });
     } finally {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
 
-    this.staticClosure = (closure.closureQuads ?? []) as Quad[];
+    this.staticClosure = closure.closureQuads ?? [];
 
     const runtimeCompiler = options.runtimeCompiler ?? this.runtimeCompiler;
     this.runtime = runtimeCompiler({
@@ -201,9 +196,8 @@ export class InferenceEngine {
     try {
       reasonStream({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
             addDerived(derived, seen, item.quad, outputMode);
@@ -233,9 +227,8 @@ export class InferenceEngine {
     try {
       reasonStream({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
             diagnostics.push(item.quad);
@@ -269,16 +262,15 @@ export class InferenceEngine {
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
-    let result: any;
+    let result: Awaited<ReturnType<typeof runAsync>>;
     try {
       result = await runAsync({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
             addDerived(derived, seen, item.quad, outputMode);
@@ -312,16 +304,15 @@ export class InferenceEngine {
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
-    let result: any;
+    let result: Awaited<ReturnType<typeof runAsync>>;
     try {
       result = await runAsync({ n3: this.runtime, quads: data }, {
         rdfjs: true,
-        dataFactory: this.dataFactory as any,
+        dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
-        builtinModules: deterministicSkolem ? [deterministicSkolem] : undefined,
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
             diagnostics.push(item.quad);
@@ -712,35 +703,45 @@ function termKey(term: Term): string {
 }
 
 type DeterministicSkolemOptions = Pick<InferenceOptions, 'deterministicSkolem' | 'skolemKey' | 'store' | 'storePath' | 'storeClear'>;
-type DeterministicSkolemBuiltin = ((api: any) => void) | undefined;
+type DeterministicSkolemBuiltin = boolean;
 
-function createDeterministicSkolemBuiltin(options: DeterministicSkolemOptions): DeterministicSkolemBuiltin {
-  if (!shouldUseDeterministicSkolem(options)) {
-    return undefined;
-  }
-
-  const scopeKey = deterministicSkolemScopeKey(options);
-  return ({ registerBuiltin, internIri, unifyTerm, isGroundTerm, termToN3, terms }: any) => {
-    const Var = terms?.Var;
-    registerBuiltin(LOG_SKOLEM, ({ goal, subst }: any) => {
-      if (!isGroundTerm(goal.s)) {
-        return [];
-      }
-
-      const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
-      const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
-      if (Var && goal.o instanceof Var) {
-        return [{ ...subst, [goal.o.name]: node }];
-      }
-
-      const next = unifyTerm(goal.o, node, subst);
-      return next !== null ? [next] : [];
-    });
+interface DeterministicSkolemApi {
+  internIri(value: string): EyelingTerm;
+  unifyTerm(left: unknown, right: unknown, subst: Record<string, EyelingTerm>): Record<string, EyelingTerm> | null;
+  isGroundTerm(term: unknown): boolean;
+  termToN3(term: unknown): string;
+  terms?: {
+    Var?: new (...args: never[]) => { name: string };
   };
 }
 
+function createDeterministicSkolemBuiltin(options: DeterministicSkolemOptions): DeterministicSkolemBuiltin {
+  if (!shouldUseDeterministicSkolem(options)) {
+    return false;
+  }
+
+  const scopeKey = deterministicSkolemScopeKey(options);
+  registerBuiltin(LOG_SKOLEM, ({ goal, subst, api }) => {
+    const { internIri, unifyTerm, isGroundTerm, termToN3, terms } = api as DeterministicSkolemApi;
+    const Var = terms?.Var;
+    if (!isGroundTerm(goal.s)) {
+      return [];
+    }
+
+    const tupleKey = `${scopeKey}\0${termToN3(goal.s)}`;
+    const node = internIri(SKOLEM_BASE_IRI + deterministicSkolemIdFromKey(tupleKey));
+    if (Var && goal.o instanceof Var) {
+      return [{ ...subst, [goal.o.name]: node }];
+    }
+
+    const next = unifyTerm(goal.o, node, subst);
+    return next !== null ? [next] : [];
+  });
+  return true;
+}
+
 function unregisterDeterministicSkolemBuiltin(deterministicSkolem: DeterministicSkolemBuiltin): void {
-  if (deterministicSkolem && typeof unregisterBuiltin === 'function') {
+  if (deterministicSkolem) {
     unregisterBuiltin(LOG_SKOLEM);
   }
 }
