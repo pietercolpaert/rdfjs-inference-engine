@@ -36,13 +36,15 @@ assert.deepEqual(
   'load(vocabularyDataset) should use every bundled rules/*.n3 file by default.',
 );
 
+const parser = new Parser();
+
 const skosProfile = readFileSync('rules/skos-entailment.n3', 'utf8');
 const selectedSkosReasoner = new InferenceEngine();
 selectedSkosReasoner.load(skosProfile, []);
 assert.equal(
-  selectedSkosReasoner.getRuntime().includes('skos:broader'),
+  selectedSkosReasoner.getRuntime().includes('=>'),
   false,
-  'Default runtime selection should omit an inactive SKOS profile when no SKOS vocabulary is loaded.',
+  'Default runtime selection should omit inactive SKOS runtime rules when no SKOS vocabulary is loaded.',
 );
 
 const fullSkosReasoner = new InferenceEngine();
@@ -53,7 +55,31 @@ assert.equal(
   'selectRuntimeRules: false should preserve the full generic profile for infer-time schema tests.',
 );
 
-const parser = new Parser();
+const browserStyleProfiles = loadDefaultRuleProfiles();
+const browserStyleSkosReasoner = new InferenceEngine();
+browserStyleSkosReasoner.load({
+  n3: browserStyleProfiles.map((profile) => profile.n3).join('\n\n'),
+  label: `Bundled profiles: ${browserStyleProfiles.map((profile) => profile.label).join(', ')}`,
+}, parseQuads(`
+@prefix : <https://example.org/subjects#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+:scheme a skos:ConceptScheme .
+`));
+const browserStyleSkosOutput = Array.from(browserStyleSkosReasoner.infer(parseQuads(`
+@prefix : <https://example.org/subjects#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+:cat skos:broader :mammal .
+:mammal skos:broader :animal .
+`)));
+assert.ok(
+  browserStyleSkosOutput.some((quad) => quad.subject.value === 'https://example.org/subjects#cat'
+    && quad.predicate.value === 'http://www.w3.org/2004/02/skos/core#broaderTransitive'
+    && quad.object.value === 'https://example.org/subjects#animal'),
+  'Browser-style bundled profile loading should retain SKOS rules for SKOS predicates that arrive in infer() data.',
+);
+
 const disjointReasoner = new InferenceEngine();
 disjointReasoner.load(
   loadDefaultRuleProfiles(),

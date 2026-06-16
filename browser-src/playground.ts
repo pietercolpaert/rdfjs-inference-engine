@@ -54,6 +54,7 @@ type ActiveRun = {
 type WorkerRequest = {
   apiScriptUrl: string;
   bundledRules: string;
+  bundledRuleProfiles: BundledRuleProfile[];
   bundledRuleCount: number;
   bundledRuleLabels: string[];
   backgroundSource: string;
@@ -195,6 +196,7 @@ async function runInference(): Promise<void> {
     await runWorkerInference(run, {
       apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', window.location.href).href,
       bundledRules: selectedProfiles.map((profile) => profile.n3).join('\n\n'),
+      bundledRuleProfiles: selectedProfiles,
       bundledRuleCount: selectedProfiles.length,
       bundledRuleLabels: selectedProfiles.map((profile) => profile.file),
       backgroundSource,
@@ -313,7 +315,10 @@ self.onmessage = async (event) => {
     const ruleLabel = request.bundledRuleLabels && request.bundledRuleLabels.length
       ? 'Bundled profiles: ' + request.bundledRuleLabels.join(', ')
       : 'Bundled N3 rule profiles';
-    const runtime = reasoner.load({ n3: request.bundledRules, label: ruleLabel }, background.quads, loadOptions);
+    const ruleProfiles = request.bundledRuleProfiles && request.bundledRuleProfiles.length
+      ? request.bundledRuleProfiles.map((profile) => ({ n3: profile.n3, label: profile.file }))
+      : [{ n3: request.bundledRules, label: ruleLabel }];
+    const runtime = reasoner.load(ruleProfiles, background.quads, loadOptions);
     const compiledAt = performance.now();
     self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 

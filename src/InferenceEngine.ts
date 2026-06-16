@@ -499,6 +499,7 @@ interface RuntimeRuleSelectionContext {
   staticPredicates: Set<string>;
   staticPredicateObjects: Set<string>;
   staticTerms: Set<string>;
+  inputTerms: Set<string>;
 }
 
 const KNOWN_PREFIXES: Record<string, string> = {
@@ -566,21 +567,6 @@ const STATIC_SCHEMA_PREDICATES = [
   'sh:qualifiedValueShape',
   'sh:qualifiedMinCount',
   'sh:qualifiedMaxCount',
-  'skos:broader',
-  'skos:narrower',
-  'skos:related',
-  'skos:broaderTransitive',
-  'skos:narrowerTransitive',
-  'skos:hasTopConcept',
-  'skos:topConceptOf',
-  'skos:member',
-  'skos:memberList',
-  'skos:inScheme',
-  'skos:exactMatch',
-  'skos:closeMatch',
-  'skos:broadMatch',
-  'skos:narrowMatch',
-  'skos:relatedMatch',
 ];
 
 const STATIC_TYPE_GUARDS = [
@@ -599,14 +585,10 @@ const STATIC_TYPE_GUARDS = [
   'rdfs:Datatype',
   'sh:NodeShape',
   'sh:PropertyShape',
-  'skos:Concept',
-  'skos:ConceptScheme',
-  'skos:Collection',
-  'skos:OrderedCollection',
 ];
 
 function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
-  const context = runtimeRuleSelectionContext([...input.vocabulary, ...input.closure]);
+  const context = runtimeRuleSelectionContext(input.vocabulary, [...input.vocabulary, ...input.closure]);
   const sections: string[] = [];
   let selectedRules = 0;
   let totalRules = 0;
@@ -647,12 +629,19 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
   ].join('\n');
 }
 
-function runtimeRuleSelectionContext(quads: Iterable<Quad>): RuntimeRuleSelectionContext {
+function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: Iterable<Quad>): RuntimeRuleSelectionContext {
   const staticPredicates = new Set<string>();
   const staticPredicateObjects = new Set<string>();
   const staticTerms = new Set<string>();
+  const inputTerms = new Set<string>();
 
-  for (const quad of quads) {
+  for (const quad of inputQuads) {
+    addTermValue(inputTerms, quad.subject);
+    addTermValue(inputTerms, quad.predicate);
+    addTermValue(inputTerms, quad.object);
+  }
+
+  for (const quad of staticQuads) {
     addTermValue(staticTerms, quad.subject);
     addTermValue(staticTerms, quad.predicate);
     addTermValue(staticTerms, quad.object);
@@ -664,7 +653,7 @@ function runtimeRuleSelectionContext(quads: Iterable<Quad>): RuntimeRuleSelectio
     }
   }
 
-  return { staticPredicates, staticPredicateObjects, staticTerms };
+  return { staticPredicates, staticPredicateObjects, staticTerms, inputTerms };
 }
 
 function addTermValue(values: Set<string>, term: Term): void {
@@ -674,19 +663,23 @@ function addTermValue(values: Set<string>, term: Term): void {
 }
 
 function isRuntimeProfileRelevant(profile: LoadedRuleProfile, context: RuntimeRuleSelectionContext): boolean {
-  const label = profile.label ?? '';
+  const label = (profile.label ?? '').toLowerCase();
   const source = profile.n3;
-  if (label.includes('shacl') || source.includes('@prefix sh:')) {
+  const hasShaclProfile = label.includes('shacl') || source.includes('@prefix sh:');
+  const hasSkosProfile = label.includes('skos') || source.includes('@prefix skos:');
+  const hasOwlProfile = label.includes('owl') || source.includes('@prefix owlrl:');
+
+  if (hasShaclProfile && !hasSkosProfile && !hasOwlProfile) {
     return hasNamespaceTerm(context, 'http://www.w3.org/ns/shacl#');
   }
-  if (label.includes('skos') || source.includes('@prefix skos:')) {
+  if (hasSkosProfile && !hasShaclProfile && !hasOwlProfile) {
     return hasNamespaceTerm(context, 'http://www.w3.org/2004/02/skos/core#');
   }
   return true;
 }
 
 function hasNamespaceTerm(context: RuntimeRuleSelectionContext, namespace: string): boolean {
-  for (const term of context.staticTerms) {
+  for (const term of context.inputTerms) {
     if (term.startsWith(namespace)) {
       return true;
     }
