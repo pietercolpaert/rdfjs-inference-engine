@@ -1,0 +1,44 @@
+# RDF Messages input for the SHACL shape planning example.
+
+VERSION "1.2-messages"
+PREFIX ex:   <https://example.org/shape-planning#>
+PREFIX sosa: <http://www.w3.org/ns/sosa/>
+
+ex:obs1 ex:observedBy ex:sensor1 .
+ex:obs1 ex:debugOnly "drop me 1" .
+
+MESSAGE
+ex:obs2 ex:observedBy ex:sensor2 .
+ex:obs2 ex:debugOnly "drop me 2" .
+
+MESSAGE
+ex:obs3 ex:observedBy ex:sensor3 .
+ex:obs3 ex:debugOnly "drop me 3" .
+
+MESSAGE
+ex:obs4 ex:observedBy ex:sensor4 .
+ex:obs4 ex:debugOnly "drop me 4" .
+
+MESSAGE
+ex:obs5 ex:observedBy ex:sensor5 .
+ex:obs5 ex:debugOnly "drop me 5" .
+
+MESSAGE
+ex:obs6 ex:observedBy ex:sensor6 .
+ex:obs6 ex:debugOnly "drop me 6" .
+
+MESSAGE
+ex:obs7 ex:observedBy ex:sensor7 .
+ex:obs7 ex:debugOnly "drop me 7" .
+
+MESSAGE
+ex:obs8 ex:observedBy ex:sensor8 .
+ex:obs8 ex:debugOnly "drop me 8" .
+
+MESSAGE
+ex:obs9 ex:observedBy ex:sensor9 .
+ex:obs9 ex:debugOnly "drop me 9" .
+
+MESSAGE
+ex:obs10 ex:observedBy ex:sensor10 .
+ex:obs10 ex:debugOnly "drop me 10" .
