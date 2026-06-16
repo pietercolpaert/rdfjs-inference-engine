@@ -145,6 +145,19 @@
       gap: 0.65rem;
     }
 
+    .shape-hints-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+      gap: 0.85rem;
+    }
+
+    .shape-hint-editor {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
     .rule-profile-option {
       display: flex;
       gap: 0.65rem;
@@ -347,6 +360,11 @@
       font-size: 0.85rem;
     }
 
+    .shape-hint-editor .CodeMirror {
+      height: 14rem;
+      font-size: 0.82rem;
+    }
+
     [hidden] {
       display: none !important;
     }
@@ -480,6 +498,24 @@
         <div id="dataTextPanel">
           <textarea id="dataText" spellcheck="false"></textarea>
         </div>
+        <details id="shapeHintsPanel" class="advanced-panel">
+          <summary>Advanced SHACL in/out shape hints</summary>
+          <div class="advanced-panel-body">
+            <p class="meta">Optional trusted optimization contracts. These SHACL shapes are not used for validation; they help the generated runtime and per-input planner keep only rules, predicates, indexes, and joins relevant to the expected input and desired output.</p>
+            <div class="shape-hints-grid">
+              <div class="shape-hint-editor">
+                <label for="shaclInText">Input SHACL shape hint</label>
+                <span class="hint">Describes RDF Messages or input batches passed to inference.</span>
+                <textarea id="shaclInText" spellcheck="false"></textarea>
+              </div>
+              <div class="shape-hint-editor">
+                <label for="shaclOutText">Output SHACL shape hint</label>
+                <span class="hint">Describes the inferred RDF you care about retaining.</span>
+                <textarea id="shaclOutText" spellcheck="false"></textarea>
+              </div>
+            </div>
+          </div>
+        </details>
       </section>
 
       <section class="card">

@@ -25,6 +25,8 @@ type PlaygroundState = {
   dataUrl?: string;
   backgroundText?: string;
   dataText?: string;
+  shaclInText?: string;
+  shaclOutText?: string;
 };
 
 type BundledRuleProfile = {
@@ -39,6 +41,10 @@ type BundledExample = {
   dataFile: string;
   background: string;
   data: string;
+  shaclInFile?: string;
+  shaclOutFile?: string;
+  shaclIn?: string;
+  shaclOut?: string;
 };
 
 type ActiveRun = {
@@ -61,6 +67,8 @@ type WorkerRequest = {
   dataMode: InputMode;
   statefulMaterialization: boolean;
   statefulStoreName?: string;
+  shaclInSource?: string;
+  shaclOutSource?: string;
   dataSource?: string;
   dataUrl?: string;
 };
@@ -82,6 +90,8 @@ const defaultState = {
 const editors = {
   backgroundText: createEditor('backgroundText', defaultState.backgroundText),
   dataText: createEditor('dataText', defaultState.dataText),
+  shaclInText: createEditor('shaclInText', ''),
+  shaclOutText: createEditor('shaclOutText', ''),
   outputText: createEditor('outputText', ''),
 };
 
@@ -96,6 +106,7 @@ const controls = {
   backgroundTextPanel: getElement('backgroundTextPanel'),
   dataUrlPanel: getElement('dataUrlPanel'),
   dataTextPanel: getElement('dataTextPanel'),
+  shapeHintsPanel: getElement('shapeHintsPanel') as HTMLDetailsElement,
   runButton: getButton('runButton'),
   stopButton: getButton('stopButton'),
   resetButton: getButton('resetButton'),
@@ -156,6 +167,12 @@ function wireControls(): void {
   for (const editor of Object.values(editors)) {
     editor.on('change', scheduleStateUpdate);
   }
+  controls.shapeHintsPanel.addEventListener('toggle', () => {
+    window.setTimeout(() => {
+      editors.shaclInText.refresh();
+      editors.shaclOutText.refresh();
+    }, 0);
+  });
   for (const input of [controls.backgroundUrl, controls.dataUrl]) {
     input.addEventListener('input', scheduleStateUpdate);
   }
@@ -184,6 +201,8 @@ async function runInference(): Promise<void> {
     const dataMode = getMode('data');
     const dataSource = dataMode === 'text' ? editors.dataText.getValue() : undefined;
     const dataUrl = dataMode === 'url' ? controls.dataUrl.value.trim() : undefined;
+    const shaclInSource = editors.shaclInText.getValue().trim() || undefined;
+    const shaclOutSource = editors.shaclOutText.getValue().trim() || undefined;
     if (dataMode === 'url' && !dataUrl) {
       throw new Error('Enter a data URL or switch to text input.');
     }
@@ -205,6 +224,8 @@ async function runInference(): Promise<void> {
       statefulStoreName: controls.statefulMaterialization.checked
         ? createStatefulStoreName(backgroundSource, dataMode === 'url' ? dataUrl ?? '' : dataSource ?? '')
         : undefined,
+      shaclInSource,
+      shaclOutSource,
       dataSource,
       dataUrl,
     });
@@ -309,18 +330,26 @@ self.onmessage = async (event) => {
 
     const reasoner = new api.InferenceEngine();
     const started = performance.now();
-    const loadOptions = request.statefulMaterialization
-      ? { skolemKey: request.statefulStoreName || 'rdfjs-inference-engine:playground:default' }
-      : undefined;
+    const loadOptions = {};
+    if (request.statefulMaterialization) {
+      loadOptions.skolemKey = request.statefulStoreName || 'rdfjs-inference-engine:playground:default';
+    }
+    if (request.shaclInSource) {
+      loadOptions.shaclIn = request.shaclInSource;
+    }
+    if (request.shaclOutSource) {
+      loadOptions.shaclOut = request.shaclOutSource;
+    }
     const ruleLabel = request.bundledRuleLabels && request.bundledRuleLabels.length
       ? 'Bundled profiles: ' + request.bundledRuleLabels.join(', ')
       : 'Bundled N3 rule profiles';
     const ruleProfiles = request.bundledRuleProfiles && request.bundledRuleProfiles.length
       ? request.bundledRuleProfiles.map((profile) => ({ n3: profile.n3, label: profile.file }))
       : [{ n3: request.bundledRules, label: ruleLabel }];
-    const runtime = reasoner.load(ruleProfiles, background.quads, loadOptions);
+    const runtime = reasoner.load(ruleProfiles, background.quads, Object.keys(loadOptions).length ? loadOptions : undefined);
     const compiledAt = performance.now();
-    self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
+    const shapeHintSummary = (request.shaclInSource || request.shaclOutSource) ? ' · SHACL hints ' + [request.shaclInSource ? 'in' : '', request.shaclOutSource ? 'out' : ''].filter(Boolean).join('/') : '';
+    self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + shapeHintSummary + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
 
     await processInputData(api, reasoner, request, compiledAt, started);
   } catch (error) {
@@ -1018,6 +1047,8 @@ function applyModeVisibility(): void {
   window.setTimeout(() => {
     editors.backgroundText.refresh();
     editors.dataText.refresh();
+    editors.shaclInText.refresh();
+    editors.shaclOutText.refresh();
     editors.outputText.refresh();
   }, 0);
 }
@@ -1043,6 +1074,9 @@ function resetDefaults(): void {
   setDisabledRuleFiles([]);
   editors.backgroundText.setValue(example.background);
   editors.dataText.setValue(example.data);
+  editors.shaclInText.setValue(example.shaclIn ?? '');
+  editors.shaclOutText.setValue(example.shaclOut ?? '');
+  controls.shapeHintsPanel.open = Boolean(example.shaclIn || example.shaclOut);
   editors.outputText.setValue('');
   suppressStateUpdate = false;
   applyModeVisibility();
@@ -1055,10 +1089,21 @@ function populateExamples(): void {
   for (const example of bundledExamples as BundledExample[]) {
     const option = document.createElement('option');
     option.value = example.id;
-    option.textContent = `${example.label} — ${example.backgroundFile} + ${example.dataFile}`;
+    option.textContent = `${example.label} — ${exampleFilesLabel(example)}`;
     controls.exampleSelect.appendChild(option);
   }
   controls.exampleSelect.value = defaultExample().id;
+}
+
+function exampleFilesLabel(example: BundledExample): string {
+  const files = [example.backgroundFile, example.dataFile];
+  if (example.shaclInFile) {
+    files.push(example.shaclInFile);
+  }
+  if (example.shaclOutFile) {
+    files.push(example.shaclOutFile);
+  }
+  return files.join(' + ');
 }
 
 function populateRuleProfiles(): void {
@@ -1177,7 +1222,7 @@ function loadBundledExample(id: string): void {
   suppressStateUpdate = false;
   applyModeVisibility();
   updateHashNow();
-  setStatus(`Loaded ${example.label} from ${example.backgroundFile} and ${example.dataFile}.`);
+  setStatus(`Loaded ${example.label} from ${exampleFilesLabel(example)}.`);
 }
 
 function applyBundledExample(example: BundledExample): void {
@@ -1189,6 +1234,9 @@ function applyBundledExample(example: BundledExample): void {
   controls.dataUrl.value = '';
   editors.backgroundText.setValue(example.background);
   editors.dataText.setValue(example.data);
+  editors.shaclInText.setValue(example.shaclIn ?? '');
+  editors.shaclOutText.setValue(example.shaclOut ?? '');
+  controls.shapeHintsPanel.open = Boolean(example.shaclIn || example.shaclOut);
   editors.outputText.setValue('');
 }
 
@@ -1222,6 +1270,8 @@ function collectState(): PlaygroundState {
 
   const backgroundText = editors.backgroundText.getValue();
   const dataText = editors.dataText.getValue();
+  const shaclInText = editors.shaclInText.getValue();
+  const shaclOutText = editors.shaclOutText.getValue();
 
   if (selectedExample && isUntouchedExample(selectedExample) && selectedExample.id !== defaultExample().id) {
     state.example = selectedExample.id;
@@ -1232,6 +1282,12 @@ function collectState(): PlaygroundState {
   }
   if (!state.example && dataText !== defaultState.dataText) {
     state.dataText = dataText;
+  }
+  if (shaclInText.trim()) {
+    state.shaclInText = shaclInText;
+  }
+  if (shaclOutText.trim()) {
+    state.shaclOutText = shaclOutText;
   }
 
   return state;
@@ -1244,7 +1300,9 @@ function isUntouchedExample(example: BundledExample): boolean {
     && controls.backgroundUrl.value.trim() === ''
     && controls.dataUrl.value.trim() === ''
     && editors.backgroundText.getValue() === example.background
-    && editors.dataText.getValue() === example.data;
+    && editors.dataText.getValue() === example.data
+    && editors.shaclInText.getValue() === (example.shaclIn ?? '')
+    && editors.shaclOutText.getValue() === (example.shaclOut ?? '');
 }
 
 function loadStateFromHash(): void {
@@ -1284,6 +1342,14 @@ function loadStateFromHash(): void {
   }
   if (state.dataText !== undefined) {
     editors.dataText.setValue(state.dataText);
+  }
+  if (state.shaclInText !== undefined) {
+    editors.shaclInText.setValue(state.shaclInText);
+    controls.shapeHintsPanel.open = true;
+  }
+  if (state.shaclOutText !== undefined) {
+    editors.shaclOutText.setValue(state.shaclOutText);
+    controls.shapeHintsPanel.open = true;
   }
   setDisabledRuleFiles(state.disabledRuleFiles ?? []);
   suppressStateUpdate = false;

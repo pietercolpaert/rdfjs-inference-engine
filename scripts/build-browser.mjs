@@ -67,6 +67,9 @@ const bundledExamplesPlugin = {
           continue;
         }
 
+        const shaclInFile = files.includes('shapes-in.n3') ? 'shapes-in.n3' : undefined;
+        const shaclOutFile = files.includes('shapes-out.n3') ? 'shapes-out.n3' : undefined;
+
         examples.push({
           id: entry.name,
           label: humanizeExampleId(entry.name),
@@ -74,6 +77,10 @@ const bundledExamplesPlugin = {
           dataFile: `examples/${entry.name}/${inputFile}`,
           background: await readFile(join(dir, backgroundFile), 'utf8'),
           data: await readFile(join(dir, inputFile), 'utf8'),
+          shaclInFile: shaclInFile ? `examples/${entry.name}/${shaclInFile}` : undefined,
+          shaclOutFile: shaclOutFile ? `examples/${entry.name}/${shaclOutFile}` : undefined,
+          shaclIn: shaclInFile ? await readFile(join(dir, shaclInFile), 'utf8') : undefined,
+          shaclOut: shaclOutFile ? await readFile(join(dir, shaclOutFile), 'utf8') : undefined,
         });
       }
 
@@ -97,6 +104,7 @@ function humanizeExampleId(id) {
     'shacl-validation': 'SHACL validation (SHACL Core)',
     'shacl12-grandfather': 'Grandfather classification (SHACL 1.2 + OWL RL)',
     'inconsistency-diagnostics': 'Inconsistency diagnostics (OWL 2 RL)',
+    'shacl-shape-planning': 'SHACL shape planning (SHACL in/out hints)',
     'transit-messages': 'Transit stream (RDF Messages)',
     'stateful-materialization': 'Stateful materialization (RDF Messages)',
   };

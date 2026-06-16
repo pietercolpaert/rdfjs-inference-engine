@@ -3,6 +3,16 @@ import { join, resolve } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling';
+import { Parser } from 'rdf-parser-ts';
+import {
+  compileShaclShapeGraph,
+  createShapePlanning,
+  optimizeInputWithShapePlanning,
+  parseShapePlanningFromRuntime,
+  shapePlanningSummary,
+  type ShapeInputOptimization,
+  type ShapePlanning,
+} from './shacl-shape-planning';
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
@@ -48,6 +58,7 @@ const INTERNAL_HELPER_PREDICATES = new Set([
 
 export type RuleProfile = string | { n3?: string; text?: string; label?: string; baseIri?: string };
 export type VocabularyDataset = DatasetCore | Iterable<Quad>;
+export type ShaclShapeInput = VocabularyDataset | string | { quads: Iterable<Quad> } | { path: string };
 
 export interface LoadedRuleProfile {
   n3: string;
@@ -72,6 +83,7 @@ export interface InferenceOptions {
   storeClear?: boolean;
   deterministicSkolem?: boolean;
   skolemKey?: string;
+  optimizeShapeInput?: boolean;
 }
 
 export interface InferenceStoreOptions {
@@ -86,6 +98,8 @@ export interface LoadOptions {
   runtimeCompiler?: RuntimeCompiler;
   includeStaticClosure?: boolean;
   selectRuntimeRules?: boolean;
+  shaclIn?: ShaclShapeInput;
+  shaclOut?: ShaclShapeInput;
   deterministicSkolem?: boolean;
   skolemKey?: string;
 }
@@ -97,6 +111,7 @@ export interface RuntimeCompilerInput {
   closure: Quad[];
   dataFactory: DataFactory;
   options: LoadOptions;
+  shapePlanning?: ShapePlanning;
 }
 
 export type RuntimeCompiler = (input: RuntimeCompilerInput) => string;
@@ -123,6 +138,8 @@ export class InferenceEngine {
   private readonly dataFactory: DataFactory;
   private readonly runtimeCompiler: RuntimeCompiler;
   private readonly outputMode: InferenceOutputMode;
+  private shapePlanning?: ShapePlanning;
+  private lastInputOptimization?: ShapeInputOptimization;
 
   public constructor(options: InferenceEngineOptions = {}) {
     this.dataFactory = options.dataFactory ?? rdfjs;
@@ -134,6 +151,7 @@ export class InferenceEngine {
     } else if (options.runtime) {
       this.runtime = options.runtime;
     }
+    this.shapePlanning = parseShapePlanningFromRuntime(this.runtime);
   }
 
   public getRuntime(): string {
@@ -148,6 +166,14 @@ export class InferenceEngine {
   public getStaticInconsistencies(options: InferenceOptions = {}): InconsistencyReport[] {
     const outputMode = options.outputMode ?? this.outputMode;
     return collectInconsistencyReports(this.staticClosure, outputMode);
+  }
+
+  public getShapePlanning(): ShapePlanning | undefined {
+    return this.shapePlanning;
+  }
+
+  public getLastInputOptimization(): ShapeInputOptimization | undefined {
+    return this.lastInputOptimization;
   }
 
   public load(vocabulary: VocabularyDataset, options?: LoadOptions): string;
@@ -171,6 +197,7 @@ export class InferenceEngine {
     }
 
     this.staticClosure = closure.closureQuads ?? [];
+    this.shapePlanning = compileLoadShapePlanning(loadOptions);
 
     const runtimeCompiler = loadOptions.runtimeCompiler ?? this.runtimeCompiler;
     this.runtime = runtimeCompiler({
@@ -180,6 +207,7 @@ export class InferenceEngine {
       closure: this.staticClosure,
       dataFactory: this.dataFactory,
       options: loadOptions,
+      shapePlanning: this.shapePlanning,
     });
 
     return this.runtime;
@@ -192,13 +220,14 @@ export class InferenceEngine {
 
   public *infer(data: Quad[], options: InferenceOptions = {}): Generator<Quad> {
     this.assertLoaded();
+    const inferenceData = this.optimizeInferenceInput(data, options);
     const derived: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
 
     try {
-      reasonStream({ n3: this.runtime, quads: data }, {
+      reasonStream({ n3: this.runtime, quads: inferenceData }, {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
@@ -223,6 +252,7 @@ export class InferenceEngine {
 
   public inferWithDiagnostics(data: Quad[], options: InferenceOptions = {}): InferenceResult {
     this.assertLoaded();
+    const inferenceData = this.optimizeInferenceInput(data, options);
     const derived: Quad[] = [];
     const diagnostics: Quad[] = [];
     const seen = new Set<string>();
@@ -230,7 +260,7 @@ export class InferenceEngine {
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
 
     try {
-      reasonStream({ n3: this.runtime, quads: data }, {
+      reasonStream({ n3: this.runtime, quads: inferenceData }, {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
@@ -269,9 +299,10 @@ export class InferenceEngine {
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
+    const inferenceData = this.optimizeInferenceInput(data, options);
     let result: Awaited<ReturnType<typeof runAsync>>;
     try {
-      result = await runAsync({ n3: this.runtime, quads: data }, {
+      result = await runAsync({ n3: this.runtime, quads: inferenceData }, {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
@@ -311,9 +342,10 @@ export class InferenceEngine {
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
+    const inferenceData = this.optimizeInferenceInput(data, options);
     let result: Awaited<ReturnType<typeof runAsync>>;
     try {
-      result = await runAsync({ n3: this.runtime, quads: data }, {
+      result = await runAsync({ n3: this.runtime, quads: inferenceData }, {
         rdfjs: true,
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
@@ -371,6 +403,17 @@ export class InferenceEngine {
     if (!this.runtime.trim()) {
       throw new Error('No inference runtime is loaded. Call load(...) or pass runtime/runtimePath to the constructor first.');
     }
+  }
+
+  private optimizeInferenceInput(data: Quad[], options: InferenceOptions): Quad[] {
+    if (options.optimizeShapeInput === false || !this.shapePlanning?.input) {
+      this.lastInputOptimization = undefined;
+      return data;
+    }
+
+    const optimization = optimizeInputWithShapePlanning(data, this.shapePlanning);
+    this.lastInputOptimization = optimization;
+    return optimization.quads;
   }
 }
 
@@ -470,6 +513,8 @@ function isLoadOptions(value: unknown): value is LoadOptions {
     && ('runtimeCompiler' in value
       || 'includeStaticClosure' in value
       || 'selectRuntimeRules' in value
+      || 'shaclIn' in value
+      || 'shaclOut' in value
       || 'deterministicSkolem' in value
       || 'skolemKey' in value
       || Object.keys(value).length === 0);
@@ -480,6 +525,10 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   const runtimeProfileN3 = input.options.selectRuntimeRules === false
     ? input.profileN3.trimEnd()
     : compileSelectedRuntimeProfiles(input).trimEnd();
+
+  if (input.shapePlanning) {
+    sections.push('', ...shapePlanningSummary(input.shapePlanning));
+  }
 
   if (runtimeProfileN3.trim()) {
     sections.push('', '# Runtime rule profile', runtimeProfileN3);
@@ -498,8 +547,25 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
 interface RuntimeRuleSelectionContext {
   staticPredicates: Set<string>;
   staticPredicateObjects: Set<string>;
+  staticClasses: Set<string>;
   staticTerms: Set<string>;
   inputTerms: Set<string>;
+  shapePlanning?: ShapePlanning;
+}
+
+interface RuntimeRuleEntry {
+  profile: LoadedRuleProfile;
+  prefixes: string[];
+  rule: string;
+  metadata: RuntimeRuleMetadata;
+}
+
+interface RuntimeRuleMetadata {
+  bodyPredicates: Set<string>;
+  headPredicates: Set<string>;
+  bodyClasses: Set<string>;
+  headClasses: Set<string>;
+  hasVariableHeadPredicate: boolean;
 }
 
 const KNOWN_PREFIXES: Record<string, string> = {
@@ -588,9 +654,8 @@ const STATIC_TYPE_GUARDS = [
 ];
 
 function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
-  const context = runtimeRuleSelectionContext(input.vocabulary, [...input.vocabulary, ...input.closure]);
-  const sections: string[] = [];
-  let selectedRules = 0;
+  const context = runtimeRuleSelectionContext(input.vocabulary, [...input.vocabulary, ...input.closure], input.shapePlanning);
+  const entries: RuntimeRuleEntry[] = [];
   let totalRules = 0;
 
   for (const profile of input.profiles) {
@@ -604,34 +669,34 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
     }
 
     const prefixes = extractPrefixDeclarations(source);
+    const prefixMap = extractPrefixMap(prefixes);
     const rules = extractTopLevelRuleStatements(source);
     totalRules += rules.length;
-    const relevantRules = rules.filter((rule) => isRuntimeRuleRelevant(rule, context));
-    selectedRules += relevantRules.length;
-
-    if (relevantRules.length === 0) {
-      continue;
+    for (const rule of rules) {
+      const metadata = extractRuntimeRuleMetadata(rule, prefixMap);
+      if (isRuntimeRuleStaticallyRelevant(rule, context)) {
+        entries.push({ profile, prefixes, rule, metadata });
+      }
     }
-
-    if (profile.label) {
-      sections.push(`# Source: ${profile.label}`);
-    }
-    sections.push(...prefixes, '', ...relevantRules);
   }
+
+  const selectedEntries = selectShapeGuidedRuntimeRules(entries, context);
+  const sections = formatRuntimeRuleEntries(selectedEntries);
 
   if (sections.length === 0) {
     return '';
   }
 
   return [
-    `# Selected ${selectedRules}/${totalRules} top-level runtime rules for the load-time vocabulary.`,
+    `# Selected ${selectedEntries.length}/${totalRules} top-level runtime rules for the load-time vocabulary${input.shapePlanning ? ' and SHACL shape hints' : ''}.`,
     ...sections,
   ].join('\n');
 }
 
-function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: Iterable<Quad>): RuntimeRuleSelectionContext {
+function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: Iterable<Quad>, shapePlanning?: ShapePlanning): RuntimeRuleSelectionContext {
   const staticPredicates = new Set<string>();
   const staticPredicateObjects = new Set<string>();
+  const staticClasses = new Set<string>();
   const staticTerms = new Set<string>();
   const inputTerms = new Set<string>();
 
@@ -649,11 +714,14 @@ function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: It
       staticPredicates.add(quad.predicate.value);
       if (quad.object.termType === 'NamedNode') {
         staticPredicateObjects.add(`${quad.predicate.value}\t${quad.object.value}`);
+        if (quad.predicate.value === RDF_TYPE) {
+          staticClasses.add(quad.object.value);
+        }
       }
     }
   }
 
-  return { staticPredicates, staticPredicateObjects, staticTerms, inputTerms };
+  return { staticPredicates, staticPredicateObjects, staticClasses, staticTerms, inputTerms, shapePlanning };
 }
 
 function addTermValue(values: Set<string>, term: Term): void {
@@ -687,7 +755,7 @@ function hasNamespaceTerm(context: RuntimeRuleSelectionContext, namespace: strin
   return false;
 }
 
-function isRuntimeRuleRelevant(rule: string, context: RuntimeRuleSelectionContext): boolean {
+function isRuntimeRuleStaticallyRelevant(rule: string, context: RuntimeRuleSelectionContext): boolean {
   const body = runtimeRuleBody(rule);
 
   for (const qname of STATIC_SCHEMA_PREDICATES) {
@@ -713,6 +781,176 @@ function isRuntimeRuleRelevant(rule: string, context: RuntimeRuleSelectionContex
   return true;
 }
 
+function selectShapeGuidedRuntimeRules(entries: RuntimeRuleEntry[], context: RuntimeRuleSelectionContext): RuntimeRuleEntry[] {
+  const planning = context.shapePlanning;
+  if (!planning) {
+    return entries;
+  }
+
+  const reachable = reachableRuleEntries(entries, context, planning);
+  if (!planning.output) {
+    return orderRuntimeRulesForShapeHints(entries.filter((_entry, index) => reachable.has(index)), planning);
+  }
+
+  const needed = outputRelevantRuleEntries(entries, planning);
+  return orderRuntimeRulesForShapeHints(entries.filter((_entry, index) => reachable.has(index) && needed.has(index)), planning);
+}
+
+function orderRuntimeRulesForShapeHints(entries: RuntimeRuleEntry[], planning: ShapePlanning): RuntimeRuleEntry[] {
+  if (planning.recommendedJoinOrderHints.length === 0) {
+    return entries;
+  }
+
+  const rankByPredicate = new Map<string, number>();
+  for (const hint of planning.recommendedJoinOrderHints) {
+    const previous = rankByPredicate.get(hint.predicate);
+    if (previous === undefined || hint.rank < previous) {
+      rankByPredicate.set(hint.predicate, hint.rank);
+    }
+  }
+
+  return entries.map((entry, index) => ({ entry, index, rank: runtimeRuleJoinRank(entry, rankByPredicate) }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map((item) => item.entry);
+}
+
+function runtimeRuleJoinRank(entry: RuntimeRuleEntry, rankByPredicate: Map<string, number>): number {
+  let rank = 10_000;
+  for (const predicate of entry.metadata.bodyPredicates) {
+    rank = Math.min(rank, rankByPredicate.get(predicate) ?? 10_000);
+  }
+  return rank;
+}
+
+function reachableRuleEntries(entries: RuntimeRuleEntry[], context: RuntimeRuleSelectionContext, planning: ShapePlanning): Set<number> {
+  const reachable = new Set<number>();
+  const availablePredicates = new Set<string>([
+    ...context.staticPredicates,
+    ...planning.relevantInputPredicates,
+  ]);
+  const availableClasses = new Set<string>([
+    ...context.staticClasses,
+    ...(planning.input?.relevantClasses ?? []),
+  ]);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const [index, entry] of entries.entries()) {
+      if (reachable.has(index) || !ruleCanMatchKnownInput(entry.metadata, availablePredicates, availableClasses)) {
+        continue;
+      }
+      reachable.add(index);
+      addAll(availablePredicates, entry.metadata.headPredicates);
+      addAll(availableClasses, entry.metadata.headClasses);
+      changed = true;
+    }
+  }
+
+  return reachable;
+}
+
+function outputRelevantRuleEntries(entries: RuntimeRuleEntry[], planning: ShapePlanning): Set<number> {
+  const needed = new Set<number>();
+  const desiredPredicates = new Set<string>(planning.relevantOutputPredicates);
+  const desiredClasses = new Set<string>(planning.output?.relevantClasses ?? []);
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+    for (const [index, entry] of entries.entries()) {
+      if (needed.has(index) || !ruleProducesDesiredOutput(entry.metadata, desiredPredicates, desiredClasses)) {
+        continue;
+      }
+      needed.add(index);
+      addAll(desiredPredicates, entry.metadata.bodyPredicates);
+      addAll(desiredClasses, entry.metadata.bodyClasses);
+      changed = true;
+    }
+  }
+
+  return needed;
+}
+
+function ruleCanMatchKnownInput(metadata: RuntimeRuleMetadata, availablePredicates: Set<string>, availableClasses: Set<string>): boolean {
+  if (metadata.bodyPredicates.size === 0 && metadata.bodyClasses.size === 0) {
+    return true;
+  }
+
+  for (const predicate of metadata.bodyPredicates) {
+    if (availablePredicates.has(predicate) || predicate.startsWith(OWLRL) || predicate.startsWith(SHACLN3)) {
+      return true;
+    }
+  }
+  for (const classValue of metadata.bodyClasses) {
+    if (availableClasses.has(classValue)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function ruleProducesDesiredOutput(metadata: RuntimeRuleMetadata, desiredPredicates: Set<string>, desiredClasses: Set<string>): boolean {
+  if (metadata.hasVariableHeadPredicate && desiredPredicates.size > 0) {
+    return true;
+  }
+
+  if (metadata.headPredicates.size === 0 && metadata.headClasses.size === 0) {
+    return false;
+  }
+
+  for (const predicate of metadata.headPredicates) {
+    if (desiredPredicates.has(predicate)) {
+      return true;
+    }
+  }
+  for (const classValue of metadata.headClasses) {
+    if (desiredClasses.has(classValue)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function formatRuntimeRuleEntries(entries: RuntimeRuleEntry[]): string[] {
+  const sections: string[] = [];
+  let currentProfile: LoadedRuleProfile | undefined;
+  for (const entry of entries) {
+    if (entry.profile !== currentProfile) {
+      currentProfile = entry.profile;
+      if (sections.length > 0) {
+        sections.push('');
+      }
+      if (entry.profile.label) {
+        sections.push(`# Source: ${entry.profile.label}`);
+      }
+      sections.push(...entry.prefixes, '');
+    }
+    sections.push(entry.rule);
+  }
+  return sections;
+}
+
+function extractRuntimeRuleMetadata(rule: string, prefixes: Record<string, string>): RuntimeRuleMetadata {
+  const body = runtimeRuleBody(rule);
+  const head = runtimeRuleHead(rule);
+  return {
+    bodyPredicates: extractPredicateIris(body, prefixes),
+    headPredicates: extractPredicateIris(head, prefixes),
+    bodyClasses: extractTypeObjectIris(body, prefixes),
+    headClasses: extractTypeObjectIris(head, prefixes),
+    hasVariableHeadPredicate: hasVariablePredicate(head),
+  };
+}
+
+function addAll<T>(target: Set<T>, values: Iterable<T>): void {
+  for (const value of values) {
+    target.add(value);
+  }
+}
+
 function runtimeRuleBody(rule: string): string {
   const forwardIndex = rule.indexOf('=>');
   const backwardIndex = rule.indexOf('<=');
@@ -723,6 +961,61 @@ function runtimeRuleBody(rule: string): string {
     return rule.slice(backwardIndex + 2);
   }
   return rule;
+}
+
+function runtimeRuleHead(rule: string): string {
+  const forwardIndex = rule.indexOf('=>');
+  const backwardIndex = rule.indexOf('<=');
+  if (forwardIndex >= 0 && (backwardIndex < 0 || forwardIndex < backwardIndex)) {
+    return rule.slice(forwardIndex + 2);
+  }
+  if (backwardIndex >= 0) {
+    return rule.slice(0, backwardIndex);
+  }
+  return '';
+}
+
+function extractPredicateIris(source: string, prefixes: Record<string, string>): Set<string> {
+  const predicates = new Set<string>();
+  const predicatePattern = /(^|[\s;])((?:[A-Za-z][\w-]*:[^\s;,.()[\]{}]+)|<[^>]+>|a)(?=\s)/g;
+  let match: RegExpExecArray | null;
+  while ((match = predicatePattern.exec(source)) !== null) {
+    const iriValue = tokenToIri(match[2], prefixes);
+    if (iriValue) {
+      predicates.add(iriValue);
+    }
+  }
+  return predicates;
+}
+
+function extractTypeObjectIris(source: string, prefixes: Record<string, string>): Set<string> {
+  const classes = new Set<string>();
+  const typePattern = /(^|[\s;])(?:rdf:type|a)\s+((?:[A-Za-z][\w-]*:[^\s;,.()[\]{}]+)|<[^>]+>)/g;
+  let match: RegExpExecArray | null;
+  while ((match = typePattern.exec(source)) !== null) {
+    const iriValue = tokenToIri(match[2], prefixes);
+    if (iriValue) {
+      classes.add(iriValue);
+    }
+  }
+  return classes;
+}
+
+function hasVariablePredicate(source: string): boolean {
+  return /(^|[\s;])\?[A-Za-z_][\w-]*(?=\s)/.test(source);
+}
+
+function tokenToIri(token: string, prefixes: Record<string, string>): string | undefined {
+  if (token === 'a') {
+    return RDF_TYPE;
+  }
+  if (token.startsWith('<') && token.endsWith('>')) {
+    return token.slice(1, -1);
+  }
+
+  const [prefix, local] = token.split(':', 2);
+  const namespace = prefixes[prefix] ?? KNOWN_PREFIXES[prefix];
+  return namespace && local ? namespace + local : undefined;
 }
 
 function qnameAppearsAsPredicate(source: string, qname: string): boolean {
@@ -744,6 +1037,49 @@ function extractPrefixDeclarations(source: string): string[] {
     .split(/\r?\n/)
     .map((line) => line.trimEnd())
     .filter((line) => /^@(prefix|base)\b/i.test(line));
+}
+
+function extractPrefixMap(prefixDeclarations: string[]): Record<string, string> {
+  const prefixes: Record<string, string> = { ...KNOWN_PREFIXES };
+  for (const declaration of prefixDeclarations) {
+    const match = /^@prefix\s+([A-Za-z][\w-]*):\s*<([^>]+)>\s*\.?$/i.exec(declaration.trim());
+    if (match) {
+      prefixes[match[1]] = match[2];
+    }
+  }
+  return prefixes;
+}
+
+function compileLoadShapePlanning(options: LoadOptions): ShapePlanning | undefined {
+  const inputPlan = options.shaclIn
+    ? compileShaclShapeGraph(quadsFromShapeInput(options.shaclIn), 'in')
+    : undefined;
+  const outputPlan = options.shaclOut
+    ? compileShaclShapeGraph(quadsFromShapeInput(options.shaclOut), 'out')
+    : undefined;
+
+  return createShapePlanning(inputPlan, outputPlan);
+}
+
+function quadsFromShapeInput(input: ShaclShapeInput): Quad[] {
+  if (typeof input === 'string') {
+    return parseShapeQuads(input);
+  }
+
+  if ('path' in Object(input) && typeof (input as { path?: unknown }).path === 'string') {
+    return parseShapeQuads(readFileSync((input as { path: string }).path, 'utf8'));
+  }
+
+  if ('quads' in Object(input) && Symbol.iterator in Object((input as { quads?: unknown }).quads)) {
+    return Array.from((input as { quads: Iterable<Quad> }).quads);
+  }
+
+  return quadsFromVocabulary(input as VocabularyDataset);
+}
+
+function parseShapeQuads(source: string): Quad[] {
+  const parsed = new Parser().parse(source) ?? [];
+  return Array.from(parsed as Iterable<unknown>) as Quad[];
 }
 
 function extractTopLevelRuleStatements(source: string): string[] {

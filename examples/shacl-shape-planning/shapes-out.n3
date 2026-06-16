@@ -1,0 +1,19 @@
+@prefix ex:   <https://example.org/shape-planning#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+
+ex:ObservationOutputShape
+  a sh:NodeShape ;
+  sh:property [
+    sh:path sosa:madeBySensor ;
+    sh:maxCount 1
+  ] ;
+  sh:property [
+    sh:path rdf:type ;
+    sh:hasValue sosa:Observation
+  ] ;
+  sh:property [
+    sh:path rdf:type ;
+    sh:hasValue sosa:Sensor
+  ] .

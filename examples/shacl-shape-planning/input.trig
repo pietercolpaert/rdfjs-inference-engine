@@ -1,0 +1,4 @@
+@prefix ex:   <https://example.org/shape-planning#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+
+ex:obs1 ex:observedBy ex:sensor1 .

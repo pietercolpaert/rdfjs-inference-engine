@@ -1,0 +1,14 @@
+@prefix ex:   <https://example.org/shape-planning#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+
+ex:ObservationInputShape
+  a sh:NodeShape ;
+  sh:closed true ;
+  sh:targetClass sosa:ObservationMessage ;
+  sh:property [
+    sh:path ex:observedBy ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
+  ] .

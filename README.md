@@ -79,6 +79,7 @@ function parseToQuads(source: string): Quad[] {
 - `load(profileOrProfiles, vocabularyDataset)` to precompute the static background closure and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset, { runtimeCompiler })` to provide custom compilation for a specific rule profile or ontology language;
 - `load(..., { selectRuntimeRules: false })` to keep the full generic rule profile in the generated runtime when later `infer()` calls may still contain ontology/schema/shape triples;
+- `load(..., { shaclIn, shaclOut })` to use optional trusted SHACL input/output shapes as rule-selection hints. These shapes are optimization contracts only; the engine does not validate incoming data against them;
 - `load(..., { skolemKey })` to make static closure `log:skolem` IRIs deterministic for a project/store key;
 - `saveRuntime(path)` to save that runtime as an N3 file;
 - `infer(quads)` to infer over an array of RDF-JS quads and return a generator of inferred RDF-JS quads;
@@ -168,6 +169,7 @@ All examples are self-contained folders under `examples/`. Each runnable example
 - [examples/complex-path-coverage/README.md](examples/complex-path-coverage/README.md) — SHACL complex paths over OWL 2 RL + SKOS materialization.
 - [examples/shacl-validation/README.md](examples/shacl-validation/README.md) — SHACL Core validation results.
 - [examples/shacl12-grandfather/README.md](examples/shacl12-grandfather/README.md) — SHACL 1.2 validation working with OWL RL classification in the grandfather example.
+- [examples/shacl-shape-planning/README.md](examples/shacl-shape-planning/README.md) — command-line playground for trusted SHACL input/output shape hints.
 - [examples/inconsistency-diagnostics/README.md](examples/inconsistency-diagnostics/README.md) — playground-focused OWL 2 RL inconsistency diagnostics.
 - [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
 - [examples/stateful-materialization/README.md](examples/stateful-materialization/README.md) — stateful RDF Messages materialization across messages.
@@ -340,7 +342,41 @@ markers. Pass `{ selectRuntimeRules: false }` to `load()` if your application or
 conformance test feeds new schema/shape axioms during `infer()` and needs the old
 full-profile runtime. The library itself does not hard-code an ontology language;
 the selection is a conservative compiler pass over the bundled N3 profiles and
-the load-time closure. In production, you still have three common options:
+the load-time closure.
+
+For predictable RDF Messages or input batches, you can pass trusted SHACL shape
+hints to `load()`:
+
+```ts
+reasoner.load(background, {
+   shaclIn: inputShapeQuads,
+   shaclOut: outputShapeQuads,
+});
+```
+
+Both `shaclIn` and `shaclOut` are optional. The default compiler compiles SHACL
+node/property shapes and full SHACL property paths, including inverse, sequence,
+alternative, zero-or-more, one-or-more, zero-or-one, and nested paths. It uses the
+input shape to identify predicates/classes that may occur in future `infer()`
+inputs and the output shape to keep rules that can contribute to the desired
+output predicates/classes. These shapes are trusted optimization contracts only:
+the engine does **not** perform SHACL validation, and non-conforming input may
+produce incomplete or unspecified optimized output. Validate upstream if shape
+conformance is not guaranteed.
+
+The generated runtime includes comments summarizing the compiled shape plan plus
+serialized shape-planning metadata. `saveRuntime()` persists those comments, and
+`new InferenceEngine({ runtime })` / `new InferenceEngine({ runtimePath })`
+restore `getShapePlanning()` metadata without reparsing the original shapes. In
+addition, shape-planned `infer()` calls build per-input temporary indexes only
+for the compiled paths, compact `sh:maxCount 1` path values into scalar record
+slots for diagnostics/planning, drop unrelated message-local facts for trusted
+closed input shapes, and order the retained input quads plus selected runtime
+rules by the SHACL-derived join-order hints. `getLastInputOptimization()` exposes
+the last per-input optimization summary. Pass `{ optimizeShapeInput: false }` to
+`infer()`/`inferAsync()` to bypass this per-input optimization while keeping the
+same generated runtime. In
+production, you still have three common options:
 
 1. emit all newly derived triples and filter downstream;
 2. add project-specific filtering around the RDF-JS quads returned by `infer()`;
@@ -360,7 +396,7 @@ The paper's take-aways map closely to this implementation:
 - **Schema and instance reasoning can be split.** The paper shows that stable ontologies can be materialized once with schema rules, after which cheaper instance rules can be applied repeatedly to incoming data. That is especially relevant for ingest pipelines and streaming RDF Messages workloads.
 - **Conformance tests need interpretation.** The paper notes that many W3C OWL 2 tests listed for OWL 2 RL are not actually covered by the OWL 2 RL rule profile, and that some tests are difficult to check for rule-materialization engines. This repository therefore distinguishes application output from conformance-oriented evaluation.
 
-One of the next optimization steps is using SHACL shapes or representative RDF Messages samples to specialize beyond schema guards and remove rules whose data-side antecedents cannot match the documented input shape.
+SHACL in/out hints are the first implementation of data-shape specialization in this package. The current planner prunes at generated-runtime level; future work can still use the same compiled path/cardinality metadata for per-message temporary index planning, compact message storage, and join-order optimization.
 
 ## Using this pattern in a project
 

@@ -15,6 +15,10 @@ declare module 'bundled-examples' {
     dataFile: string;
     background: string;
     data: string;
+    shaclInFile?: string;
+    shaclOutFile?: string;
+    shaclIn?: string;
+    shaclOut?: string;
   }>;
 }
 
