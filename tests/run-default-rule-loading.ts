@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import type { Quad } from '@rdfjs/types';
 import { Parser } from 'rdf-parser-ts';
 import { InferenceEngine, loadDefaultRuleProfiles, type RuntimeCompilerInput } from '../src';
@@ -34,6 +34,23 @@ assert.deepEqual(
   compilerInput.profiles.map((profile) => profile.label),
   expectedLabels,
   'load(vocabularyDataset) should use every bundled rules/*.n3 file by default.',
+);
+
+const skosProfile = readFileSync('rules/skos-entailment.n3', 'utf8');
+const selectedSkosReasoner = new InferenceEngine();
+selectedSkosReasoner.load(skosProfile, []);
+assert.equal(
+  selectedSkosReasoner.getRuntime().includes('skos:broader'),
+  false,
+  'Default runtime selection should omit an inactive SKOS profile when no SKOS vocabulary is loaded.',
+);
+
+const fullSkosReasoner = new InferenceEngine();
+fullSkosReasoner.load(skosProfile, [], { selectRuntimeRules: false });
+assert.equal(
+  fullSkosReasoner.getRuntime().includes('skos:broader'),
+  true,
+  'selectRuntimeRules: false should preserve the full generic profile for infer-time schema tests.',
 );
 
 const parser = new Parser();

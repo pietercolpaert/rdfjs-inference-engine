@@ -2,7 +2,7 @@
 
 This repository contains a small TypeScript library for doing **generated-runtime materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
 
-The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL, SKOS Core, the W3C-tested SHACL Core validation profile, and the draft SHACL 1.2 Core extension profile.
+The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL, SKOS Core, the SHACL Core validation profile, and the draft SHACL 1.2 Core extension profile.
 
 ## Install
 
@@ -78,6 +78,7 @@ function parseToQuads(source: string): Quad[] {
 - `load(vocabularyDataset)` to load all bundled `rules/*.n3`, precompute the static background closure, and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset)` to precompute the static background closure and load the generated runtime in memory;
 - `load(profileOrProfiles, vocabularyDataset, { runtimeCompiler })` to provide custom compilation for a specific rule profile or ontology language;
+- `load(..., { selectRuntimeRules: false })` to keep the full generic rule profile in the generated runtime when later `infer()` calls may still contain ontology/schema/shape triples;
 - `load(..., { skolemKey })` to make static closure `log:skolem` IRIs deterministic for a project/store key;
 - `saveRuntime(path)` to save that runtime as an N3 file;
 - `infer(quads)` to infer over an array of RDF-JS quads and return a generator of inferred RDF-JS quads;
@@ -322,7 +323,7 @@ This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+S
 
 1. `scripts/run-example.sh` computes the complete static closure of the
    ruleset and background quads, including asserted background triples;
-2. the default compiler creates a generic runtime from the profiles and static closure, or a caller-provided compiler can create optimized profile-specific runtime rules;
+2. the default compiler selects only runtime rules that can still be triggered by incoming data plus the precomputed static closure, or a caller-provided compiler can create optimized profile-specific runtime rules;
 3. it stores the generated runtime in memory;
 4. `saveRuntime()` can persist that runtime as a generated `.n3` file such as `generated/transit-fleet-runtime.n3`;
 5. `infer()` uses only the generated runtime and the incoming RDF
@@ -330,11 +331,16 @@ This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+S
 
 This preprocessing step is a good fit when the ruleset and ontology are stable:
 you can regenerate the compiled runtime file whenever either changes, then reuse
-it for many input runs. The library itself does not know about OWL, RDFS, SHACL,
-SKOS, or any other ontology language. For RDFS in this repository, the entailment
-regime is just another N3 rule file. If you want optimized profile-specific
-runtime generation, pass a `runtimeCompiler` callback. In production, you still have three common
-options:
+it for many input runs. The default runtime compiler assumes that vocabulary,
+ontology, taxonomy, and SHACL shape triples are provided during `load()`, not in
+later `infer()` inputs. It therefore keeps the precomputed static closure, omits
+whole inactive profiles such as SHACL/SKOS when the load-time context cannot use
+them, and drops rules guarded by absent load-time schema predicates or type
+markers. Pass `{ selectRuntimeRules: false }` to `load()` if your application or
+conformance test feeds new schema/shape axioms during `infer()` and needs the old
+full-profile runtime. The library itself does not hard-code an ontology language;
+the selection is a conservative compiler pass over the bundled N3 profiles and
+the load-time closure. In production, you still have three common options:
 
 1. emit all newly derived triples and filter downstream;
 2. add project-specific filtering around the RDF-JS quads returned by `infer()`;
@@ -350,11 +356,11 @@ The paper's take-aways map closely to this implementation:
 - **Always-applicable rules are better treated as axioms/static closure.** The paper separates OWL 2 RL rules without antecedents into axiomatic triples. Here, `load()` precomputes a static background closure once and `getStaticClosure()` exposes it for conformance-style evaluation.
 - **List and n-ary rules often need helper facts.** The paper discusses list-membership helpers, rule instantiation, binarization, and auxiliary rules for constructs such as intersections, unions, property chains, and keys. This repository uses helper predicates internally, but filters those internal OWL 2 RL maintenance triples from application output.
 - **Reflexive `owl:sameAs` should not be blindly materialized.** The paper calls out `eq-ref` as an inefficient rule that can greatly bloat datasets. This engine treats reflexive `owl:sameAs` as a conformance/evaluation concern rather than useful emitted application data.
-- **Rule selection is a compiler opportunity.** MobiBench includes domain-based rule selection: if the ontology or data shape cannot trigger a rule, the rule can be omitted from a specialized ruleset. The generated-runtime architecture in this repository is a natural place to apply the same idea. A future `runtimeCompiler` could use a project ontology, SHACL shapes, or representative RDF Messages samples to prune OWL 2 RL rules whose antecedents cannot match the documented data shape.
+- **Rule selection is a compiler opportunity.** MobiBench includes domain-based rule selection: if the ontology or data shape cannot trigger a rule, the rule can be omitted from a specialized ruleset. The default runtime compiler now applies that idea to the load-time vocabulary/closure: it keeps rules that can still combine with future input data and omits rules whose schema-side guards are absent. A custom `runtimeCompiler` can go further with project-specific data-shape knowledge.
 - **Schema and instance reasoning can be split.** The paper shows that stable ontologies can be materialized once with schema rules, after which cheaper instance rules can be applied repeatedly to incoming data. That is especially relevant for ingest pipelines and streaming RDF Messages workloads.
 - **Conformance tests need interpretation.** The paper notes that many W3C OWL 2 tests listed for OWL 2 RL are not actually covered by the OWL 2 RL rule profile, and that some tests are difficult to check for rule-materialization engines. This repository therefore distinguishes application output from conformance-oriented evaluation.
 
-In one of the next steps, we will thus be looking into allowing to pass a SHACL shape as well in the constructor to generate smaller application-specific runtimes for production pipelines whose data shape is known.
+One of the next optimization steps is using SHACL shapes or representative RDF Messages samples to specialize beyond schema guards and remove rules whose data-side antecedents cannot match the documented input shape.
 
 ## Using this pattern in a project
 

@@ -122,7 +122,7 @@ async function main(): Promise<void> {
   const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
   const outputMode = args.conformance || args.all ? 'conformance' : 'application';
   const prepared = new InferenceEngine({ outputMode });
-  prepared.load(profile, []);
+  prepared.load(profile, [], { selectRuntimeRules: false });
   const runtime = prepared.getRuntime();
   const staticClosure = outputMode === 'conformance' ? prepared.getStaticClosure({ outputMode }) : [];
 

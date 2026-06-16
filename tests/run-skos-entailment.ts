@@ -171,7 +171,7 @@ const TESTS: SkosTestCase[] = [
 function main(): void {
   const profile = readFileSync('rules/skos-entailment.n3', 'utf8');
   const prepared = new InferenceEngine();
-  prepared.load(profile, []);
+  prepared.load(profile, [], { selectRuntimeRules: false });
   const runtime = prepared.getRuntime();
 
   const results: TestResult[] = [];

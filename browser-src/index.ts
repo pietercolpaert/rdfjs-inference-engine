@@ -89,6 +89,7 @@ export interface InferenceStoreOptions {
 export interface LoadOptions {
   runtimeCompiler?: RuntimeCompiler;
   includeStaticClosure?: boolean;
+  selectRuntimeRules?: boolean;
   deterministicSkolem?: boolean;
   skolemKey?: string;
 }
@@ -443,9 +444,12 @@ export async function writeMessages(messages: Iterable<Iterable<Quad>>, prefixes
 
 export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   const sections = ['# Generated inference runtime. Do not edit by hand.'];
+  const runtimeProfileN3 = input.options.selectRuntimeRules === false
+    ? input.profileN3.trimEnd()
+    : compileSelectedRuntimeProfiles(input).trimEnd();
 
-  if (input.profileN3.trim()) {
-    sections.push('', '# Rule profiles', input.profileN3.trimEnd());
+  if (runtimeProfileN3.trim()) {
+    sections.push('', '# Runtime rule profile', runtimeProfileN3);
   }
 
   if (input.options.includeStaticClosure !== false) {
@@ -456,6 +460,345 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   }
 
   return `${sections.join('\n')}\n`;
+}
+
+interface RuntimeRuleSelectionContext {
+  staticPredicates: Set<string>;
+  staticPredicateObjects: Set<string>;
+  staticTerms: Set<string>;
+}
+
+const KNOWN_PREFIXES: Record<string, string> = {
+  rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+  rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
+  owl: 'http://www.w3.org/2002/07/owl#',
+  xsd: 'http://www.w3.org/2001/XMLSchema#',
+  sh: 'http://www.w3.org/ns/shacl#',
+  skos: 'http://www.w3.org/2004/02/skos/core#',
+  shn: SHACLN3,
+  owlrl: OWLRL,
+};
+
+const STATIC_SCHEMA_PREDICATES = [
+  'rdfs:domain',
+  'rdfs:range',
+  'rdfs:subClassOf',
+  'rdfs:subPropertyOf',
+  'owl:equivalentClass',
+  'owl:equivalentProperty',
+  'owl:inverseOf',
+  'owl:propertyChainAxiom',
+  'owl:intersectionOf',
+  'owl:unionOf',
+  'owl:oneOf',
+  'owl:members',
+  'owl:distinctMembers',
+  'owl:hasKey',
+  'owl:onProperty',
+  'owl:onClass',
+  'owl:onDataRange',
+  'owl:someValuesFrom',
+  'owl:allValuesFrom',
+  'owl:hasValue',
+  'owl:maxCardinality',
+  'owl:maxQualifiedCardinality',
+  'owl:complementOf',
+  'owl:disjointWith',
+  'owl:disjointUnionOf',
+  'owl:datatypeComplementOf',
+  'sh:path',
+  'sh:property',
+  'sh:targetNode',
+  'sh:targetClass',
+  'sh:targetSubjectsOf',
+  'sh:targetObjectsOf',
+  'sh:class',
+  'sh:datatype',
+  'sh:minCount',
+  'sh:maxCount',
+  'sh:hasValue',
+  'sh:in',
+  'sh:minInclusive',
+  'sh:minExclusive',
+  'sh:maxInclusive',
+  'sh:maxExclusive',
+  'sh:minLength',
+  'sh:maxLength',
+  'sh:pattern',
+  'sh:node',
+  'sh:and',
+  'sh:or',
+  'sh:not',
+  'sh:xone',
+  'sh:qualifiedValueShape',
+  'sh:qualifiedMinCount',
+  'sh:qualifiedMaxCount',
+  'skos:broader',
+  'skos:narrower',
+  'skos:related',
+  'skos:broaderTransitive',
+  'skos:narrowerTransitive',
+  'skos:hasTopConcept',
+  'skos:topConceptOf',
+  'skos:member',
+  'skos:memberList',
+  'skos:inScheme',
+  'skos:exactMatch',
+  'skos:closeMatch',
+  'skos:broadMatch',
+  'skos:narrowMatch',
+  'skos:relatedMatch',
+];
+
+const STATIC_TYPE_GUARDS = [
+  'owl:FunctionalProperty',
+  'owl:InverseFunctionalProperty',
+  'owl:TransitiveProperty',
+  'owl:SymmetricProperty',
+  'owl:AsymmetricProperty',
+  'owl:IrreflexiveProperty',
+  'owl:AnnotationProperty',
+  'owl:AllDifferent',
+  'owl:AllDisjointClasses',
+  'owl:AllDisjointProperties',
+  'owl:Class',
+  'rdfs:Class',
+  'rdfs:Datatype',
+  'sh:NodeShape',
+  'sh:PropertyShape',
+  'skos:Concept',
+  'skos:ConceptScheme',
+  'skos:Collection',
+  'skos:OrderedCollection',
+];
+
+function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
+  const context = runtimeRuleSelectionContext([...input.vocabulary, ...input.closure]);
+  const sections: string[] = [];
+  let selectedRules = 0;
+  let totalRules = 0;
+
+  for (const profile of input.profiles) {
+    const source = profile.n3.trimEnd();
+    if (!source) {
+      continue;
+    }
+
+    if (!isRuntimeProfileRelevant(profile, context)) {
+      continue;
+    }
+
+    const prefixes = extractPrefixDeclarations(source);
+    const rules = extractTopLevelRuleStatements(source);
+    totalRules += rules.length;
+    const relevantRules = rules.filter((rule) => isRuntimeRuleRelevant(rule, context));
+    selectedRules += relevantRules.length;
+
+    if (relevantRules.length === 0) {
+      continue;
+    }
+
+    if (profile.label) {
+      sections.push(`# Source: ${profile.label}`);
+    }
+    sections.push(...prefixes, '', ...relevantRules);
+  }
+
+  if (sections.length === 0) {
+    return '';
+  }
+
+  return [
+    `# Selected ${selectedRules}/${totalRules} top-level runtime rules for the load-time vocabulary.`,
+    ...sections,
+  ].join('\n');
+}
+
+function runtimeRuleSelectionContext(quads: Iterable<Quad>): RuntimeRuleSelectionContext {
+  const staticPredicates = new Set<string>();
+  const staticPredicateObjects = new Set<string>();
+  const staticTerms = new Set<string>();
+
+  for (const quad of quads) {
+    addTermValue(staticTerms, quad.subject);
+    addTermValue(staticTerms, quad.predicate);
+    addTermValue(staticTerms, quad.object);
+    if (quad.predicate.termType === 'NamedNode') {
+      staticPredicates.add(quad.predicate.value);
+      if (quad.object.termType === 'NamedNode') {
+        staticPredicateObjects.add(`${quad.predicate.value}\t${quad.object.value}`);
+      }
+    }
+  }
+
+  return { staticPredicates, staticPredicateObjects, staticTerms };
+}
+
+function addTermValue(values: Set<string>, term: Term): void {
+  if (term.termType === 'NamedNode') {
+    values.add(term.value);
+  }
+}
+
+function isRuntimeProfileRelevant(profile: LoadedRuleProfile, context: RuntimeRuleSelectionContext): boolean {
+  const label = profile.label ?? '';
+  const source = profile.n3;
+  if (label.includes('shacl') || source.includes('@prefix sh:')) {
+    return hasNamespaceTerm(context, 'http://www.w3.org/ns/shacl#');
+  }
+  if (label.includes('skos') || source.includes('@prefix skos:')) {
+    return hasNamespaceTerm(context, 'http://www.w3.org/2004/02/skos/core#');
+  }
+  return true;
+}
+
+function hasNamespaceTerm(context: RuntimeRuleSelectionContext, namespace: string): boolean {
+  for (const term of context.staticTerms) {
+    if (term.startsWith(namespace)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isRuntimeRuleRelevant(rule: string, context: RuntimeRuleSelectionContext): boolean {
+  const body = runtimeRuleBody(rule);
+
+  for (const qname of STATIC_SCHEMA_PREDICATES) {
+    if (!qnameAppearsAsPredicate(body, qname)) {
+      continue;
+    }
+    const iriValue = qnameToIri(qname);
+    if (iriValue && !context.staticPredicates.has(iriValue)) {
+      return false;
+    }
+  }
+
+  for (const qname of STATIC_TYPE_GUARDS) {
+    if (!qnameAppearsAsTypeObject(body, qname)) {
+      continue;
+    }
+    const iriValue = qnameToIri(qname);
+    if (iriValue && !context.staticPredicateObjects.has(`${RDF_TYPE}\t${iriValue}`)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function runtimeRuleBody(rule: string): string {
+  const forwardIndex = rule.indexOf('=>');
+  const backwardIndex = rule.indexOf('<=');
+  if (forwardIndex >= 0 && (backwardIndex < 0 || forwardIndex < backwardIndex)) {
+    return rule.slice(0, forwardIndex);
+  }
+  if (backwardIndex >= 0) {
+    return rule.slice(backwardIndex + 2);
+  }
+  return rule;
+}
+
+function qnameAppearsAsPredicate(source: string, qname: string): boolean {
+  return new RegExp(`(^|[\\s;])${escapeRegExp(qname)}(?=\\s)`).test(source);
+}
+
+function qnameAppearsAsTypeObject(source: string, qname: string): boolean {
+  return new RegExp(`(^|[\\s;])(?:rdf:type|a)\\s+${escapeRegExp(qname)}(?=[\\s.;])`).test(source);
+}
+
+function qnameToIri(qname: string): string | undefined {
+  const [prefix, local] = qname.split(':', 2);
+  const namespace = KNOWN_PREFIXES[prefix];
+  return namespace ? namespace + local : undefined;
+}
+
+function extractPrefixDeclarations(source: string): string[] {
+  return source
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => /^@(prefix|base)\b/i.test(line));
+}
+
+function extractTopLevelRuleStatements(source: string): string[] {
+  const rules: string[] = [];
+  let ruleStart = -1;
+  let braceDepth = 0;
+  let stringQuote = '';
+  let tripleQuoted = false;
+  let escaped = false;
+  let inComment = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inComment) {
+      if (char === '\n' || char === '\r') {
+        inComment = false;
+      }
+      continue;
+    }
+
+    if (stringQuote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (tripleQuoted && source.startsWith(stringQuote.repeat(3), index)) {
+        index += 2;
+        stringQuote = '';
+        tripleQuoted = false;
+      } else if (!tripleQuoted && char === stringQuote) {
+        stringQuote = '';
+      }
+      continue;
+    }
+
+    if (char === '#') {
+      inComment = true;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      stringQuote = char;
+      tripleQuoted = source.startsWith(char.repeat(3), index);
+      if (tripleQuoted) {
+        index += 2;
+      }
+      continue;
+    }
+
+    if (char === '{') {
+      if (braceDepth === 0 && ruleStart < 0) {
+        ruleStart = index;
+      }
+      braceDepth += 1;
+      continue;
+    }
+
+    if (char === '}') {
+      braceDepth = Math.max(0, braceDepth - 1);
+      continue;
+    }
+
+    if (char === '.' && braceDepth === 0 && ruleStart >= 0) {
+      const statement = source.slice(ruleStart, index + 1).trim();
+      if (statement.includes('=>') || statement.includes('<=')) {
+        rules.push(statement);
+      }
+      ruleStart = -1;
+    }
+  }
+
+  return rules;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function uniqueQuads(quads: Iterable<Quad>): Quad[] {
