@@ -6,5 +6,24 @@ sosa:madeBySensor
   rdfs:domain sosa:Observation ;
   rdfs:range sosa:Sensor .
 
+sosa:resultTime
+  rdfs:domain sosa:Observation .
+
+sosa:hasSimpleResult
+  rdfs:domain sosa:Observation .
+
+sosa:hasFeatureOfInterest
+  rdfs:domain sosa:Observation ;
+  rdfs:range sosa:FeatureOfInterest .
+
 ex:observedBy
   rdfs:subPropertyOf sosa:madeBySensor .
+
+ex:observedAt
+  rdfs:subPropertyOf sosa:resultTime .
+
+ex:temperatureCelsius
+  rdfs:subPropertyOf sosa:hasSimpleResult .
+
+ex:observedFeature
+  rdfs:subPropertyOf sosa:hasFeatureOfInterest .

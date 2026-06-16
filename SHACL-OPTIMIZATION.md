@@ -88,10 +88,28 @@ ex:ObservationInputShape
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI
+  ] ;
+  sh:property [
+    sh:path ex:observedAt ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:dateTime
+  ] ;
+  sh:property [
+    sh:path ex:temperatureCelsius ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:decimal
+  ] ;
+  sh:property [
+    sh:path ex:observedFeature ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
   ] .
 ```
 
-This tells the planner that `ex:observedBy` is a required scalar path and that unrelated message-local predicates may be dropped when the closed shape is trusted.
+This tells the planner that the compact message fields are required scalar paths and that unrelated message-local predicates may be dropped when the closed shape is trusted.
 
 ### 3. Build a combined `ShapePlanning` object
 
@@ -165,43 +183,80 @@ sosa:madeBySensor
   rdfs:domain sosa:Observation ;
   rdfs:range sosa:Sensor .
 
+sosa:resultTime
+  rdfs:domain sosa:Observation .
+
+sosa:hasSimpleResult
+  rdfs:domain sosa:Observation .
+
+sosa:hasFeatureOfInterest
+  rdfs:domain sosa:Observation ;
+  rdfs:range sosa:FeatureOfInterest .
+
 ex:observedBy
   rdfs:subPropertyOf sosa:madeBySensor .
+
+ex:observedAt
+  rdfs:subPropertyOf sosa:resultTime .
+
+ex:temperatureCelsius
+  rdfs:subPropertyOf sosa:hasSimpleResult .
+
+ex:observedFeature
+  rdfs:subPropertyOf sosa:hasFeatureOfInterest .
 ```
 
-The playground input data in [examples/shacl-shape-planning/input.messages.trig](examples/shacl-shape-planning/input.messages.trig) is a ten-message RDF Messages stream. Each message contains one useful observation triple plus one unrelated debug triple:
+The playground input data in [examples/shacl-shape-planning/input.messages.trig](examples/shacl-shape-planning/input.messages.trig) is a twenty-message RDF Messages stream. Each message contains four useful observation facts plus one unrelated debug triple:
 
 ```n3
 VERSION "1.2-messages"
 PREFIX ex:   <https://example.org/shape-planning#>
 PREFIX sosa: <http://www.w3.org/ns/sosa/>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
 
-ex:obs1 ex:observedBy ex:sensor1 .
+ex:obs1 ex:observedBy ex:sensor1 ;
+  ex:observedAt "2026-06-16T10:00:01Z"^^xsd:dateTime ;
+  ex:temperatureCelsius "18.1"^^xsd:decimal ;
+  ex:observedFeature ex:platformA .
 ex:obs1 ex:debugOnly "drop me 1" .
 
 MESSAGE
-ex:obs2 ex:observedBy ex:sensor2 .
+ex:obs2 ex:observedBy ex:sensor2 ;
+  ex:observedAt "2026-06-16T10:00:02Z"^^xsd:dateTime ;
+  ex:temperatureCelsius "18.3"^^xsd:decimal ;
+  ex:observedFeature ex:platformA .
 ex:obs2 ex:debugOnly "drop me 2" .
 
-# ... eight more messages ...
+# ... eighteen more messages ...
 ```
 
-The output shapes in [examples/shacl-shape-planning/shapes-out.n3](examples/shacl-shape-planning/shapes-out.n3) ask for the same inferred output with two validation-realistic node shapes:
+The output shapes in [examples/shacl-shape-planning/shapes-out.n3](examples/shacl-shape-planning/shapes-out.n3) ask for the desired inferred output with validation-realistic node shapes:
 
-- `ex:ObservationOutputShape` targets subjects of `sosa:madeBySensor` and asks for the sensor link plus inferred `rdf:type sosa:Observation`;
+- `ex:ObservationOutputShape` targets subjects of `sosa:madeBySensor` and asks for the sensor link, result time, simple result, feature-of-interest link, plus inferred `rdf:type sosa:Observation`;
 - `ex:SensorOutputShape` targets objects of `sosa:madeBySensor` and asks for inferred `rdf:type sosa:Sensor`.
+- `ex:FeatureOutputShape` targets objects of `sosa:hasFeatureOfInterest` and asks for inferred `rdf:type sosa:FeatureOfInterest`.
 
-That split is more realistic than one output shape that requires the same focus node to be both an observation and a sensor. The engine still uses the shapes as optimization contracts rather than validation inputs, but keeping them validation-plausible makes the example easier to reason about.
+That split is more realistic than one output shape that requires the same focus node to be an observation, a sensor, and a feature of interest. The engine still uses the shapes as optimization contracts rather than validation inputs, but keeping them validation-plausible makes the example easier to reason about.
 
 So the specialized runtime must retain enough OWL/RDFS rules to infer:
 
 ```n3
 ex:obs1 ex:observedBy ex:sensor1 .
 ex:observedBy rdfs:subPropertyOf sosa:madeBySensor .
+ex:obs1 ex:observedAt "2026-06-16T10:00:01Z"^^xsd:dateTime .
+ex:observedAt rdfs:subPropertyOf sosa:resultTime .
+ex:obs1 ex:temperatureCelsius "18.1"^^xsd:decimal .
+ex:temperatureCelsius rdfs:subPropertyOf sosa:hasSimpleResult .
+ex:obs1 ex:observedFeature ex:platformA .
+ex:observedFeature rdfs:subPropertyOf sosa:hasFeatureOfInterest .
 # entails
 ex:obs1 sosa:madeBySensor ex:sensor1 .
+ex:obs1 sosa:resultTime "2026-06-16T10:00:01Z"^^xsd:dateTime .
+ex:obs1 sosa:hasSimpleResult "18.1"^^xsd:decimal .
+ex:obs1 sosa:hasFeatureOfInterest ex:platformA .
 ex:obs1 rdf:type sosa:Observation .
 ex:sensor1 rdf:type sosa:Sensor .
+ex:platformA rdf:type sosa:FeatureOfInterest .
 ```
 
 Run the example:
@@ -227,16 +282,26 @@ It compared three generated runtime modes for the same background ontology:
 2. **Static selected runtime:** `load(background)`.
 3. **SHACL in/out selected runtime:** `load(background, { shaclIn, shaclOut })`.
 
-For reasoning time, the benchmark compared mode 2 and mode 3 on a synthetic input batch:
+For reasoning time, the benchmark compared mode 2 and mode 3 on RDF Messages input, running `infer()` separately for each message, like the command-line and playground example do.
 
-- 1,000 observations;
-- 1 useful triple per observation: `ex:obsN ex:observedBy ex:sensorM`;
-- 5 unrelated debug triples per observation;
-- 6,000 total input quads;
-- 7 measured `infer()` iterations after one warm-up iteration;
-- reported time is median wall-clock time for `Array.from(reasoner.infer(inputQuads))`.
+Two message streams were measured:
 
-The SHACL input shape is closed and only allows `ex:observedBy`, so the shape-aware inference run may drop the 5,000 unrelated debug quads before Eyeling receives the input.
+1. The actual playground example in [examples/shacl-shape-planning/input.messages.trig](examples/shacl-shape-planning/input.messages.trig):
+   - 20 messages;
+   - 5 quads per message;
+   - 4 useful triples per message: sensor, timestamp, simple result, and feature of interest;
+   - 1 unrelated debug triple per message;
+   - 100 total input quads;
+   - 10 measured stream iterations after one warm-up message.
+2. A larger synthetic RDF Messages stream:
+   - 200 messages;
+   - 9 quads per message;
+   - 4 useful triples per message: sensor, timestamp, simple result, and feature of interest;
+   - 5 unrelated debug triples per message;
+   - 1,800 total input quads;
+   - 3 measured stream iterations after one warm-up message.
+
+Reported inference time is the median wall-clock time for processing the full stream, including all per-message `Array.from(reasoner.infer(message))` calls. The SHACL input shape is closed and only allows the compact observation fields, so the shape-aware run may drop unrelated debug quads before each message reaches Eyeling.
 
 ## Benchmark results
 
@@ -244,34 +309,65 @@ The SHACL input shape is closed and only allows `ex:observedBy`, so the shape-aw
 
 | Mode | Compiler-selected top-level rules | Rule-section bytes | Full runtime bytes | Notes |
 | --- | ---: | ---: | ---: | --- |
-| Full generic runtime | all bundled rules | 139,241 | 139,295 | `selectRuntimeRules: false` |
-| Static selected runtime | 72 / 133 | 78,054 | 78,108 | Default load-time vocabulary selection |
-| SHACL in/out selected runtime | 62 / 133 | 76,192 | 95,546 | Shape-guided selection plus embedded shape metadata |
+| Full generic runtime | all bundled rules | 141,635 | 141,689 | `selectRuntimeRules: false` |
+| Static selected runtime | 72 / 133 | 80,448 | 80,502 | Default load-time vocabulary selection |
+| SHACL in/out selected runtime | 62 / 133 | 78,586 | 133,309 | Shape-guided selection plus embedded shape metadata |
 
 Compared with the static selected runtime, the SHACL in/out hints removed 10 of 72 selected top-level rules, a **13.9% rule-count reduction**. The N3 rule-section text became **2.4% smaller**.
 
-Compared with the full generic runtime, the SHACL-guided rule section was **45.3% smaller by bytes**.
+Compared with the full generic runtime, the SHACL-guided rule section was **44.5% smaller by bytes**.
 
 The full runtime file for the SHACL-guided case is larger than the static selected runtime because it embeds URL-encoded shape-planning JSON metadata so saved runtimes can restore `getShapePlanning()` without reparsing the original shapes. If comparing executable rules only, use the rule-section bytes rather than full runtime bytes.
 
-### Reasoning throughput
+### Reasoning throughput: actual twenty-message stream
 
-| Mode | Input quads passed by caller | Quads passed to Eyeling | Dropped quads | Median infer time | Output quads | Speedup |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Static selected runtime | 6,000 | 6,000 | 0 | 9,615.1 ms | 2,050 | 1.0× |
-| SHACL in/out selected runtime | 6,000 | 1,000 | 5,000 | 494.1 ms | 2,050 | 19.5× |
+| Mode | Messages | Input quads passed by caller | Quads passed to Eyeling | Dropped quads | Median stream time | Output quads | Speedup |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Static selected runtime | 20 | 100 | 100 | 0 | 594.6 ms | 140 | 1.0× |
+| SHACL in/out selected runtime | 20 | 100 | 80 | 20 | 394.4 ms | 140 | 1.5× |
 
-The shape-aware run produced the same number of inferred quads for the desired output, while reducing median inference time by **94.9%** in this test.
+The shape-aware run produced the same inferred output while reducing median stream-processing time by **33.7%** for the current playground example.
 
-The last shape-aware run reported:
+The last message optimization summary reported:
 
-- `originalQuadCount`: 6,000;
-- `optimizedQuadCount`: 1,000;
-- `droppedQuadCount`: 5,000;
-- compact records: 1,000;
+- `originalQuadCount`: 5;
+- `optimizedQuadCount`: 4;
+- `droppedQuadCount`: 1;
+- compact records: 1;
 - temporary indexes:
+  - `predicate(https://example.org/shape-planning#observedAt)`;
   - `predicate(https://example.org/shape-planning#observedBy)`;
-  - `subject-predicate(https://example.org/shape-planning#observedBy)`.
+  - `predicate(https://example.org/shape-planning#observedFeature)`;
+  - `predicate(https://example.org/shape-planning#temperatureCelsius)`;
+  - `subject-predicate(https://example.org/shape-planning#observedAt)`;
+  - `subject-predicate(https://example.org/shape-planning#observedBy)`;
+  - `subject-predicate(https://example.org/shape-planning#observedFeature)`;
+  - `subject-predicate(https://example.org/shape-planning#temperatureCelsius)`.
+
+### Reasoning throughput: larger synthetic message stream
+
+| Mode | Messages | Input quads passed by caller | Quads passed to Eyeling | Dropped quads | Median stream time | Output quads | Speedup |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Static selected runtime | 200 | 1,800 | 1,800 | 0 | 5,990.8 ms | 1,400 | 1.0× |
+| SHACL in/out selected runtime | 200 | 1,800 | 800 | 1,000 | 4,143.7 ms | 1,400 | 1.4× |
+
+The shape-aware run again produced the same inferred output while reducing median stream-processing time by **30.8%**. The per-message benchmark is intentionally stricter than a single-batch test: each message has only a few quads, so repeated reasoner invocation overhead dominates more of the total runtime.
+
+The last synthetic-message optimization summary reported:
+
+- `originalQuadCount`: 9;
+- `optimizedQuadCount`: 4;
+- `droppedQuadCount`: 5;
+- compact records: 1;
+- temporary indexes:
+  - `predicate(https://example.org/shape-planning#observedAt)`;
+  - `predicate(https://example.org/shape-planning#observedBy)`;
+  - `predicate(https://example.org/shape-planning#observedFeature)`;
+  - `predicate(https://example.org/shape-planning#temperatureCelsius)`;
+  - `subject-predicate(https://example.org/shape-planning#observedAt)`;
+  - `subject-predicate(https://example.org/shape-planning#observedBy)`;
+  - `subject-predicate(https://example.org/shape-planning#observedFeature)`;
+  - `subject-predicate(https://example.org/shape-planning#temperatureCelsius)`.
 
 ### Load-time measurements
 
@@ -279,8 +375,9 @@ The same benchmark measured load/compile time as:
 
 | Mode | Load time |
 | --- | ---: |
-| Static selected runtime | 487.2 ms |
-| SHACL in/out selected runtime | 299.4 ms |
+| Full generic runtime | 236.3 ms |
+| Static selected runtime | 164.8 ms |
+| SHACL in/out selected runtime | 146.5 ms |
 
 These load-time numbers are more sensitive to noise than the rule-size metrics. Treat them as a local observation, not a guarantee.
 

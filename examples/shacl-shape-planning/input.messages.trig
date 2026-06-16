@@ -3,42 +3,143 @@
 VERSION "1.2-messages"
 PREFIX ex:   <https://example.org/shape-planning#>
 PREFIX sosa: <http://www.w3.org/ns/sosa/>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
 
-ex:obs1 ex:observedBy ex:sensor1 .
+ex:obs1 ex:observedBy ex:sensor1 ;
+	ex:observedAt "2026-06-16T10:00:01Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "18.1"^^xsd:decimal ;
+	ex:observedFeature ex:platformA .
 ex:obs1 ex:debugOnly "drop me 1" .
 
 MESSAGE
-ex:obs2 ex:observedBy ex:sensor2 .
+ex:obs2 ex:observedBy ex:sensor2 ;
+	ex:observedAt "2026-06-16T10:00:02Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "18.3"^^xsd:decimal ;
+	ex:observedFeature ex:platformA .
 ex:obs2 ex:debugOnly "drop me 2" .
 
 MESSAGE
-ex:obs3 ex:observedBy ex:sensor3 .
+ex:obs3 ex:observedBy ex:sensor3 ;
+	ex:observedAt "2026-06-16T10:00:03Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "18.6"^^xsd:decimal ;
+	ex:observedFeature ex:platformB .
 ex:obs3 ex:debugOnly "drop me 3" .
 
 MESSAGE
-ex:obs4 ex:observedBy ex:sensor4 .
+ex:obs4 ex:observedBy ex:sensor4 ;
+	ex:observedAt "2026-06-16T10:00:04Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "18.8"^^xsd:decimal ;
+	ex:observedFeature ex:platformB .
 ex:obs4 ex:debugOnly "drop me 4" .
 
 MESSAGE
-ex:obs5 ex:observedBy ex:sensor5 .
+ex:obs5 ex:observedBy ex:sensor5 ;
+	ex:observedAt "2026-06-16T10:00:05Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "19.0"^^xsd:decimal ;
+	ex:observedFeature ex:platformC .
 ex:obs5 ex:debugOnly "drop me 5" .
 
 MESSAGE
-ex:obs6 ex:observedBy ex:sensor6 .
+ex:obs6 ex:observedBy ex:sensor1 ;
+	ex:observedAt "2026-06-16T10:00:06Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "19.2"^^xsd:decimal ;
+	ex:observedFeature ex:platformC .
 ex:obs6 ex:debugOnly "drop me 6" .
 
 MESSAGE
-ex:obs7 ex:observedBy ex:sensor7 .
+ex:obs7 ex:observedBy ex:sensor2 ;
+	ex:observedAt "2026-06-16T10:00:07Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "19.5"^^xsd:decimal ;
+	ex:observedFeature ex:platformD .
 ex:obs7 ex:debugOnly "drop me 7" .
 
 MESSAGE
-ex:obs8 ex:observedBy ex:sensor8 .
+ex:obs8 ex:observedBy ex:sensor3 ;
+	ex:observedAt "2026-06-16T10:00:08Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "19.7"^^xsd:decimal ;
+	ex:observedFeature ex:platformD .
 ex:obs8 ex:debugOnly "drop me 8" .
 
 MESSAGE
-ex:obs9 ex:observedBy ex:sensor9 .
+ex:obs9 ex:observedBy ex:sensor4 ;
+	ex:observedAt "2026-06-16T10:00:09Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "19.9"^^xsd:decimal ;
+	ex:observedFeature ex:platformE .
 ex:obs9 ex:debugOnly "drop me 9" .
 
 MESSAGE
-ex:obs10 ex:observedBy ex:sensor10 .
+ex:obs10 ex:observedBy ex:sensor5 ;
+	ex:observedAt "2026-06-16T10:00:10Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "20.0"^^xsd:decimal ;
+	ex:observedFeature ex:platformE .
 ex:obs10 ex:debugOnly "drop me 10" .
+
+MESSAGE
+ex:obs11 ex:observedBy ex:sensor1 ;
+	ex:observedAt "2026-06-16T10:00:11Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "20.2"^^xsd:decimal ;
+	ex:observedFeature ex:platformA .
+ex:obs11 ex:debugOnly "drop me 11" .
+
+MESSAGE
+ex:obs12 ex:observedBy ex:sensor2 ;
+	ex:observedAt "2026-06-16T10:00:12Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "20.4"^^xsd:decimal ;
+	ex:observedFeature ex:platformB .
+ex:obs12 ex:debugOnly "drop me 12" .
+
+MESSAGE
+ex:obs13 ex:observedBy ex:sensor3 ;
+	ex:observedAt "2026-06-16T10:00:13Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "20.6"^^xsd:decimal ;
+	ex:observedFeature ex:platformC .
+ex:obs13 ex:debugOnly "drop me 13" .
+
+MESSAGE
+ex:obs14 ex:observedBy ex:sensor4 ;
+	ex:observedAt "2026-06-16T10:00:14Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "20.8"^^xsd:decimal ;
+	ex:observedFeature ex:platformD .
+ex:obs14 ex:debugOnly "drop me 14" .
+
+MESSAGE
+ex:obs15 ex:observedBy ex:sensor5 ;
+	ex:observedAt "2026-06-16T10:00:15Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "21.0"^^xsd:decimal ;
+	ex:observedFeature ex:platformE .
+ex:obs15 ex:debugOnly "drop me 15" .
+
+MESSAGE
+ex:obs16 ex:observedBy ex:sensor1 ;
+	ex:observedAt "2026-06-16T10:00:16Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "21.1"^^xsd:decimal ;
+	ex:observedFeature ex:platformA .
+ex:obs16 ex:debugOnly "drop me 16" .
+
+MESSAGE
+ex:obs17 ex:observedBy ex:sensor2 ;
+	ex:observedAt "2026-06-16T10:00:17Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "21.3"^^xsd:decimal ;
+	ex:observedFeature ex:platformB .
+ex:obs17 ex:debugOnly "drop me 17" .
+
+MESSAGE
+ex:obs18 ex:observedBy ex:sensor3 ;
+	ex:observedAt "2026-06-16T10:00:18Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "21.5"^^xsd:decimal ;
+	ex:observedFeature ex:platformC .
+ex:obs18 ex:debugOnly "drop me 18" .
+
+MESSAGE
+ex:obs19 ex:observedBy ex:sensor4 ;
+	ex:observedAt "2026-06-16T10:00:19Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "21.7"^^xsd:decimal ;
+	ex:observedFeature ex:platformD .
+ex:obs19 ex:debugOnly "drop me 19" .
+
+MESSAGE
+ex:obs20 ex:observedBy ex:sensor5 ;
+	ex:observedAt "2026-06-16T10:00:20Z"^^xsd:dateTime ;
+	ex:temperatureCelsius "21.9"^^xsd:decimal ;
+	ex:observedFeature ex:platformE .
+ex:obs20 ex:debugOnly "drop me 20" .

@@ -2,6 +2,7 @@
 @prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix sh:   <http://www.w3.org/ns/shacl#> .
 @prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 
 ex:ObservationOutputShape
   a sh:NodeShape ;
@@ -9,6 +10,21 @@ ex:ObservationOutputShape
   sh:property [
     sh:path sosa:madeBySensor ;
     sh:maxCount 1
+  ] ;
+  sh:property [
+    sh:path sosa:resultTime ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:dateTime
+  ] ;
+  sh:property [
+    sh:path sosa:hasSimpleResult ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:decimal
+  ] ;
+  sh:property [
+    sh:path sosa:hasFeatureOfInterest ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
   ] ;
   sh:property [
     sh:path rdf:type ;
@@ -21,4 +37,12 @@ ex:SensorOutputShape
   sh:property [
     sh:path rdf:type ;
     sh:hasValue sosa:Sensor
+  ] .
+
+ex:FeatureOutputShape
+  a sh:NodeShape ;
+  sh:targetObjectsOf sosa:hasFeatureOfInterest ;
+  sh:property [
+    sh:path rdf:type ;
+    sh:hasValue sosa:FeatureOfInterest
   ] .

@@ -65,14 +65,34 @@ sosa:madeBySensor
   rdfs:domain sosa:Observation ;
   rdfs:range sosa:Sensor .
 
+sosa:resultTime
+  rdfs:domain sosa:Observation .
+
+sosa:hasSimpleResult
+  rdfs:domain sosa:Observation .
+
+sosa:hasFeatureOfInterest
+  rdfs:domain sosa:Observation ;
+  rdfs:range sosa:FeatureOfInterest .
+
 ex:observedBy
   rdfs:subPropertyOf sosa:madeBySensor .
+
+ex:observedAt
+  rdfs:subPropertyOf sosa:resultTime .
+
+ex:temperatureCelsius
+  rdfs:subPropertyOf sosa:hasSimpleResult .
+
+ex:observedFeature
+  rdfs:subPropertyOf sosa:hasFeatureOfInterest .
 `);
 
 const shaclIn = parseQuads(`
 @prefix ex: <${EX}> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix sosa: <${SOSA}> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 ex:ObservationInputShape
   a sh:NodeShape ;
@@ -80,6 +100,24 @@ ex:ObservationInputShape
   sh:closed true ;
   sh:property [
     sh:path ex:observedBy ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
+  ] ;
+  sh:property [
+    sh:path ex:observedAt ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:dateTime
+  ] ;
+  sh:property [
+    sh:path ex:temperatureCelsius ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:decimal
+  ] ;
+  sh:property [
+    sh:path ex:observedFeature ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI
@@ -91,6 +129,7 @@ const shaclOut = parseQuads(`
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix sosa: <${SOSA}> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 ex:ObservationOutputShape
   a sh:NodeShape ;
@@ -98,6 +137,21 @@ ex:ObservationOutputShape
   sh:property [
     sh:path sosa:madeBySensor ;
     sh:maxCount 1
+  ] ;
+  sh:property [
+    sh:path sosa:resultTime ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:dateTime
+  ] ;
+  sh:property [
+    sh:path sosa:hasSimpleResult ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:decimal
+  ] ;
+  sh:property [
+    sh:path sosa:hasFeatureOfInterest ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
   ] ;
   sh:property [
     sh:path rdf:type ;
@@ -110,6 +164,14 @@ ex:SensorOutputShape
   sh:property [
     sh:path rdf:type ;
     sh:hasValue sosa:Sensor
+  ] .
+
+ex:FeatureOutputShape
+  a sh:NodeShape ;
+  sh:targetObjectsOf sosa:hasFeatureOfInterest ;
+  sh:property [
+    sh:path rdf:type ;
+    sh:hasValue sosa:FeatureOfInterest
   ] .
 `);
 
@@ -132,14 +194,18 @@ assert.deepEqual(
 const inferred = Array.from(reasoner.infer(parseQuads(`
 @prefix ex: <${EX}> .
 @prefix sosa: <${SOSA}> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-ex:obs1 ex:observedBy ex:sensor1 .
+ex:obs1 ex:observedBy ex:sensor1 ;
+  ex:observedAt "2026-06-16T10:00:01Z"^^xsd:dateTime ;
+  ex:temperatureCelsius "18.1"^^xsd:decimal ;
+  ex:observedFeature ex:platformA .
 ex:obs1 ex:debugOnly "drop me" .
 `)));
 const optimization = reasoner.getLastInputOptimization();
 assert.ok(optimization?.enabled, 'Shape-guided infer() should enable per-input optimization.');
-assert.equal(optimization.originalQuadCount, 2, 'Optimization diagnostics should report the original input size.');
-assert.equal(optimization.optimizedQuadCount, 1, 'Closed input shapes should compact away unrelated message-local facts.');
+assert.equal(optimization.originalQuadCount, 5, 'Optimization diagnostics should report the original input size.');
+assert.equal(optimization.optimizedQuadCount, 4, 'Closed input shapes should compact away unrelated message-local facts.');
 assert.equal(optimization.droppedQuadCount, 1, 'Optimization diagnostics should count dropped message-local facts.');
 assert.ok(
   optimization.indexesBuilt.some((index) => index.kind === 'subject-predicate' && index.predicate === EX + 'observedBy'),
@@ -153,6 +219,11 @@ assert.equal(
   optimization.compactRecords[0]?.scalarValues[EX + 'observedBy'],
   EX + 'sensor1',
   'Shape-guided compact storage should store sh:maxCount 1 path values in scalar slots.',
+);
+assert.equal(
+  optimization.compactRecords[0]?.scalarValues[EX + 'observedAt'],
+  '"2026-06-16T10:00:01Z"^^http://www.w3.org/2001/XMLSchema#dateTime',
+  'Shape-guided compact storage should keep scalar timestamp values.',
 );
 assert.ok(
   inferred.some((quad) => quad.subject.value === EX + 'obs1'
@@ -171,6 +242,30 @@ assert.ok(
     && quad.predicate.value === SOSA + 'madeBySensor'
     && quad.object.value === EX + 'sensor1'),
   'Shape-guided runtime should keep variable-head subproperty rules when the output shape asks for the super-property.',
+);
+assert.ok(
+  inferred.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === SOSA + 'resultTime'
+    && quad.object.value === '2026-06-16T10:00:01Z'),
+  'Shape-guided runtime should keep timestamp subproperty rules when the output shape asks for sosa:resultTime.',
+);
+assert.ok(
+  inferred.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === SOSA + 'hasSimpleResult'
+    && quad.object.value === '18.1'),
+  'Shape-guided runtime should keep result subproperty rules when the output shape asks for sosa:hasSimpleResult.',
+);
+assert.ok(
+  inferred.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === SOSA + 'hasFeatureOfInterest'
+    && quad.object.value === EX + 'platformA'),
+  'Shape-guided runtime should keep feature-of-interest subproperty rules when the output shape asks for sosa:hasFeatureOfInterest.',
+);
+assert.ok(
+  inferred.some((quad) => quad.subject.value === EX + 'platformA'
+    && quad.predicate.value === RDF_TYPE
+    && quad.object.value === SOSA + 'FeatureOfInterest'),
+  'Shape-guided runtime should still infer the feature-of-interest type from rdfs:range.',
 );
 
 Array.from(reasoner.infer(parseQuads(`
