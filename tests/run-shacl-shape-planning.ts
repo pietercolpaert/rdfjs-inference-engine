@@ -183,6 +183,7 @@ assert.ok(planning.relevantInputPredicates.includes(EX + 'observedBy'), 'Input s
 assert.ok(planning.relevantOutputPredicates.includes(RDF_TYPE), 'Output shape predicates should guide rule selection.');
 assert.ok(reasoner.getRuntime().includes('SHACL shape hints'), 'Generated runtime should explain that shape hints were used.');
 assert.equal(reasoner.getRuntime().includes('rules/shacl-core-eyeling.n3'), false, 'Optimization shapes should not activate SHACL validation rules by themselves.');
+assert.equal(reasoner.getRuntime().includes('rules/owl2rl-eyeling.n3'), false, 'Shape-guided partial evaluation should avoid retaining generic OWL2RL rules when direct static-ontology rules cover the requested output shape.');
 
 const restoredReasoner = new InferenceEngine({ runtime: reasoner.getRuntime() });
 assert.deepEqual(

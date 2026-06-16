@@ -1,5 +1,4 @@
 @prefix : <https://example.org/transit#>.
 
-:bus-42 a :Vehicle.
+:bus-42 a :Bus, :Vehicle.
 :operator-7 a :Operator.
-:bus-42 a :Bus.

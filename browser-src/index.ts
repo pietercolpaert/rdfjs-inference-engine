@@ -21,6 +21,13 @@ import {
 
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+const RDFS_DOMAIN = 'http://www.w3.org/2000/01/rdf-schema#domain';
+const RDFS_RANGE = 'http://www.w3.org/2000/01/rdf-schema#range';
+const RDFS_SUB_CLASS_OF = 'http://www.w3.org/2000/01/rdf-schema#subClassOf';
+const RDFS_SUB_PROPERTY_OF = 'http://www.w3.org/2000/01/rdf-schema#subPropertyOf';
+const OWL_EQUIVALENT_CLASS = 'http://www.w3.org/2002/07/owl#equivalentClass';
+const OWL_EQUIVALENT_PROPERTY = 'http://www.w3.org/2002/07/owl#equivalentProperty';
+const OWL_INVERSE_OF = 'http://www.w3.org/2002/07/owl#inverseOf';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const LOG_SKOLEM = 'http://www.w3.org/2000/10/swap/log#skolem';
 const SKOLEM_BASE_IRI = 'https://eyereasoner.github.io/.well-known/genid/';
@@ -519,6 +526,7 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
 }
 
 interface RuntimeRuleSelectionContext {
+  staticQuads: Quad[];
   staticPredicates: Set<string>;
   staticPredicateObjects: Set<string>;
   staticClasses: Set<string>;
@@ -532,6 +540,7 @@ interface RuntimeRuleEntry {
   prefixes: string[];
   rule: string;
   metadata: RuntimeRuleMetadata;
+  partialEvaluation?: boolean;
 }
 
 interface RuntimeRuleMetadata {
@@ -540,6 +549,31 @@ interface RuntimeRuleMetadata {
   bodyClasses: Set<string>;
   headClasses: Set<string>;
   hasVariableHeadPredicate: boolean;
+}
+
+type Owl2RlPartialRuleKind =
+  | 'domain'
+  | 'range'
+  | 'subProperty'
+  | 'equivalentPropertyForward'
+  | 'equivalentPropertyBackward'
+  | 'inverseForward'
+  | 'inverseBackward'
+  | 'subClass'
+  | 'equivalentClassForward'
+  | 'equivalentClassBackward';
+
+type StaticOwl2RlFactKind = 'domain' | 'range' | 'subProperty' | 'equivalentProperty' | 'inverse' | 'subClass' | 'equivalentClass';
+
+interface StaticOwl2RlFacts {
+  facts: Record<StaticOwl2RlFactKind, Array<[string, string]>>;
+  hasNonSpecializableFacts: Set<StaticOwl2RlFactKind>;
+}
+
+interface Owl2RlPartialEvaluationResult {
+  entries: RuntimeRuleEntry[];
+  generatedRuleCount: number;
+  replacedRuleCount: number;
 }
 
 const KNOWN_PREFIXES: Record<string, string> = {
@@ -627,6 +661,24 @@ const STATIC_TYPE_GUARDS = [
   'sh:PropertyShape',
 ];
 
+const PARTIAL_EVALUATED_OWL2RL_PROFILE: LoadedRuleProfile = {
+  n3: '',
+  label: 'Partial-evaluated OWL 2 RL rules from static ontology',
+};
+
+const OWL2RL_PARTIAL_RULE_SIGNATURES: Record<Owl2RlPartialRuleKind, string> = {
+  domain: '{?prdfs:domain?c.?x?p?y.}=>{?xrdf:type?c.}.',
+  range: '{?prdfs:range?c.?x?p?y.}=>{?yrdf:type?c.}.',
+  subProperty: '{?p1rdfs:subPropertyOf?p2.?x?p1?y.}=>{?x?p2?y.}.',
+  equivalentPropertyForward: '{?p1owl:equivalentProperty?p2.?x?p1?y.}=>{?x?p2?y.}.',
+  equivalentPropertyBackward: '{?p1owl:equivalentProperty?p2.?x?p2?y.}=>{?x?p1?y.}.',
+  inverseForward: '{?p1owl:inverseOf?p2.?x?p1?y.}=>{?y?p2?x.}.',
+  inverseBackward: '{?p1owl:inverseOf?p2.?x?p2?y.}=>{?y?p1?x.}.',
+  subClass: '{?c1rdfs:subClassOf?c2.?xrdf:type?c1.}=>{?xrdf:type?c2.}.',
+  equivalentClassForward: '{?c1owl:equivalentClass?c2.?xrdf:type?c1.}=>{?xrdf:type?c2.}.',
+  equivalentClassBackward: '{?c1owl:equivalentClass?c2.?xrdf:type?c2.}=>{?xrdf:type?c1.}.',
+};
+
 function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
   const context = runtimeRuleSelectionContext(input.vocabulary, [...input.vocabulary, ...input.closure], input.shapePlanning);
   const entries: RuntimeRuleEntry[] = [];
@@ -654,7 +706,8 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
     }
   }
 
-  const selectedEntries = selectShapeGuidedRuntimeRules(entries, context);
+  const partialEvaluation = partialEvaluateOwl2RlRuntimeRules(entries, context);
+  const selectedEntries = selectShapeGuidedRuntimeRules(partialEvaluation.entries, context);
   const sections = formatRuntimeRuleEntries(selectedEntries);
 
   if (sections.length === 0) {
@@ -662,12 +715,13 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
   }
 
   return [
-    `# Selected ${selectedEntries.length}/${totalRules} top-level runtime rules for the load-time vocabulary${input.shapePlanning ? ' and SHACL shape hints' : ''}.`,
+    `# Selected ${selectedEntries.length}/${totalRules} top-level runtime rules for the load-time vocabulary${input.shapePlanning ? ' and SHACL shape hints' : ''}${partialEvaluation.generatedRuleCount > 0 ? `; partial-evaluated ${partialEvaluation.replacedRuleCount} OWL 2 RL schema rules into ${partialEvaluation.generatedRuleCount} direct data rules` : ''}.`,
     ...sections,
   ].join('\n');
 }
 
 function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: Iterable<Quad>, shapePlanning?: ShapePlanning): RuntimeRuleSelectionContext {
+  const staticQuadList = Array.from(staticQuads);
   const staticPredicates = new Set<string>();
   const staticPredicateObjects = new Set<string>();
   const staticClasses = new Set<string>();
@@ -680,7 +734,7 @@ function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: It
     addTermValue(inputTerms, quad.object);
   }
 
-  for (const quad of staticQuads) {
+  for (const quad of staticQuadList) {
     addTermValue(staticTerms, quad.subject);
     addTermValue(staticTerms, quad.predicate);
     addTermValue(staticTerms, quad.object);
@@ -695,7 +749,177 @@ function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: It
     }
   }
 
-  return { staticPredicates, staticPredicateObjects, staticClasses, staticTerms, inputTerms, shapePlanning };
+  return { staticQuads: staticQuadList, staticPredicates, staticPredicateObjects, staticClasses, staticTerms, inputTerms, shapePlanning };
+}
+
+function partialEvaluateOwl2RlRuntimeRules(entries: RuntimeRuleEntry[], context: RuntimeRuleSelectionContext): Owl2RlPartialEvaluationResult {
+  const staticFacts = collectStaticOwl2RlFacts(context.staticQuads, context.inputTerms);
+  const specializedEntries: RuntimeRuleEntry[] = [];
+  let generatedRuleCount = 0;
+  let replacedRuleCount = 0;
+
+  for (const entry of entries) {
+    const kind = partialOwl2RlRuleKind(entry.rule);
+    if (!kind) {
+      specializedEntries.push(entry);
+      continue;
+    }
+
+    const replacements = specializedOwl2RlEntries(kind, staticFacts);
+    if (replacements.length === 0) {
+      specializedEntries.push(entry);
+      continue;
+    }
+
+    specializedEntries.push(...replacements);
+    generatedRuleCount += replacements.length;
+    replacedRuleCount += 1;
+  }
+
+  return { entries: specializedEntries, generatedRuleCount, replacedRuleCount };
+}
+
+function collectStaticOwl2RlFacts(staticQuads: Quad[], loadTimeTerms: Set<string>): StaticOwl2RlFacts {
+  const facts: StaticOwl2RlFacts['facts'] = {
+    domain: [],
+    range: [],
+    subProperty: [],
+    equivalentProperty: [],
+    inverse: [],
+    subClass: [],
+    equivalentClass: [],
+  };
+  const seen = new Set<string>();
+  const hasNonSpecializableFacts = new Set<StaticOwl2RlFactKind>();
+
+  for (const quad of staticQuads) {
+    if (quad.graph.termType !== 'DefaultGraph' || quad.predicate.termType !== 'NamedNode') {
+      continue;
+    }
+
+    const kind = staticOwl2RlFactKind(quad.predicate.value);
+    if (!kind) {
+      continue;
+    }
+
+    if (quad.subject.termType !== 'NamedNode' || quad.object.termType !== 'NamedNode') {
+      hasNonSpecializableFacts.add(kind);
+      continue;
+    }
+
+    if (!loadTimeTerms.has(quad.subject.value) || !loadTimeTerms.has(quad.object.value)) {
+      continue;
+    }
+
+    if (quad.subject.value === quad.object.value && kind !== 'domain' && kind !== 'range') {
+      continue;
+    }
+
+    const key = `${kind}\t${quad.subject.value}\t${quad.object.value}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      facts[kind].push([quad.subject.value, quad.object.value]);
+    }
+  }
+
+  for (const values of Object.values(facts)) {
+    values.sort(([leftSubject, leftObject], [rightSubject, rightObject]) => leftSubject.localeCompare(rightSubject) || leftObject.localeCompare(rightObject));
+  }
+
+  return { facts, hasNonSpecializableFacts };
+}
+
+function staticOwl2RlFactKind(predicate: string): StaticOwl2RlFactKind | undefined {
+  switch (predicate) {
+    case RDFS_DOMAIN:
+      return 'domain';
+    case RDFS_RANGE:
+      return 'range';
+    case RDFS_SUB_PROPERTY_OF:
+      return 'subProperty';
+    case OWL_EQUIVALENT_PROPERTY:
+      return 'equivalentProperty';
+    case OWL_INVERSE_OF:
+      return 'inverse';
+    case RDFS_SUB_CLASS_OF:
+      return 'subClass';
+    case OWL_EQUIVALENT_CLASS:
+      return 'equivalentClass';
+    default:
+      return undefined;
+  }
+}
+
+function partialOwl2RlRuleKind(rule: string): Owl2RlPartialRuleKind | undefined {
+  const normalized = normalizeRuntimeRule(rule);
+  for (const [kind, signature] of Object.entries(OWL2RL_PARTIAL_RULE_SIGNATURES) as Array<[Owl2RlPartialRuleKind, string]>) {
+    if (normalized === signature) {
+      return kind;
+    }
+  }
+  return undefined;
+}
+
+function specializedOwl2RlEntries(kind: Owl2RlPartialRuleKind, staticFacts: StaticOwl2RlFacts): RuntimeRuleEntry[] {
+  const factKind = partialRuleFactKind(kind);
+  if (staticFacts.hasNonSpecializableFacts.has(factKind)) {
+    return [];
+  }
+
+  return staticFacts.facts[factKind].map((fact) => partialEvaluatedRuleEntry(specializedOwl2RlRule(kind, fact)));
+}
+
+function partialRuleFactKind(kind: Owl2RlPartialRuleKind): StaticOwl2RlFactKind {
+  switch (kind) {
+    case 'equivalentPropertyForward':
+    case 'equivalentPropertyBackward':
+      return 'equivalentProperty';
+    case 'inverseForward':
+    case 'inverseBackward':
+      return 'inverse';
+    case 'equivalentClassForward':
+    case 'equivalentClassBackward':
+      return 'equivalentClass';
+    default:
+      return kind;
+  }
+}
+
+function specializedOwl2RlRule(kind: Owl2RlPartialRuleKind, [left, right]: [string, string]): string {
+  switch (kind) {
+    case 'domain':
+      return `{ ?x ${iri(left)} ?y . }\n=> { ?x ${iri(RDF_TYPE)} ${iri(right)} . } .`;
+    case 'range':
+      return `{ ?x ${iri(left)} ?y . }\n=> { ?y ${iri(RDF_TYPE)} ${iri(right)} . } .`;
+    case 'subProperty':
+    case 'equivalentPropertyForward':
+      return `{ ?x ${iri(left)} ?y . }\n=> { ?x ${iri(right)} ?y . } .`;
+    case 'equivalentPropertyBackward':
+      return `{ ?x ${iri(right)} ?y . }\n=> { ?x ${iri(left)} ?y . } .`;
+    case 'inverseForward':
+      return `{ ?x ${iri(left)} ?y . }\n=> { ?y ${iri(right)} ?x . } .`;
+    case 'inverseBackward':
+      return `{ ?x ${iri(right)} ?y . }\n=> { ?y ${iri(left)} ?x . } .`;
+    case 'subClass':
+    case 'equivalentClassForward':
+      return `{ ?x ${iri(RDF_TYPE)} ${iri(left)} . }\n=> { ?x ${iri(RDF_TYPE)} ${iri(right)} . } .`;
+    case 'equivalentClassBackward':
+      return `{ ?x ${iri(RDF_TYPE)} ${iri(right)} . }\n=> { ?x ${iri(RDF_TYPE)} ${iri(left)} . } .`;
+  }
+}
+
+function partialEvaluatedRuleEntry(rule: string): RuntimeRuleEntry {
+  return {
+    profile: PARTIAL_EVALUATED_OWL2RL_PROFILE,
+    prefixes: [],
+    rule,
+    metadata: extractRuntimeRuleMetadata(rule, KNOWN_PREFIXES),
+    partialEvaluation: true,
+  };
+}
+
+function normalizeRuntimeRule(rule: string): string {
+  return rule.replace(/\s+/g, '');
 }
 
 function addTermValue(values: Set<string>, term: Term): void {
@@ -833,7 +1057,10 @@ function outputRelevantRuleEntries(entries: RuntimeRuleEntry[], planning: ShapeP
   while (changed) {
     changed = false;
     for (const [index, entry] of entries.entries()) {
-      if (needed.has(index) || !ruleProducesDesiredOutput(entry.metadata, desiredPredicates, desiredClasses)) {
+      if (needed.has(index)) {
+        continue;
+      }
+      if (!entry.partialEvaluation && !ruleProducesDesiredOutput(entry.metadata, desiredPredicates, desiredClasses)) {
         continue;
       }
       needed.add(index);
@@ -866,7 +1093,7 @@ function ruleCanMatchKnownInput(metadata: RuntimeRuleMetadata, availablePredicat
 }
 
 function ruleProducesDesiredOutput(metadata: RuntimeRuleMetadata, desiredPredicates: Set<string>, desiredClasses: Set<string>): boolean {
-  if (metadata.hasVariableHeadPredicate && desiredPredicates.size > 0) {
+  if (metadata.hasVariableHeadPredicate && desiredPredicates.size > 0 && desiredClasses.size === 0) {
     return true;
   }
 
@@ -875,6 +1102,9 @@ function ruleProducesDesiredOutput(metadata: RuntimeRuleMetadata, desiredPredica
   }
 
   for (const predicate of metadata.headPredicates) {
+    if (predicate === RDF_TYPE && desiredClasses.size > 0) {
+      continue;
+    }
     if (desiredPredicates.has(predicate)) {
       return true;
     }
@@ -964,7 +1194,7 @@ function extractPredicateIris(source: string, prefixes: Record<string, string>):
 
 function extractTypeObjectIris(source: string, prefixes: Record<string, string>): Set<string> {
   const classes = new Set<string>();
-  const typePattern = /(^|[\s;])(?:rdf:type|a)\s+((?:[A-Za-z][\w-]*:[^\s;,.()[\]{}]+)|<[^>]+>)/g;
+  const typePattern = /(^|[\s;])(?:rdf:type|a|<http:\/\/www\.w3\.org\/1999\/02\/22-rdf-syntax-ns#type>)\s+((?:[A-Za-z][\w-]*:[^\s;,.()[\]{}]+)|<[^>]+>)/g;
   let match: RegExpExecArray | null;
   while ((match = typePattern.exec(source)) !== null) {
     const iriValue = tokenToIri(match[2], prefixes);

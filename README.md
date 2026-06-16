@@ -325,7 +325,7 @@ This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+S
 
 1. `scripts/run-example.sh` computes the complete static closure of the
    ruleset and background quads, including asserted background triples;
-2. the default compiler selects only runtime rules that can still be triggered by incoming data plus the precomputed static closure, or a caller-provided compiler can create optimized profile-specific runtime rules;
+2. the default compiler selects only runtime rules that can still be triggered by incoming data plus the precomputed static closure, partial-evaluates common OWL 2 RL schema/data joins such as static `rdfs:domain`, `rdfs:range`, `rdfs:subPropertyOf`, `rdfs:subClassOf`, `owl:equivalentProperty`, `owl:equivalentClass`, and `owl:inverseOf` facts into direct data rules, or a caller-provided compiler can create optimized profile-specific runtime rules;
 3. it stores the generated runtime in memory;
 4. `saveRuntime()` can persist that runtime as a generated `.n3` file such as `generated/transit-fleet-runtime.n3`;
 5. `infer()` uses only the generated runtime and the incoming RDF
@@ -337,7 +337,7 @@ it for many input runs. The default runtime compiler assumes that vocabulary,
 ontology, taxonomy, and SHACL shape triples are provided during `load()`, not in
 later `infer()` inputs. It therefore keeps the precomputed static closure, omits
 whole inactive profiles such as SHACL/SKOS when the load-time context cannot use
-them, and drops rules guarded by absent load-time schema predicates or type
+them, turns known static OWL 2 RL ontology facts into direct predicate/class rules for incoming data, and drops rules guarded by absent load-time schema predicates or type
 markers. Pass `{ selectRuntimeRules: false }` to `load()` if your application or
 conformance test feeds new schema/shape axioms during `infer()` and needs the old
 full-profile runtime. The library itself does not hard-code an ontology language;

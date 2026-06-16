@@ -80,6 +80,96 @@ assert.ok(
   'Browser-style bundled profile loading should retain SKOS rules for SKOS predicates that arrive in infer() data.',
 );
 
+const partialOwlReasoner = new InferenceEngine();
+partialOwlReasoner.load(
+  loadDefaultRuleProfiles(),
+  parseQuads(`
+@prefix ex: <https://example.org/test#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:inputProperty rdfs:subPropertyOf ex:normalizedProperty .
+ex:normalizedProperty
+  rdfs:domain ex:NormalizedSubject ;
+  rdfs:range ex:NormalizedObject .
+ex:Child rdfs:subClassOf ex:Parent .
+ex:leftProperty owl:inverseOf ex:rightProperty .
+`),
+);
+const partialOwlRuntime = partialOwlReasoner.getRuntime();
+assert.equal(
+  partialOwlRuntime.includes('{ ?p rdfs:domain ?c .\n  ?x ?p ?y . }\n=> { ?x rdf:type ?c . } .'),
+  false,
+  'Default runtime selection should replace generic OWL2RL domain joins with direct rules for static ontology facts.',
+);
+assert.ok(
+  partialOwlRuntime.includes('{ ?x <https://example.org/test#normalizedProperty> ?y . }\n=> { ?x <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://example.org/test#NormalizedSubject> . } .'),
+  'Static rdfs:domain facts should compile to direct predicate-to-class rules.',
+);
+assert.ok(
+  partialOwlRuntime.includes('{ ?x <https://example.org/test#inputProperty> ?y . }\n=> { ?x <https://example.org/test#normalizedProperty> ?y . } .'),
+  'Static rdfs:subPropertyOf facts should compile to direct predicate-to-predicate rules.',
+);
+assert.ok(
+  partialOwlRuntime.includes('partial-evaluated'),
+  'Generated runtime summary should mention OWL2RL partial evaluation when it is applied.',
+);
+
+const partialOwlOutput = Array.from(partialOwlReasoner.infer(parseQuads(`
+@prefix ex: <https://example.org/test#> .
+
+ex:subject ex:inputProperty ex:object ;
+  ex:leftProperty ex:target ;
+  a ex:Child .
+`)));
+assert.ok(
+  partialOwlOutput.some((quad) => quad.subject.value === 'https://example.org/test#subject'
+    && quad.predicate.value === 'https://example.org/test#normalizedProperty'
+    && quad.object.value === 'https://example.org/test#object'),
+  'Partial-evaluated subproperty rules should still derive normalized data predicates.',
+);
+assert.ok(
+  partialOwlOutput.some((quad) => quad.subject.value === 'https://example.org/test#subject'
+    && quad.predicate.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+    && quad.object.value === 'https://example.org/test#NormalizedSubject'),
+  'Partial-evaluated domain rules should still classify subjects.',
+);
+assert.ok(
+  partialOwlOutput.some((quad) => quad.subject.value === 'https://example.org/test#object'
+    && quad.predicate.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+    && quad.object.value === 'https://example.org/test#NormalizedObject'),
+  'Partial-evaluated range rules should still classify objects.',
+);
+assert.ok(
+  partialOwlOutput.some((quad) => quad.subject.value === 'https://example.org/test#subject'
+    && quad.predicate.value === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+    && quad.object.value === 'https://example.org/test#Parent'),
+  'Partial-evaluated subclass rules should still classify subclass instances.',
+);
+assert.ok(
+  partialOwlOutput.some((quad) => quad.subject.value === 'https://example.org/test#target'
+    && quad.predicate.value === 'https://example.org/test#rightProperty'
+    && quad.object.value === 'https://example.org/test#subject'),
+  'Partial-evaluated inverse-property rules should still derive inverse triples.',
+);
+
+const fullOwlReasoner = new InferenceEngine();
+fullOwlReasoner.load(
+  loadDefaultRuleProfiles(),
+  parseQuads(`
+@prefix ex: <https://example.org/test#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:runtimeSchemaProperty rdfs:domain ex:RuntimeClass .
+`),
+  { selectRuntimeRules: false },
+);
+assert.equal(
+  fullOwlReasoner.getRuntime().includes('{ ?p rdfs:domain ?c .\n  ?x ?p ?y . }\n=> { ?x rdf:type ?c . } .'),
+  true,
+  'selectRuntimeRules: false should preserve the full generic OWL2RL profile without partial evaluation.',
+);
+
 const disjointReasoner = new InferenceEngine();
 disjointReasoner.load(
   loadDefaultRuleProfiles(),
