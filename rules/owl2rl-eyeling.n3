@@ -968,6 +968,20 @@ owl:Nothing rdf:type owl:Class .
 => { ?lt rdf:type xsd:string ;
          rdf:type rdfs:Literal . } .
 
+# xsd:string value difference is still needed for OWL 2 RL tests such as
+# rdfbased-dat-dtype-string-diff. Keep it scoped to explicit owl:sameAs links
+# instead of relying on dt:datatype to also report rdfs:Literal for strings or
+# indexing every string literal into the generic quadratic dt-diff helper.
+#
+# See also https://github.com/pietercolpaert/rdfjs-inference-engine/issues/3
+#
+{ ?x owl:sameAs ?lt1 .
+  ?y owl:sameAs ?lt2 .
+  ?lt1 dt:datatype xsd:string .
+  ?lt2 dt:datatype xsd:string .
+  ?lt1 dt:differentValueFrom ?lt2 . }
+=> { ?x owl:differentFrom ?y . } .
+
 { ?s ?p ?lt .
   ?lt dt:datatype rdf:langString . }
 => { ?lt rdf:type rdf:langString ;
