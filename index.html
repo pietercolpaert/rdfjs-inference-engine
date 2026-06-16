@@ -360,6 +360,11 @@
       font-size: 0.85rem;
     }
 
+    .generated-runtime .CodeMirror {
+      height: 24rem;
+      font-size: 0.78rem;
+    }
+
     .shape-hint-editor .CodeMirror {
       height: 14rem;
       font-size: 0.82rem;
@@ -533,6 +538,13 @@
         <h2 class="section-title">Output</h2>
         <p class="meta">Newly inferred triples.</p>
         <textarea id="outputText" spellcheck="false"></textarea>
+        <details id="generatedRuntimePanel" class="advanced-panel generated-runtime" hidden>
+          <summary>Advanced: View generated N3 runtime</summary>
+          <div class="advanced-panel-body">
+            <p class="meta">The generated N3 runtime is shown after inference compiles the selected rule profiles, background knowledge, and optional SHACL in/out hints. This is the exact runtime text passed to Eyeling in the browser.</p>
+            <textarea id="generatedRuntimeText" spellcheck="false" readonly></textarea>
+          </div>
+        </details>
       </section>
     </main>
   </div>

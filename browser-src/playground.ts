@@ -13,6 +13,7 @@ type Editor = {
   getLine?(line: number): string;
   refresh(): void;
   on(event: string, listener: () => void): void;
+  setOption?(option: string, value: unknown): void;
 };
 
 type PlaygroundState = {
@@ -75,7 +76,7 @@ type WorkerRequest = {
 
 type WorkerMessage =
   | { type: 'status'; message: string }
-  | { type: 'runtime'; message: string }
+  | { type: 'runtime'; message: string; runtime?: string }
   | { type: 'append'; chunk: string }
   | { type: 'result'; output?: string; status: string }
   | { type: 'error'; message: string };
@@ -95,6 +96,8 @@ const editors = {
   outputText: createEditor('outputText', ''),
 };
 
+const generatedRuntimeEditor = createEditor('generatedRuntimeText', '', { readOnly: true });
+
 const controls = {
   exampleSelect: getSelect('exampleSelect'),
   backgroundMode: getSelect('backgroundMode'),
@@ -107,6 +110,7 @@ const controls = {
   dataUrlPanel: getElement('dataUrlPanel'),
   dataTextPanel: getElement('dataTextPanel'),
   shapeHintsPanel: getElement('shapeHintsPanel') as HTMLDetailsElement,
+  generatedRuntimePanel: getElement('generatedRuntimePanel') as HTMLDetailsElement,
   runButton: getButton('runButton'),
   stopButton: getButton('stopButton'),
   resetButton: getButton('resetButton'),
@@ -132,7 +136,7 @@ scheduleStateUpdate();
 setRunning(false);
 setStatus('Ready. Choose an example, URL, or text input, then run inference.');
 
-function createEditor(id: string, value: string): Editor {
+function createEditor(id: string, value: string, options: Record<string, unknown> = {}): Editor {
   const textarea = document.getElementById(id) as HTMLTextAreaElement | null;
   if (!textarea) {
     throw new Error(`Missing textarea #${id}`);
@@ -144,7 +148,20 @@ function createEditor(id: string, value: string): Editor {
     lineWrapping: true,
     tabSize: 2,
     viewportMargin: Infinity,
+    ...options,
   });
+}
+
+function hideGeneratedRuntime(): void {
+  generatedRuntimeEditor.setValue('');
+  controls.generatedRuntimePanel.open = false;
+  controls.generatedRuntimePanel.hidden = true;
+}
+
+function showGeneratedRuntime(runtime: string): void {
+  generatedRuntimeEditor.setValue(runtime);
+  controls.generatedRuntimePanel.hidden = false;
+  window.setTimeout(() => generatedRuntimeEditor.refresh(), 0);
 }
 
 function wireControls(): void {
@@ -173,6 +190,9 @@ function wireControls(): void {
       editors.shaclOutText.refresh();
     }, 0);
   });
+  controls.generatedRuntimePanel.addEventListener('toggle', () => {
+    window.setTimeout(() => generatedRuntimeEditor.refresh(), 0);
+  });
   for (const input of [controls.backgroundUrl, controls.dataUrl]) {
     input.addEventListener('input', scheduleStateUpdate);
   }
@@ -191,6 +211,7 @@ async function runInference(): Promise<void> {
     setRunning(true);
     controls.runtimeStats.textContent = '';
     controls.runtimeStats.hidden = true;
+    hideGeneratedRuntime();
     clearOutputAppendBuffer();
     startElapsedCounter(run);
     editors.outputText.setValue('');
@@ -268,6 +289,9 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
         setRunStatus(run, message.message);
       } else if (message.type === 'runtime') {
         run.runtimeMessage = message.message;
+        if (message.runtime !== undefined) {
+          showGeneratedRuntime(message.runtime);
+        }
         updateElapsedCounter(run);
       } else if (message.type === 'append') {
         appendOutput(message.chunk);
@@ -349,7 +373,7 @@ self.onmessage = async (event) => {
     const runtime = reasoner.load(ruleProfiles, background.quads, Object.keys(loadOptions).length ? loadOptions : undefined);
     const compiledAt = performance.now();
     const shapeHintSummary = (request.shaclInSource || request.shaclOutSource) ? ' · SHACL hints ' + [request.shaclInSource ? 'in' : '', request.shaclOutSource ? 'out' : ''].filter(Boolean).join('/') : '';
-    self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + shapeHintSummary + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB' });
+    self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + shapeHintSummary + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB', runtime });
 
     await processInputData(api, reasoner, request, compiledAt, started);
   } catch (error) {
