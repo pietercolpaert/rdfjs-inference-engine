@@ -94,6 +94,7 @@ const shaclOut = parseQuads(`
 
 ex:ObservationOutputShape
   a sh:NodeShape ;
+  sh:targetSubjectsOf sosa:madeBySensor ;
   sh:property [
     sh:path sosa:madeBySensor ;
     sh:maxCount 1
@@ -101,7 +102,11 @@ ex:ObservationOutputShape
   sh:property [
     sh:path rdf:type ;
     sh:hasValue sosa:Observation
-  ] ;
+  ] .
+
+ex:SensorOutputShape
+  a sh:NodeShape ;
+  sh:targetObjectsOf sosa:madeBySensor ;
   sh:property [
     sh:path rdf:type ;
     sh:hasValue sosa:Sensor

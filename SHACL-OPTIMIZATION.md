@@ -186,11 +186,12 @@ ex:obs2 ex:debugOnly "drop me 2" .
 # ... eight more messages ...
 ```
 
-The output shape in [examples/shacl-shape-planning/shapes-out.n3](examples/shacl-shape-planning/shapes-out.n3) asks for:
+The output shapes in [examples/shacl-shape-planning/shapes-out.n3](examples/shacl-shape-planning/shapes-out.n3) ask for the same inferred output with two validation-realistic node shapes:
 
-- `sosa:madeBySensor` links;
-- inferred `rdf:type sosa:Observation`;
-- inferred `rdf:type sosa:Sensor`.
+- `ex:ObservationOutputShape` targets subjects of `sosa:madeBySensor` and asks for the sensor link plus inferred `rdf:type sosa:Observation`;
+- `ex:SensorOutputShape` targets objects of `sosa:madeBySensor` and asks for inferred `rdf:type sosa:Sensor`.
+
+That split is more realistic than one output shape that requires the same focus node to be both an observation and a sensor. The engine still uses the shapes as optimization contracts rather than validation inputs, but keeping them validation-plausible makes the example easier to reason about.
 
 So the specialized runtime must retain enough OWL/RDFS rules to infer:
 

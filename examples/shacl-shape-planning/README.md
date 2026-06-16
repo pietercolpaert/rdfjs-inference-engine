@@ -9,7 +9,7 @@ Files:
 - `ontology.n3` — tiny RDFS background ontology.
 - `input.messages.trig` — ten-message RDF Messages stream to infer over.
 - `shapes-in.n3` — trusted input shape contract.
-- `shapes-out.n3` — trusted output shape contract.
+- `shapes-out.n3` — trusted output shape contract, split into observation and sensor node shapes.
 - `run.ts` — command-line playground.
 
 Run it from the repository root:
