@@ -169,10 +169,21 @@ ex:observedBy
   rdfs:subPropertyOf sosa:madeBySensor .
 ```
 
-The input data contains observations using the application predicate:
+The playground input data in [examples/shacl-shape-planning/input.messages.trig](examples/shacl-shape-planning/input.messages.trig) is a ten-message RDF Messages stream. Each message contains one useful observation triple plus one unrelated debug triple:
 
 ```n3
+VERSION "1.2-messages"
+PREFIX ex:   <https://example.org/shape-planning#>
+PREFIX sosa: <http://www.w3.org/ns/sosa/>
+
 ex:obs1 ex:observedBy ex:sensor1 .
+ex:obs1 ex:debugOnly "drop me 1" .
+
+MESSAGE
+ex:obs2 ex:observedBy ex:sensor2 .
+ex:obs2 ex:debugOnly "drop me 2" .
+
+# ... eight more messages ...
 ```
 
 The output shape in [examples/shacl-shape-planning/shapes-out.n3](examples/shacl-shape-planning/shapes-out.n3) asks for:

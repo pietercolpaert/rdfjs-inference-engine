@@ -7,7 +7,7 @@ The shapes are **not** used for SHACL validation. They describe the expected inc
 Files:
 
 - `ontology.n3` — tiny RDFS background ontology.
-- `input.trig` — input data to infer over.
+- `input.messages.trig` — ten-message RDF Messages stream to infer over.
 - `shapes-in.n3` — trusted input shape contract.
 - `shapes-out.n3` — trusted output shape contract.
 - `run.ts` — command-line playground.
