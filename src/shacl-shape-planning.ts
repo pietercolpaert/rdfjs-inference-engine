@@ -129,6 +129,12 @@ export interface ShapeInputOptimization {
   quads: Quad[];
 }
 
+interface OutputProjectionPlan {
+  allowedPredicates: Set<string>;
+  unconstrainedPredicates: Set<string>;
+  allowedObjectsByPredicate: Map<string, Set<string>>;
+}
+
 interface ShapeGraphIndex {
   bySubjectPredicate: Map<string, Term[]>;
 }
@@ -235,6 +241,20 @@ export function optimizeInputWithShapePlanning(quads: Iterable<Quad>, planning: 
   };
 }
 
+export function projectOutputWithShapePlanning(quads: Iterable<Quad>, planning: ShapePlanning | undefined): Quad[] {
+  const outputQuads = Array.from(quads);
+  if (!planning?.output) {
+    return outputQuads;
+  }
+
+  const projection = outputProjectionPlan(planning.output);
+  if (projection.allowedPredicates.size === 0) {
+    return outputQuads;
+  }
+
+  return outputQuads.filter((quad) => outputQuadMatchesProjection(quad, projection));
+}
+
 export function parseShapePlanningFromRuntime(runtime: string): ShapePlanning | undefined {
   const match = /^# rdfjs-inference-engine shapePlanning=(.+)$/m.exec(runtime);
   if (!match) {
@@ -247,6 +267,52 @@ export function parseShapePlanningFromRuntime(runtime: string): ShapePlanning | 
   } catch {
     return undefined;
   }
+}
+
+function outputProjectionPlan(plan: ShapeGraphPlan): OutputProjectionPlan {
+  const allowedPredicates = new Set<string>();
+  const unconstrainedPredicates = new Set<string>();
+  const allowedObjectsByPredicate = new Map<string, Set<string>>();
+
+  for (const shape of plan.shapes) {
+    for (const property of shape.propertyPlans) {
+      const objectConstraints = [...property.hasValues, ...property.inValues];
+      for (const predicate of property.metadata.predicates) {
+        allowedPredicates.add(predicate);
+        if (property.path.type === 'predicate' && objectConstraints.length > 0) {
+          const values = allowedObjectsByPredicate.get(predicate) ?? new Set<string>();
+          for (const value of objectConstraints) {
+            values.add(value);
+          }
+          allowedObjectsByPredicate.set(predicate, values);
+        } else {
+          unconstrainedPredicates.add(predicate);
+        }
+      }
+    }
+  }
+
+  if (allowedPredicates.size === 0) {
+    for (const predicate of plan.relevantPredicates) {
+      allowedPredicates.add(predicate);
+      unconstrainedPredicates.add(predicate);
+    }
+  }
+
+  return { allowedPredicates, unconstrainedPredicates, allowedObjectsByPredicate };
+}
+
+function outputQuadMatchesProjection(quad: Quad, projection: OutputProjectionPlan): boolean {
+  const predicate = quad.predicate.value;
+  if (!projection.allowedPredicates.has(predicate)) {
+    return false;
+  }
+  if (projection.unconstrainedPredicates.has(predicate)) {
+    return true;
+  }
+
+  const allowedObjects = projection.allowedObjectsByPredicate.get(predicate);
+  return !allowedObjects || allowedObjects.has(termId(quad.object as Term));
 }
 
 function appendGraphPlanSummary(lines: string[], label: string, plan: ShapeGraphPlan | undefined): void {

@@ -32,8 +32,8 @@
 @prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix list:   <http://www.w3.org/2000/10/swap/list#> .
 @prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
-@prefix skosn3: <https://example.org/skos-entailment-n3#> .
 
 #################################################################
 # 0. SKOS Core vocabulary facts from sections 3-10
@@ -250,18 +250,12 @@ skos:relatedMatch rdfs:subPropertyOf skos:mappingRelation, skos:related ;
 # S33-S34: domain/range of skos:memberList.
 { ?collection skos:memberList ?list . }
 => { ?collection a skos:OrderedCollection .
-     ?list a rdf:List .
-     ?list skosn3:memberListFor ?collection . } .
+  ?list a rdf:List . } .
 
 # S36: every RDF list item in skos:memberList is also a skos:member.
-{ ?list skosn3:memberListFor ?collection .
-  ?list rdf:first ?member . }
+{ ?collection skos:memberList ?list .
+  ?list list:member ?member . }
 => { ?collection skos:member ?member . } .
-
-{ ?list skosn3:memberListFor ?collection .
-  ?list rdf:rest ?tail .
-  ?tail rdf:first ?member . }
-=> { ?tail skosn3:memberListFor ?collection . } .
 
 #################################################################
 # 5. Mapping properties (S39-S45)

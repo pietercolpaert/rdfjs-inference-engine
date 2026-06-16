@@ -35,7 +35,6 @@ owlrl:intersectionListRoot a rdf:Property .
 owlrl:longIntersectionListRoot a rdf:Property .
 owlrl:keyListRoot a rdf:Property .
 owlrl:propertyChainRoot a rdf:Property .
-owlrl:listMember a rdf:Property .
 owlrl:listPair a rdf:Property .
 owlrl:left a rdf:Property .
 owlrl:right a rdf:Property .
@@ -195,21 +194,11 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?tail rdf:first ?head . }
 => { ?tail owlrl:propertyChainRoot true . } .
 
-# list membership: LIST[h, ..., x, ...]
-{ ?list owlrl:listRoot true .
-  ?list rdf:first ?member . }
-=> { ?list owlrl:listMember ?member . } .
-
-{ ?list owlrl:listRoot true .
-  ?list rdf:rest ?tail .
-  ?tail owlrl:listMember ?member . }
-=> { ?list owlrl:listMember ?member . } .
-
 # ordered pairs i<j in a list. The pair node is stable via log:skolem.
 { ?list owlrl:listRoot true .
   ?list rdf:first ?left .
   ?list rdf:rest ?tail .
-  ?tail owlrl:listMember ?right .
+  ?tail list:member ?right .
   (owlrl:listPair ?list ?left ?right) log:skolem ?pair . }
 => { ?list owlrl:listPair ?pair .
      ?pair owlrl:left ?left ;
@@ -698,12 +687,12 @@ owl:Nothing rdf:type owl:Class .
 # cls-int2
 { ?c owl:intersectionOf ?list .
   ?y rdf:type ?c .
-  ?list owlrl:listMember ?ci . }
+  ?list list:member ?ci . }
 => { ?y rdf:type ?ci . } .
 
 # cls-uni
 { ?c owl:unionOf ?list .
-  ?list owlrl:listMember ?ci .
+  ?list list:member ?ci .
   ?y rdf:type ?ci . }
 => { ?y rdf:type ?c . } .
 
@@ -864,7 +853,7 @@ owl:Nothing rdf:type owl:Class .
 
 # cls-oo
 { ?c owl:oneOf ?list .
-  ?list owlrl:listMember ?individual . }
+  ?list list:member ?individual . }
 => { ?individual rdf:type ?c . } .
 
 #################################################################
@@ -1166,12 +1155,12 @@ owl:Nothing rdf:type owl:Class .
 
 # scm-int
 { ?c owl:intersectionOf ?list .
-  ?list owlrl:listMember ?ci . }
+  ?list list:member ?ci . }
 => { ?c rdfs:subClassOf ?ci . } .
 
 # scm-uni
 { ?c owl:unionOf ?list .
-  ?list owlrl:listMember ?ci . }
+  ?list list:member ?ci . }
 => { ?ci rdfs:subClassOf ?c . } .
 
 #################################################################

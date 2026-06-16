@@ -16,7 +16,7 @@
 #
 # Eyeling/N3 built-ins used by this profile:
 # - SWAP-style built-ins implemented by Eyeling: log:notIncludes, log:skolem,
-#   log:collectAllIn, log:notEqualTo, list:length, list:notMember,
+#   log:collectAllIn, log:notEqualTo, list:length, list:member, list:notMember,
 #   math:lessThan, math:greaterThan, math:notGreaterThan, math:notLessThan,
 #   string:length, and string:notMatches.
 # - Eyeling-specific datatype built-ins in the
@@ -88,12 +88,6 @@
 # complete path semantics from a stable scoped snapshot instead of counting
 # helper triples that may still be materializing.
 
-{ ?list shn:listMember ?item . }
-<= { ?list rdf:first ?item . } .
-
-{ ?list shn:listMember ?item . }
-<= { ?list rdf:rest ?tail . ?tail shn:listMember ?item . } .
-
 # Predicate paths.
 { (?focus ?path ?value) shn:pathValue true . }
 <= { ?focus ?path ?value . } .
@@ -109,7 +103,7 @@
 { (?focus ?path ?value) shn:pathValue true . }
 <= {
   ?path sh:alternativePath ?alternatives .
-  ?alternatives shn:listMember ?nested .
+  ?alternatives list:member ?nested .
   (?focus ?nested ?value) shn:pathValue true .
 } .
 

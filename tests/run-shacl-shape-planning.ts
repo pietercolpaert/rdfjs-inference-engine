@@ -62,7 +62,7 @@ const ontology = parseQuads(`
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
 sosa:madeBySensor
-  rdfs:domain sosa:Observation ;
+  rdfs:domain sosa:Observation, ex:InternalObservation ;
   rdfs:range sosa:Sensor .
 
 sosa:resultTime
@@ -76,7 +76,7 @@ sosa:hasFeatureOfInterest
   rdfs:range sosa:FeatureOfInterest .
 
 ex:observedBy
-  rdfs:subPropertyOf sosa:madeBySensor .
+  rdfs:subPropertyOf sosa:madeBySensor, ex:internalSensorLink .
 
 ex:observedAt
   rdfs:subPropertyOf sosa:resultTime .
@@ -191,7 +191,7 @@ assert.deepEqual(
   'Saved runtime text should embed enough shape planning metadata to restore it without reparsing shapes.',
 );
 
-const inferred = Array.from(reasoner.infer(parseQuads(`
+const observationInput = parseQuads(`
 @prefix ex: <${EX}> .
 @prefix sosa: <${SOSA}> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -201,7 +201,8 @@ ex:obs1 ex:observedBy ex:sensor1 ;
   ex:temperatureCelsius "18.1"^^xsd:decimal ;
   ex:observedFeature ex:platformA .
 ex:obs1 ex:debugOnly "drop me" .
-`)));
+`);
+const inferred = Array.from(reasoner.infer(observationInput));
 const optimization = reasoner.getLastInputOptimization();
 assert.ok(optimization?.enabled, 'Shape-guided infer() should enable per-input optimization.');
 assert.equal(optimization.originalQuadCount, 5, 'Optimization diagnostics should report the original input size.');
@@ -266,6 +267,34 @@ assert.ok(
     && quad.predicate.value === RDF_TYPE
     && quad.object.value === SOSA + 'FeatureOfInterest'),
   'Shape-guided runtime should still infer the feature-of-interest type from rdfs:range.',
+);
+assert.equal(
+  inferred.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === EX + 'internalSensorLink'
+    && quad.object.value === EX + 'sensor1'),
+  false,
+  'SHACL output projection should hide predicates not mentioned by the output shape.',
+);
+assert.equal(
+  inferred.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === RDF_TYPE
+    && quad.object.value === EX + 'InternalObservation'),
+  false,
+  'SHACL output projection should hide rdf:type values not mentioned by the output shape.',
+);
+
+const unprojected = Array.from(reasoner.infer(observationInput, { projectShapeOutput: false }));
+assert.ok(
+  unprojected.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === EX + 'internalSensorLink'
+    && quad.object.value === EX + 'sensor1'),
+  'projectShapeOutput: false should expose derived predicates outside the output shape projection.',
+);
+assert.ok(
+  unprojected.some((quad) => quad.subject.value === EX + 'obs1'
+    && quad.predicate.value === RDF_TYPE
+    && quad.object.value === EX + 'InternalObservation'),
+  'projectShapeOutput: false should expose derived triples outside the output shape projection.',
 );
 
 Array.from(reasoner.infer(parseQuads(`

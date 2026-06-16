@@ -1,7 +1,8 @@
 export { InferenceEngine, defaultRuntimeCompiler, loadDefaultRuleProfiles, serializeQuadsAsN3 } from './InferenceEngine';
-export { compileShaclShapeGraph, createShapePlanning, parseShapePlanningFromRuntime, shapePlanningSummary } from './shacl-shape-planning';
+export { compileShaclShapeGraph, createShapePlanning, parseShapePlanningFromRuntime, projectOutputWithShapePlanning, shapePlanningSummary } from './shacl-shape-planning';
 export type {
   InferenceEngineOptions,
+  InferenceOptions,
   InferenceStoreOptions,
   InferenceResult,
   InconsistencyReport,

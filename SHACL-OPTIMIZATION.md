@@ -14,7 +14,7 @@ The shapes are **not** validation inputs. They are contracts: if future `infer()
 ## What the two shapes mean
 
 - `shaclIn` describes RDF that will be passed to `infer()` later. It tells the planner which data-side predicates, classes, paths, cardinalities, and closed-shape constraints are expected.
-- `shaclOut` describes the inferred RDF that the application cares about retaining. It tells the runtime compiler which rule heads and intermediate derivations can contribute to desired output predicates/classes.
+- `shaclOut` describes the inferred RDF that the application cares about retaining. It tells the runtime compiler which rule heads and intermediate derivations can contribute to desired output predicates/classes, and it projects the final inferred output to the properties and constrained `rdf:type` values mentioned by the output shape.
 
 Both options are independent:
 
@@ -162,7 +162,18 @@ The inference-time optimizer:
 3. for trusted closed shapes, drops unrelated message-local facts;
 4. orders retained quads by SHACL-derived join hints;
 5. stores compact diagnostic records, using scalar slots for `sh:maxCount 1` paths and arrays for repeated paths;
-6. passes the optimized quad list to Eyeling.
+6. passes the optimized quad list to Eyeling;
+7. if `shaclOut` exists, projects the derived output to the properties named by output property shapes and to constrained `rdf:type` values such as `sh:hasValue sosa:Observation`.
+
+You can keep the shape-guided runtime and input optimization while exposing all derived triples from that runtime for debugging:
+
+```ts
+const unprojected = Array.from(reasoner.infer(inputQuads, {
+  projectShapeOutput: false,
+}));
+```
+
+Conceptually, this output projection is the same role a generated N3 `log:query` could play: the output SHACL shape is compiled into a query-like projection over the materialized closure. The implementation currently performs that projection in the RDF-JS layer after Eyeling derives the runtime output, which keeps browser and Node behavior identical and avoids adding another generated N3 query stage.
 
 The latest optimization summary is visible through:
 

@@ -9,6 +9,7 @@ import {
   createShapePlanning,
   optimizeInputWithShapePlanning,
   parseShapePlanningFromRuntime,
+  projectOutputWithShapePlanning,
   shapePlanningSummary,
   type ShapeInputOptimization,
   type ShapePlanning,
@@ -84,6 +85,7 @@ export interface InferenceOptions {
   deterministicSkolem?: boolean;
   skolemKey?: string;
   optimizeShapeInput?: boolean;
+  projectShapeOutput?: boolean;
 }
 
 export interface InferenceStoreOptions {
@@ -247,7 +249,7 @@ export class InferenceEngine {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
 
-    yield* derived;
+    yield* this.projectInferenceOutput(derived, options);
   }
 
   public inferWithDiagnostics(data: Quad[], options: InferenceOptions = {}): InferenceResult {
@@ -284,7 +286,7 @@ export class InferenceEngine {
     }
 
     return {
-      quads: derived,
+      quads: this.projectInferenceOutput(derived, options),
       inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics], outputMode),
     };
   }
@@ -328,7 +330,7 @@ export class InferenceEngine {
       await result.store.close();
     }
 
-    return derived;
+    return this.projectInferenceOutput(derived, options);
   }
 
   public async inferAsyncWithDiagnostics(data: Quad[], options: InferenceOptions = {}): Promise<InferenceResult> {
@@ -376,7 +378,7 @@ export class InferenceEngine {
     }
 
     return {
-      quads: derived,
+      quads: this.projectInferenceOutput(derived, options),
       inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics], outputMode),
     };
   }
@@ -414,6 +416,14 @@ export class InferenceEngine {
     const optimization = optimizeInputWithShapePlanning(data, this.shapePlanning);
     this.lastInputOptimization = optimization;
     return optimization.quads;
+  }
+
+  private projectInferenceOutput(data: Quad[], options: InferenceOptions): Quad[] {
+    if (options.projectShapeOutput === false || !this.shapePlanning?.output) {
+      return data;
+    }
+
+    return projectOutputWithShapePlanning(data, this.shapePlanning);
   }
 }
 
