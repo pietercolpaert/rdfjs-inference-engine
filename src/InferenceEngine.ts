@@ -542,6 +542,7 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   const runtimeProfileN3 = input.options.selectRuntimeRules === false
     ? input.profileN3.trimEnd()
     : compileSelectedRuntimeProfiles(input).trimEnd();
+  const includeStaticClosure = shouldIncludeStaticClosure(input, runtimeProfileN3);
 
   if (input.shapePlanning) {
     sections.push('', ...shapePlanningSummary(input.shapePlanning));
@@ -551,7 +552,7 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
     sections.push('', '# Runtime rule profile', runtimeProfileN3);
   }
 
-  if (input.options.includeStaticClosure !== false) {
+  if (includeStaticClosure) {
     const backgroundClosure = uniqueQuads([...input.vocabulary, ...input.closure]);
     if (backgroundClosure.length > 0) {
       sections.push('', '# Precomputed background facts and closure', serializeQuadsAsN3(backgroundClosure).trimEnd());
@@ -559,6 +560,27 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   }
 
   return `${sections.join('\n')}\n`;
+}
+
+function shouldIncludeStaticClosure(input: RuntimeCompilerInput, runtimeProfileN3: string): boolean {
+  if (input.options.includeStaticClosure !== undefined) {
+    return input.options.includeStaticClosure;
+  }
+
+  if (!input.shapePlanning?.input || !input.shapePlanning.output) {
+    return true;
+  }
+
+  return hasNonPartialRuntimeRuleSource(runtimeProfileN3);
+}
+
+function hasNonPartialRuntimeRuleSource(runtimeProfileN3: string): boolean {
+  const sourceMatches = [...runtimeProfileN3.matchAll(/^# Source: (.+)$/gm)].map((match) => match[1]);
+  if (sourceMatches.length === 0) {
+    return runtimeProfileN3.includes('=>') || runtimeProfileN3.includes('<=');
+  }
+
+  return sourceMatches.some((source) => source !== PARTIAL_EVALUATED_OWL2RL_PROFILE.label);
 }
 
 interface RuntimeRuleSelectionContext {
