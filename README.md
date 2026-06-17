@@ -521,3 +521,11 @@ There are still practical and semantic boundaries:
 - OWL 2 RL profile: https://www.w3.org/TR/owl2-profiles/
 - OWL 2 RL/RIF rules: https://www.w3.org/TR/rif-owl-rl/
 - Notation3 Community Group specification: https://w3c-cg.github.io/N3/spec/
+
+# Copyright
+
+© IMEC - Ghent University
+
+MIT licensed
+
+Author: Pieter Colpaert
