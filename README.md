@@ -2,7 +2,7 @@
 
 This repository contains a small TypeScript library for doing **generated-runtime materialization at ingest time** with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
 
-The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL, SKOS Core, the SHACL Core validation profile, and the draft SHACL 1.2 Core extension profile.
+The library core is intentionally agnostic about the ontology language or rule profile. By default, the Node examples and browser playground load all bundled N3 rule profiles from the `rules/` folder, including OWL 2 RL and SKOS Core.
 
 ## Install
 
@@ -107,14 +107,6 @@ It also includes broader OWL 2 RL consequences such as `owl:sameAs`, class expre
 
 This is a SKOS Core profile. It implements positive materialization rules for the normative entailment-relevant parts of W3C SKOS Reference sections 3-10, including concept-scheme links, lexical label and note super-properties, semantic-relation hierarchy/inverses/transitive closures, collection member-list expansion, and mapping-property hierarchy/symmetry/transitivity. It deliberately excludes SKOS-XL, integrity constraints, validation checks, qSKOS/SHACL quality checks, warnings, and best-practice diagnostics.
 
-#### rules/shacl-core-eyeling.n3
-
-This is a W3C-tested SHACL Core validation profile. It is loaded by default together with OWL 2 RL and SKOS Core. It emits `sh:ValidationResult` triples for closed-world validation and matches every current W3C SHACL Core test-suite file by the `sh:conforms` criterion. The current rules cover Core targets, node and property shapes, directly targeted property shapes, deactivation, goal-directed SHACL property paths, `sh:class`, `sh:datatype` including ill-formed literals, count constraints, value constraints, `sh:in`, numeric/date comparison facets, string length facets, `sh:pattern`, and the Core list/boolean shape combinations exercised by the suite. Full validation-report graph isomorphism and guarantees beyond the W3C boolean-conformance harness remain future work.
-
-#### rules/shacl12-core-eyeling.n3
-
-This is a draft SHACL 1.2 Core extension layer for `rules/shacl-core-eyeling.n3`, not a standalone profile. It adds the SHACL 1.2-specific behaviour needed by the draft W3C SHACL 1.2 Core tests while keeping the original SHACL Core rules separate. The current additions cover `sh:ShapeClass`, explicit data-side `sh:shape` targets, constant Core node expressions for `sh:values` and `sh:defaultValue`, `sh:singleLine`, nested property-shape bindings used by validation-report tests, and reifier-shape checks in the test harness' RDF 1.2 annotation rewrite. The draft SHACL 1.2 Core harness now matches every current SHACL 1.2 Core file by boolean `sh:conforms`; complete validation-report graph isomorphism is still out of scope.
-
 The bundled rulesets are meant to be loaded as rule profiles. In normal projects, keep any additional rule profiles vendored/versioned and pass your own background quads to `load()`.
 
 By default, load all bundled rule profiles with only the background dataset:
@@ -142,7 +134,7 @@ The bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `
 
 ### The Playground
 
-The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile, so the playground currently runs the OWL 2 RL, SKOS Core, SHACL Core, and draft SHACL 1.2 Core extension profiles together. It also bundles the self-contained examples from `examples/` into an example picker. The page provides syntax-highlighted RDF editors for:
+The root `index.html` file is a browser playground. At browser-build time, it bundles every `.n3` file from the repository `rules/` folder as the default rule profile, so the playground currently runs the OWL 2 RL and SKOS Core profiles together. It also bundles the self-contained examples from `examples/` into an example picker. The page provides syntax-highlighted RDF editors for:
 
 - ontology/background RDF used to generate the runtime, selected as either a URL or text input;
 - ordinary RDF input or an RDF Messages log, selected as either a URL or text input;
@@ -166,9 +158,6 @@ All examples are self-contained folders under `examples/`. Each runnable example
 - [examples/shipment-logistics/README.md](examples/shipment-logistics/README.md) — broader OWL 2 RL materialization features.
 - [examples/skos-taxonomy/README.md](examples/skos-taxonomy/README.md) — SKOS Core taxonomy materialization.
 - [examples/owl-skos-catalog/README.md](examples/owl-skos-catalog/README.md) — combined OWL 2 RL + SKOS Core reasoning.
-- [examples/complex-path-coverage/README.md](examples/complex-path-coverage/README.md) — SHACL complex paths over OWL 2 RL + SKOS materialization.
-- [examples/shacl-validation/README.md](examples/shacl-validation/README.md) — SHACL Core validation results.
-- [examples/shacl12-grandfather/README.md](examples/shacl12-grandfather/README.md) — SHACL 1.2 validation working with OWL RL classification in the grandfather example.
 - [examples/shacl-shape-planning/README.md](examples/shacl-shape-planning/README.md) — command-line playground for trusted SHACL input/output shape hints.
 - [examples/inconsistency-diagnostics/README.md](examples/inconsistency-diagnostics/README.md) — playground-focused OWL 2 RL inconsistency diagnostics.
 - [examples/transit-messages/README.md](examples/transit-messages/README.md) — RDF Messages input and inferred RDF Messages output.
@@ -281,24 +270,6 @@ npm run test:skos
 
 The tests are derived from positive entailments and explicit non-entailments in W3C SKOS Reference sections 3-10. They cover concept schemes, labels, notes, semantic relations, ordered collections, mapping properties, `skos:exactMatch` transitivity, and guards against overreaching rules such as transitive `skos:broader`, transitive `skos:closeMatch`, or automatic concept-scheme containment across semantic relations.
 
-### SHACL Core validation tests
-
-The repository includes a W3C data-shapes test-suite harness for the SHACL Core profile:
-
-```bash
-npm run test:shacl
-```
-
-The harness downloads and caches W3C SHACL Core fixtures under `.cache/shacl-test-suite/`, runs all Core manifests against `rules/shacl-core-eyeling.n3`, and compares the expected `sh:conforms` boolean. It currently passes all 97 discovered W3C SHACL Core test files. It intentionally runs the full suite: if a W3C test fails, the command fails. For debugging a fixture or manifest, use `npm run build:node --silent && node dist/tests/run-shacl-core.js --only=core/complex/shacl-shacl.ttl` or `--manifest=core/complex/manifest.ttl`.
-
-The draft SHACL 1.2 Core harness uses the newer `shacl12-test-suite` fixtures and runs the original SHACL Core profile together with `rules/shacl12-core-eyeling.n3`:
-
-```bash
-npm run test:shacl12
-```
-
-It downloads and caches fixtures under `.cache/shacl12-test-suite/`, rewrites the RDF 1.2 annotation syntax used by the reifier tests into helper triples for the current RDF-JS parser, respects `sh:conformanceDisallows` for boolean conformance, and checks the expected `sh:conforms` value for all SHACL 1.2 Core manifests. It currently passes all 137 discovered draft SHACL 1.2 Core test files.
-
 The default test command runs the SKOS Core tests plus both compatible OWL 2 RL subsets:
 
 ```bash
@@ -317,7 +288,7 @@ The example output checks are kept separately:
 npm run test:examples
 ```
 
-This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, complex-path coverage, SHACL validation, RDF Messages, and stateful materialization examples.
+This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+SKOS catalog, RDF Messages, and stateful materialization examples.
 
 ## Preprocessing and generated runtimes
 
@@ -334,9 +305,9 @@ This checks the transit fleet, shipment logistics, SKOS taxonomy, combined OWL+S
 This preprocessing step is a good fit when the ruleset and ontology are stable:
 you can regenerate the compiled runtime file whenever either changes, then reuse
 it for many input runs. The default runtime compiler assumes that vocabulary,
-ontology, taxonomy, and SHACL shape triples are provided during `load()`, not in
+ontology, taxonomy, and shape-hint triples are provided during `load()`, not in
 later `infer()` inputs. It therefore keeps the precomputed static closure, omits
-whole inactive profiles such as SHACL/SKOS when the load-time context cannot use
+whole inactive profiles such as SKOS when the load-time context cannot use
 them, turns known static OWL 2 RL ontology facts into direct predicate/class rules for incoming data, and drops rules guarded by absent load-time schema predicates or type
 markers. Pass `{ selectRuntimeRules: false }` to `load()` if your application or
 conformance test feeds new schema/shape axioms during `infer()` and needs the old
@@ -362,8 +333,7 @@ inputs and the output shape to keep rules that can contribute to the desired
 output predicates/classes. When `shaclOut` is present, the engine also projects
 the final derived output to the properties and constrained `rdf:type` values
 mentioned by the output property shapes. These shapes are trusted optimization contracts only:
-the engine does **not** perform SHACL validation, and non-conforming input may
-produce incomplete or unspecified optimized output. Validate upstream if shape
+non-conforming input may produce incomplete or unspecified optimized output. Validate upstream if shape
 conformance is not guaranteed.
 
 The generated runtime includes comments summarizing the compiled shape plan plus

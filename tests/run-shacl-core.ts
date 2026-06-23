@@ -7,7 +7,7 @@ import { parseRdfWithBase, readCachedUrl, termKey } from './utils';
 
 const RAW_BASE = 'https://raw.githubusercontent.com/w3c/data-shapes/gh-pages/data-shapes-test-suite/tests/';
 const CACHE_ROOT = resolve('.cache/shacl-test-suite');
-const SHACL_RULES_PATH = resolve('rules/shacl-core-eyeling.n3');
+const SHACL_RULES_PATH = resolve('rules/shacl-experimental/shacl-core-eyeling.n3');
 
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const XSD_BOOLEAN = 'http://www.w3.org/2001/XMLSchema#boolean';
@@ -47,7 +47,7 @@ interface TestOutcome {
 }
 
 async function main(): Promise<void> {
-  assert.ok(existsSync(SHACL_RULES_PATH), 'Expected rules/shacl-core-eyeling.n3 to exist.');
+  assert.ok(existsSync(SHACL_RULES_PATH), 'Expected rules/shacl-experimental/shacl-core-eyeling.n3 to exist.');
 
   const options = parseCliOptions(process.argv.slice(2));
   const testCases = await loadTestCases(options.manifests, options);

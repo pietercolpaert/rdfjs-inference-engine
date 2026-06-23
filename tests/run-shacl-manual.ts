@@ -10,7 +10,7 @@ const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
 const SHN = 'https://example.org/shacl-n3#';
 
-const rules = `${readFileSync('rules/shacl-core-eyeling.n3', 'utf8')}
+const rules = `${readFileSync('rules/shacl-experimental/shacl-core-eyeling.n3', 'utf8')}
 
 @prefix : <${EX}> .
 @prefix sh: <${SH}> .

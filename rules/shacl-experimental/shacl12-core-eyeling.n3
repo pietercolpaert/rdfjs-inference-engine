@@ -1,6 +1,6 @@
 # SHACL 1.2 Core validation additions for Eyeling.
 #
-# This file is intentionally an extension layer for rules/shacl-core-eyeling.n3,
+# This file is intentionally an extension layer for shacl-core-eyeling.n3,
 # not a standalone SHACL implementation.  Keep the SHACL 1.1-compatible rules in
 # shacl-core-eyeling.n3 and add only SHACL 1.2 Core behaviour here so profile
 # toggles can enable/disable the draft extensions independently.

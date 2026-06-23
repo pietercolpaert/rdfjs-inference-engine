@@ -8,8 +8,8 @@ import { parseRdfWithBase, readCachedUrl, termKey } from './utils';
 const RAW_BASE = 'https://raw.githubusercontent.com/w3c/data-shapes/gh-pages/shacl12-test-suite/tests/core/';
 const CACHE_ROOT = resolve('.cache/shacl12-test-suite/core');
 const SHACL_RULES_PATHS = [
-  resolve('rules/shacl-core-eyeling.n3'),
-  resolve('rules/shacl12-core-eyeling.n3'),
+  resolve('rules/shacl-experimental/shacl-core-eyeling.n3'),
+  resolve('rules/shacl-experimental/shacl12-core-eyeling.n3'),
 ];
 
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
