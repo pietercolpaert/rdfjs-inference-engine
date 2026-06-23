@@ -4,7 +4,7 @@ This folder contains an experiment in which validation reports are generated thr
 
 ## Status
 
-This experiment will not be further developed as part of this repository but is left here for reference.
+This experiment will not be further developed as part of this repository but is left here for reference. If you like the ideas outlined here, you’ll also like this project: https://github.com/giacomociti/eye-shacl
 
 ## Profiles
 
