@@ -1,6 +1,6 @@
 {
   "name": "rdfjs-inference-engine",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "RDF-JS inference engine for generated Eyeling runtimes and N3 rule profiles.",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
