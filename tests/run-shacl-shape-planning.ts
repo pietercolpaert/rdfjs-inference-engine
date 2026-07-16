@@ -10,6 +10,7 @@ const SOSA = 'http://www.w3.org/ns/sosa/';
 const pathShape = parseQuads(`
 @prefix ex: <${EX}> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 
@@ -21,7 +22,7 @@ ex:Shape
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:datatype xsd:decimal ;
-    sh:unit ( unit:M unit:CentiM )
+    qcr:UcumUnitIn ( unit:M unit:CentiM )
   ] ;
   sh:property [
     sh:path [ sh:inversePath ex:hasPart ]
@@ -54,9 +55,9 @@ assert.ok(pathPlan.relevantPredicates.includes(EX + 'broader'), 'Repeated paths 
 assert.ok(pathPlan.repeatedPaths.some((path) => path.endsWith('+')), 'oneOrMorePath should be marked as repeated.');
 assert.ok(pathPlan.scalarPaths.includes(EX + 'value'), 'sh:maxCount 1 paths should be scalar.');
 assert.deepEqual(
-  pathPlan.shapes[0].propertyPlans.find((property) => property.pathText === EX + 'value')?.units,
+  pathPlan.shapes[0].propertyPlans.find((property) => property.pathText === EX + 'value')?.ucumUnitIn,
   ['http://qudt.org/vocab/unit/CentiM', 'http://qudt.org/vocab/unit/M'],
-  'Shape planning should retain RDF-list sh:unit constraints for profile specialization.',
+  'Shape planning should retain qcr:UcumUnitIn alternatives for profile specialization.',
 );
 assert.ok(
   pathPlan.pathTexts.includes(`${EX}parent / (${EX}name | ${EX}label)`),

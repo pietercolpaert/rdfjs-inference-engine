@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { buildSync } from 'esbuild';
 
 const QCR_NORMALIZED_QUANTITY = 'https://w3id.org/qudt-inference#normalizedQuantity';
+const QCR_NORMALIZED_UCUM_LITERAL = 'https://w3id.org/qudt-inference#normalizedUcumLiteral';
+const CDT_UCUM = 'https://w3id.org/cdt/ucum';
 const bundlePath = `/tmp/rdfjs-browser-engine-qudt-${process.pid}.cjs`;
 
 buildSync({
@@ -50,6 +52,10 @@ try {
       1,
       `Browser message ${index + 1} should expose one normalized QUDT quantity.`,
     );
+    const ucumLiterals = output.filter((quad) => quad.predicate.value === QCR_NORMALIZED_UCUM_LITERAL);
+    assert.equal(ucumLiterals.length, 1, `Browser message ${index + 1} should expose one normalized UCUM literal.`);
+    assert.equal(ucumLiterals[0].object.termType === 'Literal' ? ucumLiterals[0].object.datatype.value : undefined, CDT_UCUM,
+      `Browser message ${index + 1} should use the cdt:ucum datatype.`);
   }
 
   console.log(`Browser QUDT runtime test: ${(runtime.length / 1024).toFixed(1)} KiB and ${input.messages.length}/4 messages normalized.`);

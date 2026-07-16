@@ -1,6 +1,7 @@
 @prefix ex: <https://example.org/qudt-speed#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix cdt: <https://w3id.org/cdt/> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 
 ex:SpeedInputShape a sh:NodeShape ;
@@ -9,5 +10,5 @@ ex:SpeedInputShape a sh:NodeShape ;
     sh:path ex:speed ;
     sh:minCount 1 ; sh:maxCount 1 ;
     sh:datatype cdt:speed ;
-    sh:unit ( unit:M-PER-SEC unit:KiloM-PER-HR unit:MI-PER-HR unit:KN )
+    qcr:UcumUnitIn ( unit:M-PER-SEC unit:KiloM-PER-HR unit:MI-PER-HR unit:KN )
   ] .

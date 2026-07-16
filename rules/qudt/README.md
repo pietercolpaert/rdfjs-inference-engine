@@ -22,6 +22,34 @@ ex:length qcr:normalizationProfile qcr:LengthProfile .
 
 This contract takes precedence over dimension-only profile selection. It prevents a time-valued object on a length property from receiving a misleading result and lets applications distinguish quantity kinds that share a dimension vector.
 
+### CDT unit alternatives
+
+This profile defines `qcr:UcumUnitIn` for SHACL property shapes whose value nodes are CDT literals:
+
+```turtle
+qcr:UcumUnitIn a rdf:Property ;
+  rdfs:comment "Allowed QUDT units encoded by a CDT literal, interpreted disjunctively." .
+```
+
+Its value is one RDF list. Every list member is a QUDT unit IRI, and membership is interpreted as an alternative: the unit encoded in the CDT lexical form is expected to be any one member of the list.
+
+```turtle
+sh:property [
+  sh:path ex:speed ;
+  sh:datatype cdt:speed ;
+  qcr:UcumUnitIn (
+    unit:M-PER-SEC
+    unit:KiloM-PER-HR
+    unit:MI-PER-HR
+    unit:KN
+  )
+] .
+```
+
+When exactly one unit is possible, use the SHACL 1.2 annotation directly, for example `sh:unit unit:DeciB`. Do not use an RDF list as the value of `sh:unit`.
+
+`qcr:UcumUnitIn` is a trusted planning extension, not a SHACL Core validation component. The engine uses it to retain the alternative source units in the prepared QUDT projection. Applications that accept untrusted data must separately validate that the unit token encoded in each CDT literal belongs to the declared list.
+
 ## What It Does Not Do
 
 The profile is not a complete dimensional-analysis or unit-algebra engine. It depends on the unit metadata present in the bundled QUDT projection and the normalization profiles encoded in `qudt-cdt-normalization.n3`.
@@ -34,7 +62,7 @@ QUDT normalization needs unit metadata from `https://qudt.org/qudt-all`. Loading
 
 For that reason this folder includes `qudt-cdt-normalization.runtime.n3`, a checked-in generated runtime projection containing the QUDT statements used by this profile. `InferenceEngine` activates this precompiled runtime automatically when the QUDT profile is selected by itself, or when a mixed-profile load-time vocabulary contains QUDT/CDT terms. It stays dormant for unrelated mixed OWL/SKOS loads.
 
-When SHACL IN and SHACL OUT provide unit constraints, the engine specializes this projection before attaching it. It reads scalar or list-valued `sh:unit` constraints and `sh:hasValue`/`sh:in` constraints on `qudt:unit`. Exact input constraints retain only the named source and target units. If SHACL IN intentionally leaves the source unit open, all units sharing a QUDT dimension vector with the requested output unit are retained. Local unit identifiers are resolved through load-time OWL `owl:sameAs`, SKOS `skos:exactMatch`, or `qcr:alignedQudtUnit` facts before specialization.
+When SHACL IN and SHACL OUT provide unit constraints, the engine specializes this projection before attaching it. It reads scalar `sh:unit` annotations, CDT alternatives from `qcr:UcumUnitIn`, and `sh:hasValue`/`sh:in` constraints on `qudt:unit`. Exact input constraints retain only the named source and target units. If SHACL IN intentionally leaves the source unit open, all units sharing a QUDT dimension vector with the requested output unit are retained. Local unit identifiers are resolved through load-time OWL `owl:sameAs`, SKOS `skos:exactMatch`, or `qcr:alignedQudtUnit` facts before specialization.
 
 The executable normalization kernel and its canonical datatype profiles remain in the generated runtime. The large QUDT fact projection is the specialized part; omitting individual kernel declarations based only on predicates would be unsound because CDT literals encode their source unit in the lexical form rather than as an RDF object.
 

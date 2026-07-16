@@ -1647,6 +1647,9 @@ function qudtUnitsFromShapePlan(plan: ShapePlanning['input'] | ShapePlanning['ou
       for (const unit of property.units ?? []) {
         units.add(unit);
       }
+      for (const unit of property.ucumUnitIn ?? []) {
+        units.add(unit);
+      }
       if (property.path.type === 'predicate' && property.path.predicate === QUDT + 'unit') {
         for (const unit of [...property.hasValues, ...property.inValues]) {
           units.add(unit);

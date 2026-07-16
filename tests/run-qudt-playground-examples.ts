@@ -8,6 +8,7 @@ import { parseRdfOrMessages, parseToQuads } from '../examples/util';
 const QCR = 'https://w3id.org/qudt-inference#';
 const QUDT = 'http://qudt.org/schema/qudt/';
 const UNIT = 'http://qudt.org/vocab/unit/';
+const CDT_UCUM = 'https://w3id.org/cdt/ucum';
 
 interface ExpectedMessage {
   subject: string;
@@ -159,7 +160,26 @@ function runExample(example: LoadedExample, reasoner: InferenceEngine): void {
 
   for (let index = 0; index < expectation.messages.length; index += 1) {
     assertExpectedMessage(expectation.id, output, expectation.messages[index]);
+    if (expectation.id === 'qudt-logarithmic' && expectation.messages[index].unit) {
+      assertNormalizedUcumLiteral(expectation.id, output, expectation.messages[index]);
+    }
   }
+}
+
+function assertNormalizedUcumLiteral(example: string, output: Quad[], expectation: ExpectedMessage): void {
+  const literals = output.filter((quad) => quad.subject.value === expectation.subject
+    && quad.predicate.value === QCR + 'normalizedUcumLiteral');
+  assert.equal(literals.length, 1, `${example}: ${expectation.subject} needs one normalized cdt:ucum literal.`);
+  const literal = literals[0].object;
+  assert.equal(literal.termType, 'Literal', `${example}: normalized UCUM output must be a literal.`);
+  assert.equal(literal.termType === 'Literal' ? literal.datatype.value : undefined, CDT_UCUM,
+    `${example}: normalized UCUM output must use the current cdt:ucum datatype.`);
+  const [numericToken, unitToken, ...extra] = literal.value.trim().split(/\s+/);
+  assert.equal(unitToken, '1', `${example}: normalized dimensionless UCUM output must use unit token 1.`);
+  assert.equal(extra.length, 0, `${example}: normalized UCUM output must contain one numeric and one unit token.`);
+  assert.ok(approximately(Number(numericToken), expectation.value ?? Number.NaN, expectation.tolerance ?? 1e-10),
+    `${example}: expected UCUM numeric value ${expectation.value}, got ${numericToken}.`);
+  assertions += 6;
 }
 
 function assertExpectedMessage(example: string, output: Quad[], expectation: ExpectedMessage): void {

@@ -1,9 +1,10 @@
 import type { Quad, Term } from '@rdfjs/types';
 
-export const SHACL_SHAPE_PLANNING_VERSION = 2;
+export const SHACL_SHAPE_PLANNING_VERSION = 3;
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
+const QCR = 'https://w3id.org/qudt-inference#';
 
 const RDF_TYPE = RDF + 'type';
 const RDF_FIRST = RDF + 'first';
@@ -44,6 +45,7 @@ export interface PropertyShapePlan {
   hasValues: string[];
   inValues: string[];
   units: string[];
+  ucumUnitIn: string[];
   scalar: boolean;
   required: boolean;
   indexSpecs: IndexSpec[];
@@ -173,6 +175,7 @@ interface RuntimePropertyShape {
   h: string[];
   i: string[];
   u: string[];
+  ui: string[];
 }
 
 export function compileShaclShapeGraph(quads: Iterable<Quad>, direction: ShapeDirection): ShapeGraphPlan {
@@ -337,6 +340,7 @@ function compactRuntimeShapeGraph(plan: ShapeGraphPlan): RuntimeShapeGraph {
         h: property.hasValues,
         i: property.inValues,
         u: property.units,
+        ui: property.ucumUnitIn,
       })),
       ip: shape.ignoredPredicates,
       c: shape.closed,
@@ -386,6 +390,7 @@ function expandRuntimeShape(compact: RuntimeShape): ShapePlan {
       hasValues: property.h,
       inValues: property.i,
       units: property.u,
+      ucumUnitIn: property.ui,
       scalar: property.max === 1,
       required: property.min !== undefined && property.min > 0,
       indexSpecs: indexSpecsForPath(property.p, pathText, metadata),
@@ -490,6 +495,7 @@ function appendGraphPlanSummary(lines: string[], label: string, plan: ShapeGraph
   lines.push(`# ${label}: ${plan.shapes.length} shape(s)`);
   appendList(lines, `${label} paths`, plan.pathTexts);
   appendList(lines, `${label} units`, sortedUnion(plan.shapes.flatMap((shape) => shape.propertyPlans.flatMap((property) => property.units))));
+  appendList(lines, `${label} CDT UCUM unit options`, sortedUnion(plan.shapes.flatMap((shape) => shape.propertyPlans.flatMap((property) => property.ucumUnitIn))));
   appendList(lines, `${label} scalar paths`, plan.scalarPaths);
   appendList(lines, `${label} repeated paths`, plan.repeatedPaths);
 }
@@ -598,6 +604,7 @@ function compilePropertyShapePlan(propertyShape: Term, index: ShapeGraphIndex): 
   const hasValues = termIds(objects(index, propertyShape, SH + 'hasValue'));
   const inValues = termIds(readListObjects(index, objects(index, propertyShape, SH + 'in')));
   const units = namedNodeValues(readValueOrListObjects(index, objects(index, propertyShape, SH + 'unit')));
+  const ucumUnitIn = namedNodeValues(readListObjects(index, objects(index, propertyShape, QCR + 'UcumUnitIn')));
 
   return {
     propertyShape: termId(propertyShape),
@@ -612,6 +619,7 @@ function compilePropertyShapePlan(propertyShape: Term, index: ShapeGraphIndex): 
     hasValues,
     inValues,
     units,
+    ucumUnitIn,
     scalar: maxCount === 1,
     required: minCount !== undefined && minCount > 0,
     indexSpecs: indexSpecsForPath(path, pathToText(path), metadata),
