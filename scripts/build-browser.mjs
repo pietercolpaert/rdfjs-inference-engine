@@ -1,8 +1,10 @@
-import { mkdir, readdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 
 await mkdir('browser', { recursive: true });
+
+const nonDefaultRuleDirs = new Set(['precompiled', 'shacl-experimental']);
 
 const common = {
   bundle: true,
@@ -19,13 +21,15 @@ const bundledRulesPlugin = {
   setup(build) {
     build.onResolve({ filter: /^bundled-rules$/ }, () => ({ path: 'bundled-rules', namespace: 'bundled-rules' }));
     build.onLoad({ filter: /.*/, namespace: 'bundled-rules' }, async () => {
-      const files = (await readdir('rules')).filter((file) => file.endsWith('.n3')).sort();
+      const files = await discoverBundledRuleFiles('rules');
       const profiles = [];
       for (const file of files) {
         const text = await readFile(join('rules', file), 'utf8');
+        const precompiledPath = join('rules', file.replace(/\.n3$/, '.runtime.n3'));
         profiles.push({
           file,
           n3: `# Source: rules/${file}\n${text.trimEnd()}`,
+          precompiledRuntime: await fileExists(precompiledPath) ? await readFile(precompiledPath, 'utf8') : undefined,
         });
       }
 
@@ -40,6 +44,42 @@ const bundledRulesPlugin = {
     });
   },
 };
+
+async function discoverBundledRuleFiles(rulesDir) {
+  const files = [];
+  for (const entry of await readdir(rulesDir, { withFileTypes: true })) {
+    if (entry.isFile() && isRuleProfileFile(entry.name)) {
+      files.push(entry.name);
+      continue;
+    }
+
+    if (!entry.isDirectory() || nonDefaultRuleDirs.has(entry.name)) {
+      continue;
+    }
+
+    const dir = join(rulesDir, entry.name);
+    for (const file of await readdir(dir)) {
+      if (isRuleProfileFile(file)) {
+        files.push(`${entry.name}/${file}`);
+      }
+    }
+  }
+
+  return files.sort();
+}
+
+function isRuleProfileFile(file) {
+  return file.endsWith('.n3') && !file.endsWith('.runtime.n3');
+}
+
+async function fileExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const bundledExamplesPlugin = {
   name: 'bundled-examples',

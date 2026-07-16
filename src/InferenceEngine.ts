@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling';
@@ -32,6 +32,7 @@ const OWLRL_INCONSISTENCY = OWLRL + 'Inconsistency';
 const SHACL = 'http://www.w3.org/ns/shacl#';
 const SHACL_VALIDATION_RESULT = SHACL + 'ValidationResult';
 const SHACLN3 = 'https://example.org/shacl-n3#';
+const NON_DEFAULT_RULE_DIRS = new Set(['precompiled', 'shacl-experimental']);
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
   OWLRL + 'intersectionListRoot',
@@ -64,7 +65,13 @@ const INTERNAL_HELPER_PREDICATES = new Set([
   SHACLN3 + 'value',
 ]);
 
-export type RuleProfile = string | { n3?: string; text?: string; label?: string; baseIri?: string };
+export type RuleProfile = string | {
+  n3?: string;
+  text?: string;
+  label?: string;
+  baseIri?: string;
+  precompiledRuntime?: string;
+};
 export type VocabularyDataset = DatasetCore | Iterable<Quad>;
 export type ShaclShapeInput = VocabularyDataset | string | { quads: Iterable<Quad> } | { path: string };
 
@@ -72,6 +79,7 @@ export interface LoadedRuleProfile {
   n3: string;
   label?: string;
   baseIri?: string;
+  precompiledRuntime?: string;
 }
 
 export interface InferenceEngineOptions {
@@ -190,7 +198,10 @@ export class InferenceEngine {
   public load(profilesOrVocabulary: RuleProfile | RuleProfile[] | VocabularyDataset, vocabularyOrOptions?: VocabularyDataset | LoadOptions, options: LoadOptions = {}): string {
     const { profiles, vocabulary, loadOptions } = normalizeLoadArguments(profilesOrVocabulary, vocabularyOrOptions, options);
     const normalizedProfiles = normalizeProfiles(profiles);
-    const profileN3 = normalizedProfiles.map((profile) => profile.n3).join('\n\n');
+    const profileN3 = normalizedProfiles
+      .filter((profile) => !profile.precompiledRuntime)
+      .map((profile) => profile.n3)
+      .join('\n\n');
     const vocabularyQuads = quadsFromVocabulary(vocabulary);
     const deterministicSkolem = createDeterministicSkolemBuiltin(loadOptions);
     let closure: ReturnType<typeof reasonStream>;
@@ -209,7 +220,7 @@ export class InferenceEngine {
     this.shapePlanning = compileLoadShapePlanning(loadOptions);
 
     const runtimeCompiler = loadOptions.runtimeCompiler ?? this.runtimeCompiler;
-    this.runtime = runtimeCompiler({
+    const compiledRuntime = runtimeCompiler({
       profiles: normalizedProfiles,
       profileN3,
       vocabulary: vocabularyQuads,
@@ -218,6 +229,7 @@ export class InferenceEngine {
       options: loadOptions,
       shapePlanning: this.shapePlanning,
     });
+    this.runtime = appendPrecompiledProfileRuntimes(compiledRuntime, normalizedProfiles, vocabularyQuads);
 
     return this.runtime;
   }
@@ -448,18 +460,49 @@ export function loadDefaultRuleProfiles(rulesDir?: string): LoadedRuleProfile[] 
       continue;
     }
 
-    const files = readdirSync(candidate).filter((file) => file.endsWith('.n3')).sort();
+    const files = discoverDefaultRuleProfileFiles(candidate);
     if (files.length === 0) {
       continue;
     }
 
-    return files.map((file) => ({
-      n3: readFileSync(join(candidate, file), 'utf8'),
-      label: `rules/${file}`,
-    }));
+    return files.map(({ path, label }) => {
+      const precompiledPath = path.replace(/\.n3$/, '.runtime.n3');
+      return {
+        n3: readFileSync(path, 'utf8'),
+        label,
+        precompiledRuntime: existsSync(precompiledPath) ? readFileSync(precompiledPath, 'utf8') : undefined,
+      };
+    });
   }
 
-  throw new Error('Could not find default rule profiles. Pass explicit rule profiles to load(...) or install the package with rules/*.n3.');
+  throw new Error('Could not find default rule profiles. Pass explicit rule profiles to load(...) or install the package with rules/*/*.n3.');
+}
+
+function discoverDefaultRuleProfileFiles(rulesDir: string): Array<{ path: string; label: string }> {
+  const files: Array<{ path: string; label: string }> = [];
+  for (const entry of readdirSync(rulesDir).sort()) {
+    const entryPath = join(rulesDir, entry);
+    if (isRuleProfileFile(entry) && statSync(entryPath).isFile()) {
+      files.push({ path: entryPath, label: `rules/${entry}` });
+      continue;
+    }
+
+    if (!statSync(entryPath).isDirectory() || NON_DEFAULT_RULE_DIRS.has(entry)) {
+      continue;
+    }
+
+    for (const file of readdirSync(entryPath).filter(isRuleProfileFile).sort()) {
+      const path = join(entryPath, file);
+      const normalizedRelativePath = relative(rulesDir, path).split(sep).join('/');
+      files.push({ path, label: `rules/${normalizedRelativePath}` });
+    }
+  }
+
+  return files.sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function isRuleProfileFile(file: string): boolean {
+  return file.endsWith('.n3') && !file.endsWith('.runtime.n3');
 }
 
 function normalizeLoadArguments(
@@ -506,7 +549,7 @@ function isRuleProfileInput(value: RuleProfile | RuleProfile[] | VocabularyDatas
 function isRuleProfileObject(value: unknown): value is Exclude<RuleProfile, string> {
   return typeof value === 'object'
     && value !== null
-    && ('n3' in value || 'text' in value || 'label' in value || 'baseIri' in value)
+    && ('n3' in value || 'text' in value || 'label' in value || 'baseIri' in value || 'precompiledRuntime' in value)
     && !('subject' in value && 'predicate' in value && 'object' in value);
 }
 
@@ -743,6 +786,9 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
   let totalRules = 0;
 
   for (const profile of input.profiles) {
+    if (profile.precompiledRuntime) {
+      continue;
+    }
     const source = profile.n3.trimEnd();
     if (!source) {
       continue;
@@ -1454,8 +1500,37 @@ function normalizeProfiles(profiles: RuleProfile | RuleProfile[]): LoadedRulePro
       n3: profile.n3 ?? profile.text ?? '',
       label: profile.label,
       baseIri: profile.baseIri,
+      precompiledRuntime: profile.precompiledRuntime,
     };
   });
+}
+
+function appendPrecompiledProfileRuntimes(runtime: string, profiles: LoadedRuleProfile[], vocabulary: Quad[]): string {
+  const activatePreparedProfiles = profiles.length === 1 || vocabulary.some((quad) => [quad.subject, quad.predicate, quad.object]
+    .some(isQudtCdtTerm));
+  if (!activatePreparedProfiles) {
+    return runtime;
+  }
+
+  const prepared = profiles
+    .filter((profile) => profile.precompiledRuntime?.trim())
+    .map((profile) => [
+      `# Precompiled runtime profile${profile.label ? `: ${profile.label}` : ''}`,
+      profile.precompiledRuntime!.trim(),
+    ].join('\n'));
+
+  return prepared.length === 0
+    ? runtime
+    : `${[runtime.trimEnd(), ...prepared].filter(Boolean).join('\n\n')}\n`;
+}
+
+function isQudtCdtTerm(term: Term): boolean {
+  const iri = term.termType === 'Literal' ? term.datatype.value : term.value;
+  return (term.termType === 'NamedNode' || term.termType === 'Literal')
+    && (iri.startsWith('http://qudt.org/')
+      || iri.startsWith('https://qudt.org/')
+      || iri.startsWith('https://w3id.org/cdt/')
+      || iri.startsWith('http://w3id.org/lindt/custom_datatypes#'));
 }
 
 function quadsFromVocabulary(vocabulary: VocabularyDataset): Quad[] {

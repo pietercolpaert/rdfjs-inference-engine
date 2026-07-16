@@ -1,0 +1,1172 @@
+# QUDT/CDT normalization rules for rdfjs-inference-engine and Eyeling
+#
+# Purpose
+# -------
+# Forward-normalize quantity descriptions into:
+#
+#   1. qcr:normalizedQuantity, a qudt:QuantityValue with a canonical SI unit;
+#   2. qcr:normalizedUcumLiteral, a literal typed cdt:ucum;
+#   3. qcr:normalizedCdtLiteral, a literal using the quantity-specific CDT.
+#
+# Supported input forms
+# ---------------------
+# A. Linked Datatype literals:
+#
+#      ex:obs ex:speed "15 m/s"^^cdt:speed .
+#      ex:obs ex:length "25 cm"^^cdt:ucum .
+#
+# B. QUDT quantity-value objects:
+#
+#      ex:obs ex:result [
+#          a qudt:QuantityValue ;
+#          qudt:numericValue 15 ;
+#          qudt:unit unit:M-PER-SEC
+#      ] .
+#
+# The packaged profile includes a build-generated runtime projection of
+# https://qudt.org/qudt-all. It is activated automatically when this profile is
+# selected on its own, or when load-time vocabulary contains QUDT/CDT terms.
+# These rules perform no runtime dereferencing.
+#
+# Notes
+# -----
+# * The current LINDT datatype IRIs are https://w3id.org/cdt/<name>.
+# * Legacy http://w3id.org/lindt/custom_datatypes#<name> IRIs are accepted.
+# * Ordinary units use affine normalization:
+#
+#       canonical = (source + sourceOffset) * sourceMultiplier
+#       target    = canonical / targetMultiplier - targetOffset
+#
+# * Logarithmic units use explicit profiles and math:exponentiation.
+#   Eyeling can also solve math:exponentiation backwards for the exponent,
+#   enabling both logarithmic-to-linear and linear-to-logarithmic conversion.
+# * Dimensional compatibility is mandatory for affine conversions.
+# * Reciprocal, calendar-aware, currency, lookup-table, and contextual
+#   conversions remain outside this initial rule profile.
+# * Generic cdt:ucum values are normalized only when a configured target unit
+#   with the same QUDT dimension can be selected.
+#
+# Example expected result:
+#
+#   "1.5e1 m/s"^^cdt:speed
+#
+# becomes:
+#
+#   qcr:normalizedQuantity [
+#       a qudt:QuantityValue ;
+#       qudt:numericValue 15.0 ;
+#       qudt:unit unit:M-PER-SEC
+#   ] ;
+#   qcr:normalizedUcumLiteral "15.0 m/s"^^cdt:ucum ;
+#   qcr:normalizedCdtLiteral  "15.0 m/s"^^cdt:speed .
+#
+# The lexical rendering of the numeric value is implementation-dependent
+# (for example 15, 15.0, or 1.5E1), but the numeric value is equivalent.
+
+@prefix qcr:    <https://w3id.org/qudt-inference#> .
+@prefix qudt:   <http://qudt.org/schema/qudt/> .
+@prefix unit:   <http://qudt.org/vocab/unit/> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+@prefix cdt:    <https://w3id.org/cdt/> .
+@prefix lcdt:   <http://w3id.org/lindt/custom_datatypes#> .
+
+@prefix math:   <http://www.w3.org/2000/10/swap/math#> .
+@prefix log:    <http://www.w3.org/2000/10/swap/log#> .
+@prefix string: <http://www.w3.org/2000/10/swap/string#> .
+@prefix dt:     <https://eyereasoner.github.io/eyeling/datatype#> .
+
+
+#################################################################
+# Canonical normalization profiles
+#
+# qcr:datatype           accepted current CDT datatype
+# qcr:legacyDatatype     accepted legacy LINDT datatype
+# qcr:targetUnit         canonical QUDT unit
+# qcr:targetUcumCode     lexical unit code emitted in CDT literals
+#################################################################
+
+qcr:AccelerationProfile
+    qcr:datatype cdt:acceleration ;
+    qcr:legacyDatatype lcdt:acceleration ;
+    qcr:targetUnit unit:M-PER-SEC2 ;
+    qcr:targetUcumCode "m/s2" .
+
+qcr:AmountOfSubstanceProfile
+    qcr:datatype cdt:amountOfSubstance ;
+    qcr:legacyDatatype lcdt:amountOfSubstance ;
+    qcr:targetUnit unit:MOL ;
+    qcr:targetUcumCode "mol" .
+
+qcr:AngleProfile
+    qcr:datatype cdt:angle ;
+    qcr:legacyDatatype lcdt:angle ;
+    qcr:targetUnit unit:RAD ;
+    qcr:targetUcumCode "rad" .
+
+qcr:AreaProfile
+    qcr:datatype cdt:area ;
+    qcr:legacyDatatype lcdt:area ;
+    qcr:targetUnit unit:M2 ;
+    qcr:targetUcumCode "m2" .
+
+qcr:CatalyticActivityProfile
+    qcr:datatype cdt:catalyticActivity ;
+    qcr:legacyDatatype lcdt:catalyticActivity ;
+    qcr:targetUnit unit:KAT ;
+    qcr:targetUcumCode "kat" .
+
+qcr:DimensionlessProfile
+    qcr:datatype cdt:dimensionless ;
+    qcr:legacyDatatype lcdt:dimensionless ;
+    qcr:targetUnit unit:UNITLESS ;
+    qcr:targetUcumCode "1" .
+
+qcr:ElectricCapacitanceProfile
+    qcr:datatype cdt:electricCapacitance ;
+    qcr:legacyDatatype lcdt:electricCapacitance ;
+    qcr:targetUnit unit:FARAD ;
+    qcr:targetUcumCode "F" .
+
+qcr:ElectricChargeProfile
+    qcr:datatype cdt:electricCharge ;
+    qcr:legacyDatatype lcdt:electricCharge ;
+    qcr:targetUnit unit:C ;
+    qcr:targetUcumCode "C" .
+
+qcr:ElectricConductanceProfile
+    qcr:datatype cdt:electricConductance ;
+    qcr:legacyDatatype lcdt:electricConductance ;
+    qcr:targetUnit unit:S ;
+    qcr:targetUcumCode "S" .
+
+qcr:ElectricCurrentProfile
+    qcr:datatype cdt:electricCurrent ;
+    qcr:legacyDatatype lcdt:electricCurrent ;
+    qcr:targetUnit unit:A ;
+    qcr:targetUcumCode "A" .
+
+qcr:ElectricInductanceProfile
+    qcr:datatype cdt:electricInductance ;
+    qcr:legacyDatatype lcdt:electricInductance ;
+    qcr:targetUnit unit:H ;
+    qcr:targetUcumCode "H" .
+
+qcr:ElectricPotentialProfile
+    qcr:datatype cdt:electricPotential ;
+    qcr:legacyDatatype lcdt:electricPotential ;
+    qcr:targetUnit unit:V ;
+    qcr:targetUcumCode "V" .
+
+qcr:ElectricResistanceProfile
+    qcr:datatype cdt:electricResistance ;
+    qcr:legacyDatatype lcdt:electricResistance ;
+    qcr:targetUnit unit:OHM ;
+    qcr:targetUcumCode "Ohm" .
+
+qcr:EnergyProfile
+    qcr:datatype cdt:energy ;
+    qcr:legacyDatatype lcdt:energy ;
+    qcr:targetUnit unit:J ;
+    qcr:targetUcumCode "J" .
+
+qcr:ForceProfile
+    qcr:datatype cdt:force ;
+    qcr:legacyDatatype lcdt:force ;
+    qcr:targetUnit unit:N ;
+    qcr:targetUcumCode "N" .
+
+qcr:FrequencyProfile
+    qcr:datatype cdt:frequency ;
+    qcr:legacyDatatype lcdt:frequency ;
+    qcr:targetUnit unit:HZ ;
+    qcr:targetUcumCode "Hz" .
+
+qcr:IlluminanceProfile
+    qcr:datatype cdt:illuminance ;
+    qcr:legacyDatatype lcdt:illuminance ;
+    qcr:targetUnit unit:LUX ;
+    qcr:targetUcumCode "lx" .
+
+qcr:LengthProfile
+    qcr:datatype cdt:length ;
+    qcr:legacyDatatype lcdt:length ;
+    qcr:targetUnit unit:M ;
+    qcr:targetUcumCode "m" .
+
+qcr:LuminousFluxProfile
+    qcr:datatype cdt:luminousFlux ;
+    qcr:legacyDatatype lcdt:luminousFlux ;
+    qcr:targetUnit unit:LM ;
+    qcr:targetUcumCode "lm" .
+
+qcr:LuminousIntensityProfile
+    qcr:datatype cdt:luminousIntensity ;
+    qcr:legacyDatatype lcdt:luminousIntensity ;
+    qcr:targetUnit unit:CD ;
+    qcr:targetUcumCode "cd" .
+
+qcr:MagneticFluxProfile
+    qcr:datatype cdt:magneticFlux ;
+    qcr:legacyDatatype lcdt:magneticFlux ;
+    qcr:targetUnit unit:WB ;
+    qcr:targetUcumCode "Wb" .
+
+qcr:MagneticFluxDensityProfile
+    qcr:datatype cdt:magneticFluxDensity ;
+    qcr:legacyDatatype lcdt:magneticFluxDensity ;
+    qcr:targetUnit unit:T ;
+    qcr:targetUcumCode "T" .
+
+qcr:MassProfile
+    qcr:datatype cdt:mass ;
+    qcr:legacyDatatype lcdt:mass ;
+    qcr:targetUnit unit:KiloGM ;
+    qcr:targetUcumCode "kg" .
+
+qcr:PowerProfile
+    qcr:datatype cdt:power ;
+    qcr:legacyDatatype lcdt:power ;
+    qcr:targetUnit unit:W ;
+    qcr:targetUcumCode "W" .
+
+qcr:PressureProfile
+    qcr:datatype cdt:pressure ;
+    qcr:legacyDatatype lcdt:pressure ;
+    qcr:targetUnit unit:PA ;
+    qcr:targetUcumCode "Pa" .
+
+qcr:RadiationDoseAbsorbedProfile
+    qcr:datatype cdt:radiationDoseAbsorbed ;
+    qcr:legacyDatatype lcdt:radiationDoseAbsorbed ;
+    qcr:targetUnit unit:GRAY ;
+    qcr:targetUcumCode "Gy" .
+
+qcr:RadiationDoseEffectiveProfile
+    qcr:datatype cdt:radiationDoseEffective ;
+    qcr:legacyDatatype lcdt:radiationDoseEffective ;
+    qcr:targetUnit unit:SV ;
+    qcr:targetUcumCode "Sv" .
+
+qcr:RadioactivityProfile
+    qcr:datatype cdt:radioactivity ;
+    qcr:legacyDatatype lcdt:radioactivity ;
+    qcr:targetUnit unit:BQ ;
+    qcr:targetUcumCode "Bq" .
+
+qcr:SolidAngleProfile
+    qcr:datatype cdt:solidAngle ;
+    qcr:legacyDatatype lcdt:solidAngle ;
+    qcr:targetUnit unit:SR ;
+    qcr:targetUcumCode "sr" .
+
+qcr:SpeedProfile
+    qcr:datatype cdt:speed ;
+    qcr:legacyDatatype lcdt:speed ;
+    qcr:targetUnit unit:M-PER-SEC ;
+    qcr:targetUcumCode "m/s" .
+
+qcr:TemperatureProfile
+    qcr:datatype cdt:temperature ;
+    qcr:legacyDatatype lcdt:temperature ;
+    qcr:targetUnit unit:K ;
+    qcr:targetUcumCode "K" .
+
+qcr:TimeProfile
+    qcr:datatype cdt:time ;
+    qcr:legacyDatatype lcdt:time ;
+    qcr:targetUnit unit:SEC ;
+    qcr:targetUcumCode "s" .
+
+qcr:VolumeProfile
+    qcr:datatype cdt:volume ;
+    qcr:legacyDatatype lcdt:volume ;
+    qcr:targetUnit unit:M3 ;
+    qcr:targetUcumCode "m3" .
+
+
+
+#################################################################
+# Logarithmic normalization profiles
+#
+# These profiles normalize logarithmic quantities to a linear,
+# dimensionless ratio in unit:UNITLESS.
+#
+# qcr:logBase:
+#   base of the exponential.
+#
+# qcr:logExponentMultiplier:
+#   multiplier applied to the source value before exponentiation.
+#
+# The resulting linear ratio is:
+#
+#   ratio = base ^ (sourceValue * logExponentMultiplier)
+#
+# Conventions:
+#
+# * Bel and decibel use the power-ratio convention:
+#       B  -> 10^B
+#       dB -> 10^(dB/10)
+#
+#   A field/amplitude ratio would instead use 10^(dB/20). QUDT's
+#   generic unit:DeciB does not by itself identify which convention
+#   applies, so applications needing field ratios should provide a
+#   more specific rule or unit.
+#
+# * Neper uses the field-ratio convention:
+#       ratio = e^Np
+#
+# * Octave and decade represent frequency ratios:
+#       ratio = 2^octave
+#       ratio = 10^decade
+#
+# * pH is normalized to hydrogen-ion activity, not directly to a
+#   concentration:
+#       activity ratio = 10^(-pH)
+#################################################################
+
+unit:B
+    qcr:logBase 10.0 ;
+    qcr:logExponentMultiplier 1.0 ;
+    qcr:logarithmicConvention qcr:PowerRatio .
+
+unit:DeciB
+    qcr:logBase 10.0 ;
+    qcr:logExponentMultiplier 0.1 ;
+    qcr:logarithmicConvention qcr:PowerRatio .
+
+unit:NP
+    qcr:logBase 2.718281828459045 ;
+    qcr:logExponentMultiplier 1.0 ;
+    qcr:logarithmicConvention qcr:FieldRatio .
+
+unit:OCT
+    qcr:logBase 2.0 ;
+    qcr:logExponentMultiplier 1.0 ;
+    qcr:logarithmicConvention qcr:FrequencyRatio .
+
+unit:DECADE
+    qcr:logBase 10.0 ;
+    qcr:logExponentMultiplier 1.0 ;
+    qcr:logarithmicConvention qcr:FrequencyRatio .
+
+unit:PH
+    qcr:logBase 10.0 ;
+    qcr:logExponentMultiplier -1.0 ;
+    qcr:logarithmicConvention qcr:HydrogenIonActivity .
+
+
+#################################################################
+# Memoized backward helper predicates
+#################################################################
+
+qcr:unitToken                  log:memoize true .
+qcr:effectiveOffset            log:memoize true .
+qcr:parsedQuantityLiteral      log:memoize true .
+qcr:convertedValue             log:memoize true .
+qcr:linearRatioFromLogValue    log:memoize true .
+qcr:logValueFromLinearRatio    log:memoize true .
+qcr:profileForDatatype         log:memoize true .
+qcr:profileForGenericUcum      log:memoize true .
+qcr:normalizedLexicalForm      log:memoize true .
+
+
+#################################################################
+# QUDT unit-token resolution
+#
+# Accept:
+#   * qudt:ucumCode lexical forms, e.g. "m.s-1", "Cel", "[degF]";
+#   * qudt:symbol strings, e.g. "m/s", "km/h", "°C";
+#   * qudt:expression strings when present.
+#################################################################
+
+{
+    ?unit qcr:unitToken ?token .
+}
+<=
+{
+    ?unit qudt:symbol ?token .
+} .
+
+{
+    ?unit qcr:unitToken ?token .
+}
+<=
+{
+    ?unit qudt:expression ?token .
+} .
+
+{
+    ?unit qcr:unitToken ?token .
+}
+<=
+{
+    ?unit qudt:ucumCode ?ucumLiteral .
+    ?ucumLiteral dt:lexicalForm ?token .
+} .
+
+
+#################################################################
+# Effective offsets
+#################################################################
+
+{
+    ?unit qcr:effectiveOffset ?offset .
+}
+<=
+{
+    ?unit qudt:conversionOffset ?offset .
+} .
+
+{
+    ?unit qcr:effectiveOffset 0.0 .
+}
+<=
+{
+    ?unit qudt:conversionMultiplier ?multiplier .
+
+    _:scope log:notIncludes {
+        ?unit qudt:conversionOffset ?offset .
+    } .
+} .
+
+
+#################################################################
+# Resolve current and legacy datatype IRIs to one profile
+#################################################################
+
+{
+    ?datatype qcr:profileForDatatype ?profile .
+}
+<=
+{
+    ?profile qcr:datatype ?datatype .
+} .
+
+{
+    ?datatype qcr:profileForDatatype ?profile .
+}
+<=
+{
+    ?profile qcr:legacyDatatype ?datatype .
+} .
+
+
+#################################################################
+# Parse CDT quantity literals
+#################################################################
+
+{
+    (?literal ?datatype)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+}
+<=
+{
+    ?literal dt:datatype ?datatype .
+    ?datatype qcr:profileForDatatype ?profile .
+
+    ?literal dt:lexicalForm ?lexicalForm .
+
+    (
+        ?lexicalForm
+        "^\\s*([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\\s+"
+    )
+        string:scrape
+        ?numericLexicalForm .
+
+    (
+        ?lexicalForm
+        "^\\s*[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?\\s+(.+?)\\s*$"
+    )
+        string:scrape
+        ?unitToken .
+
+    (?numericLexicalForm xsd:double)
+        log:dtlit
+        ?sourceValue .
+
+    ?sourceUnit qcr:unitToken ?unitToken .
+} .
+
+
+#################################################################
+# Parse generic current and legacy cdt:ucum literals
+#################################################################
+
+{
+    (?literal cdt:ucum)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+}
+<=
+{
+    ?literal dt:datatype cdt:ucum .
+    ?literal dt:lexicalForm ?lexicalForm .
+
+    (
+        ?lexicalForm
+        "^\\s*([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\\s+"
+    )
+        string:scrape
+        ?numericLexicalForm .
+
+    (
+        ?lexicalForm
+        "^\\s*[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?\\s+(.+?)\\s*$"
+    )
+        string:scrape
+        ?unitToken .
+
+    (?numericLexicalForm xsd:double)
+        log:dtlit
+        ?sourceValue .
+
+    ?sourceUnit qcr:unitToken ?unitToken .
+} .
+
+{
+    (?literal lcdt:ucum)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+}
+<=
+{
+    ?literal dt:datatype lcdt:ucum .
+    ?literal dt:lexicalForm ?lexicalForm .
+
+    (
+        ?lexicalForm
+        "^\\s*([+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)\\s+"
+    )
+        string:scrape
+        ?numericLexicalForm .
+
+    (
+        ?lexicalForm
+        "^\\s*[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?\\s+(.+?)\\s*$"
+    )
+        string:scrape
+        ?unitToken .
+
+    (?numericLexicalForm xsd:double)
+        log:dtlit
+        ?sourceValue .
+
+    ?sourceUnit qcr:unitToken ?unitToken .
+} .
+
+
+#################################################################
+# Select a profile for a generic cdt:ucum value by dimension
+#
+# Multiple quantity kinds can share a dimension (for example energy
+# and torque). This profile only contains one normalization target for
+# each currently configured ambiguous dimension. Applications that need
+# different semantics should use a quantity-specific CDT or override the
+# profile table.
+#################################################################
+
+{
+    ?sourceUnit qcr:profileForGenericUcum ?profile .
+}
+<=
+{
+    ?sourceUnit qudt:hasDimensionVector ?dimension .
+
+    ?profile qcr:targetUnit ?targetUnit .
+    ?targetUnit qudt:hasDimensionVector ?dimension .
+} .
+
+
+#################################################################
+# Generic affine QUDT conversion
+#################################################################
+
+{
+    (?sourceValue ?sourceUnit ?targetUnit)
+        qcr:convertedValue
+        ?targetValue .
+}
+<=
+{
+    _:linearScope log:notIncludes {
+        ?sourceUnit a qudt:LogarithmicUnit .
+    } .
+
+    _:linearScope log:notIncludes {
+        ?targetUnit a qudt:LogarithmicUnit .
+    } .
+
+    ?sourceUnit
+        qudt:hasDimensionVector ?dimension ;
+        qudt:conversionMultiplier ?sourceMultiplier ;
+        qcr:effectiveOffset ?sourceOffset .
+
+    ?targetUnit
+        qudt:hasDimensionVector ?dimension ;
+        qudt:conversionMultiplier ?targetMultiplier ;
+        qcr:effectiveOffset ?targetOffset .
+
+    (?sourceValue ?sourceOffset)
+        math:sum
+        ?shiftedSource .
+
+    (?shiftedSource ?sourceMultiplier)
+        math:product
+        ?canonicalValue .
+
+    (?canonicalValue ?targetMultiplier)
+        math:quotient
+        ?shiftedTarget .
+
+    (?shiftedTarget ?targetOffset)
+        math:difference
+        ?targetValue .
+} .
+
+
+#################################################################
+# Construct normalized CDT lexical forms and literals
+#################################################################
+
+{
+    (?numericValue ?ucumCode)
+        qcr:normalizedLexicalForm
+        ?lexicalForm .
+}
+<=
+{
+    ?numericValue dt:lexicalForm ?numericLexicalForm .
+
+    (?numericLexicalForm " " ?ucumCode)
+        string:concatenation
+        ?lexicalForm .
+} .
+
+
+#################################################################
+# Forward normalization rule 1:
+# quantity-specific current or legacy CDT literal
+#################################################################
+
+{
+    ?focusNode ?sourceProperty ?literal .
+
+    ?literal dt:datatype ?sourceDatatype .
+    ?sourceDatatype qcr:profileForDatatype ?profile .
+
+    (?literal ?sourceDatatype)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+
+    ?profile
+        qcr:datatype ?targetDatatype ;
+        qcr:targetUnit ?targetUnit ;
+        qcr:targetUcumCode ?targetUcumCode .
+
+    (?sourceValue ?sourceUnit ?targetUnit)
+        qcr:convertedValue
+        ?targetValue .
+
+    (?targetValue ?targetUcumCode)
+        qcr:normalizedLexicalForm
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+
+    (?normalizedLexicalForm ?targetDatatype)
+        log:dtlit
+        ?normalizedSpecificLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?targetValue ;
+            qudt:unit ?targetUnit ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceLiteral ?literal
+        ] ;
+        qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
+        qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+} .
+
+
+#################################################################
+# Forward normalization rule 2:
+# generic current cdt:ucum literal
+#################################################################
+
+{
+    ?focusNode ?sourceProperty ?literal .
+
+    ?literal dt:datatype cdt:ucum .
+
+    (?literal cdt:ucum)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+
+    ?sourceUnit qcr:profileForGenericUcum ?profile .
+
+    ?profile
+        qcr:datatype ?targetDatatype ;
+        qcr:targetUnit ?targetUnit ;
+        qcr:targetUcumCode ?targetUcumCode .
+
+    (?sourceValue ?sourceUnit ?targetUnit)
+        qcr:convertedValue
+        ?targetValue .
+
+    (?targetValue ?targetUcumCode)
+        qcr:normalizedLexicalForm
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+
+    (?normalizedLexicalForm ?targetDatatype)
+        log:dtlit
+        ?normalizedSpecificLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?targetValue ;
+            qudt:unit ?targetUnit ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceLiteral ?literal
+        ] ;
+        qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
+        qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+} .
+
+
+#################################################################
+# Forward normalization rule 3:
+# legacy generic lcdt:ucum literal
+#################################################################
+
+{
+    ?focusNode ?sourceProperty ?literal .
+
+    ?literal dt:datatype lcdt:ucum .
+
+    (?literal lcdt:ucum)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+
+    ?sourceUnit qcr:profileForGenericUcum ?profile .
+
+    ?profile
+        qcr:datatype ?targetDatatype ;
+        qcr:targetUnit ?targetUnit ;
+        qcr:targetUcumCode ?targetUcumCode .
+
+    (?sourceValue ?sourceUnit ?targetUnit)
+        qcr:convertedValue
+        ?targetValue .
+
+    (?targetValue ?targetUcumCode)
+        qcr:normalizedLexicalForm
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+
+    (?normalizedLexicalForm ?targetDatatype)
+        log:dtlit
+        ?normalizedSpecificLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?targetValue ;
+            qudt:unit ?targetUnit ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceLiteral ?literal
+        ] ;
+        qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
+        qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+} .
+
+
+#################################################################
+# Forward normalization rule 4:
+# QUDT QuantityValue input object
+#################################################################
+
+{
+    ?focusNode ?sourceProperty ?sourceQuantity .
+
+    ?sourceQuantity
+        qudt:numericValue ?sourceValue ;
+        qudt:unit ?sourceUnit .
+
+    ?sourceUnit qcr:profileForGenericUcum ?profile .
+
+    ?profile
+        qcr:datatype ?targetDatatype ;
+        qcr:targetUnit ?targetUnit ;
+        qcr:targetUcumCode ?targetUcumCode .
+
+    (?sourceValue ?sourceUnit ?targetUnit)
+        qcr:convertedValue
+        ?targetValue .
+
+    (?targetValue ?targetUcumCode)
+        qcr:normalizedLexicalForm
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+
+    (?normalizedLexicalForm ?targetDatatype)
+        log:dtlit
+        ?normalizedSpecificLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?targetValue ;
+            qudt:unit ?targetUnit ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceQuantity ?sourceQuantity
+        ] ;
+        qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
+        qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+} .
+
+
+
+#################################################################
+# Logarithmic value -> linear ratio
+#################################################################
+
+{
+    (?sourceValue ?sourceUnit)
+        qcr:linearRatioFromLogValue
+        (?linearRatio ?convention) .
+}
+<=
+{
+    ?sourceUnit
+        a qudt:LogarithmicUnit ;
+        qcr:logBase ?base ;
+        qcr:logExponentMultiplier ?exponentMultiplier ;
+        qcr:logarithmicConvention ?convention .
+
+    (?sourceValue ?exponentMultiplier)
+        math:product
+        ?exponent .
+
+    (?base ?exponent)
+        math:exponentiation
+        ?linearRatio .
+} .
+
+
+#################################################################
+# Linear ratio -> logarithmic value
+#
+# Eyeling may solve math:exponentiation backwards when the base
+# and result are known and the exponent is the variable:
+#
+#     (?base ?exponent) math:exponentiation ?linearRatio
+#
+# The logarithmic value is then:
+#
+#     sourceValue = exponent / logExponentMultiplier
+#################################################################
+
+{
+    (?linearRatio ?targetUnit)
+        qcr:logValueFromLinearRatio
+        (?targetValue ?convention) .
+}
+<=
+{
+    ?targetUnit
+        a qudt:LogarithmicUnit ;
+        qcr:logBase ?base ;
+        qcr:logExponentMultiplier ?exponentMultiplier ;
+        qcr:logarithmicConvention ?convention .
+
+    (?base ?exponent)
+        math:exponentiation
+        ?linearRatio .
+
+    (?exponent ?exponentMultiplier)
+        math:quotient
+        ?targetValue .
+} .
+
+
+#################################################################
+# Forward normalization rule 5:
+# logarithmic CDT/UCUM literal -> linear dimensionless ratio
+#################################################################
+
+{
+    ?focusNode ?sourceProperty ?literal .
+
+    ?literal dt:datatype ?sourceDatatype .
+
+    (?literal ?sourceDatatype)
+        qcr:parsedQuantityLiteral
+        (?sourceValue ?sourceUnit) .
+
+    (?sourceValue ?sourceUnit)
+        qcr:linearRatioFromLogValue
+        (?linearRatio ?convention) .
+
+    ?linearRatio dt:lexicalForm ?linearLexicalForm .
+
+    (?linearLexicalForm " 1")
+        string:concatenation
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+
+    (?normalizedLexicalForm cdt:dimensionless)
+        log:dtlit
+        ?normalizedSpecificLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?linearRatio ;
+            qudt:unit unit:UNITLESS ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceLiteral ?literal ;
+            qcr:sourceUnit ?sourceUnit ;
+            qcr:logarithmicConvention ?convention
+        ] ;
+        qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
+        qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+} .
+
+
+#################################################################
+# Forward normalization rule 6:
+# logarithmic QUDT QuantityValue -> linear dimensionless ratio
+#################################################################
+
+{
+    ?focusNode ?sourceProperty ?sourceQuantity .
+
+    ?sourceQuantity
+        qudt:numericValue ?sourceValue ;
+        qudt:unit ?sourceUnit .
+
+    (?sourceValue ?sourceUnit)
+        qcr:linearRatioFromLogValue
+        (?linearRatio ?convention) .
+
+    ?linearRatio dt:lexicalForm ?linearLexicalForm .
+
+    (?linearLexicalForm " 1")
+        string:concatenation
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+
+    (?normalizedLexicalForm cdt:dimensionless)
+        log:dtlit
+        ?normalizedSpecificLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?linearRatio ;
+            qudt:unit unit:UNITLESS ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceQuantity ?sourceQuantity ;
+            qcr:sourceUnit ?sourceUnit ;
+            qcr:logarithmicConvention ?convention
+        ] ;
+        qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
+        qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+} .
+
+
+
+#################################################################
+# Forward normalization rule 7:
+# linear dimensionless QUDT QuantityValue -> configured log unit
+#
+# To request a particular logarithmic representation, attach:
+#
+#     ?focusNode qcr:targetLogarithmicUnit unit:DeciB .
+#
+# This avoids guessing among bel, decibel, neper, octave, decade,
+# pH, and any future logarithmic units.
+#################################################################
+
+{
+    ?focusNode
+        ?sourceProperty ?sourceQuantity ;
+        qcr:targetLogarithmicUnit ?targetUnit .
+
+    ?sourceQuantity
+        qudt:numericValue ?linearRatio ;
+        qudt:unit unit:UNITLESS .
+
+    (?linearRatio ?targetUnit)
+        qcr:logValueFromLinearRatio
+        (?targetValue ?convention) .
+
+    ?targetValue dt:lexicalForm ?targetLexicalForm .
+
+    ?targetUnit qcr:unitToken ?targetUnitToken .
+
+    (?targetLexicalForm " " ?targetUnitToken)
+        string:concatenation
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedLogarithmicQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?targetValue ;
+            qudt:unit ?targetUnit ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceQuantity ?sourceQuantity ;
+            qcr:logarithmicConvention ?convention
+        ] ;
+        qcr:normalizedLogarithmicUcumLiteral ?normalizedUcumLiteral .
+} .
+
+
+#################################################################
+# Forward normalization rule 8:
+# linear cdt:dimensionless or cdt:ucum literal -> configured log unit
+#
+# Example request:
+#
+#     ex:gain
+#         ex:ratio "100 1"^^cdt:dimensionless ;
+#         qcr:targetLogarithmicUnit unit:DeciB .
+#################################################################
+
+{
+    ?focusNode
+        ?sourceProperty ?literal ;
+        qcr:targetLogarithmicUnit ?targetUnit .
+
+    ?literal dt:datatype ?sourceDatatype .
+
+    (?literal ?sourceDatatype)
+        qcr:parsedQuantityLiteral
+        (?linearRatio ?sourceUnit) .
+
+    ?sourceUnit qudt:hasDimensionVector ?dimension .
+    unit:UNITLESS qudt:hasDimensionVector ?dimension .
+
+    (?linearRatio ?targetUnit)
+        qcr:logValueFromLinearRatio
+        (?targetValue ?convention) .
+
+    ?targetValue dt:lexicalForm ?targetLexicalForm .
+
+    ?targetUnit qcr:unitToken ?targetUnitToken .
+
+    (?targetLexicalForm " " ?targetUnitToken)
+        string:concatenation
+        ?normalizedLexicalForm .
+
+    (?normalizedLexicalForm cdt:ucum)
+        log:dtlit
+        ?normalizedUcumLiteral .
+}
+=>
+{
+    ?focusNode
+        qcr:normalizedLogarithmicQuantity [
+            a qudt:QuantityValue ;
+            qudt:numericValue ?targetValue ;
+            qudt:unit ?targetUnit ;
+            qcr:sourceProperty ?sourceProperty ;
+            qcr:sourceLiteral ?literal ;
+            qcr:logarithmicConvention ?convention
+        ] ;
+        qcr:normalizedLogarithmicUcumLiteral ?normalizedUcumLiteral .
+} .
+
+
+#################################################################
+# Optional example input
+#
+# Uncomment in the Eyeling playground:
+#
+# @prefix ex: <https://example.org/> .
+#
+# ex:cdt-speed-001
+#     a ex:Observation ;
+#     ex:speed "1.5e1 m/s"^^cdt:speed .
+#
+# Expected normalized numeric value: 15 m/s.
+#
+# Another example:
+#
+# ex:temperature-001
+#     ex:temperature "32 [degF]"^^cdt:temperature .
+#
+# Expected normalized numeric value: 273.15 K.
+#
+# Logarithmic examples:
+#
+# ex:gain-001
+#     ex:gain "20 dB"^^cdt:ucum .
+#
+# Expected normalized ratio under the documented power-ratio
+# convention: 100 unitless.
+#
+# ex:interval-001
+#     ex:interval [
+#         a qudt:QuantityValue ;
+#         qudt:numericValue 3 ;
+#         qudt:unit unit:OCT
+#     ] .
+#
+# Expected normalized ratio: 8 unitless.
+#
+# Reverse logarithmic example:
+#
+# ex:gain-ratio-001
+#     ex:ratio [
+#         a qudt:QuantityValue ;
+#         qudt:numericValue 100 ;
+#         qudt:unit unit:UNITLESS
+#     ] ;
+#     qcr:targetLogarithmicUnit unit:DeciB .
+#
+# Expected logarithmic value under the power-ratio convention:
+# 20 dB.
+#################################################################

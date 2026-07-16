@@ -33,6 +33,7 @@ type PlaygroundState = {
 type BundledRuleProfile = {
   file: string;
   n3: string;
+  precompiledRuntime?: string;
 };
 
 type BundledExample = {
@@ -368,7 +369,7 @@ self.onmessage = async (event) => {
       ? 'Bundled profiles: ' + request.bundledRuleLabels.join(', ')
       : 'Bundled N3 rule profiles';
     const ruleProfiles = request.bundledRuleProfiles && request.bundledRuleProfiles.length
-      ? request.bundledRuleProfiles.map((profile) => ({ n3: profile.n3, label: profile.file }))
+      ? request.bundledRuleProfiles.map((profile) => ({ n3: profile.n3, label: profile.file, precompiledRuntime: profile.precompiledRuntime }))
       : [{ n3: request.bundledRules, label: ruleLabel }];
     const runtime = reasoner.load(ruleProfiles, background.quads, Object.keys(loadOptions).length ? loadOptions : undefined);
     const compiledAt = performance.now();
@@ -1174,13 +1175,17 @@ function populateRuleProfiles(): void {
 
 function ruleProfileCopy(file: string): { label: string; description: string } {
   const profiles: Record<string, { label: string; description: string }> = {
-    'owl2rl-eyeling.n3': {
+    'owl2rl/owl2rl-eyeling.n3': {
       label: 'OWL 2 RL / RDF rules',
       description: 'Materializes OWL 2 RL and RDFS-style consequences such as subclass, subproperty, domain/range, equivalence, property chains, selected restrictions, sameAs, and inconsistency diagnostics.',
     },
-    'skos-entailment.n3': {
+    'skos/skos-entailment.n3': {
       label: 'SKOS Core entailment rules',
       description: 'Materializes SKOS Core consequences such as concept-scheme membership, broader/narrower inverses and transitive closures, semantic relation hierarchy, labels, notes, collections, and mapping properties.',
+    },
+    'qudt/qudt-cdt-normalization.n3': {
+      label: 'QUDT/CDT normalization rules',
+      description: 'Normalizes QUDT quantity values and cdt: quantity literals, using the bundled precompiled QUDT projection when this profile is selected or QUDT/CDT vocabulary is loaded.',
     },
   };
   return profiles[file] ?? {

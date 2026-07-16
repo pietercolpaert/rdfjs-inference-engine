@@ -1,13 +1,29 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Quad } from '@rdfjs/types';
 import { Parser } from 'rdf-parser-ts';
 import { InferenceEngine, loadDefaultRuleProfiles, type RuntimeCompilerInput } from '../src';
 
 const SKOLEM_BASE_IRI = 'https://eyereasoner.github.io/.well-known/genid/';
+const parser = new Parser();
 
-const expectedLabels = readdirSync('rules')
-  .filter((file) => file.endsWith('.n3'))
+function isRuleProfileFile(file: string): boolean {
+  return file.endsWith('.n3') && !file.endsWith('.runtime.n3');
+}
+
+const expectedLabels = readdirSync('rules', { withFileTypes: true })
+  .flatMap((entry) => {
+    if (entry.isFile() && isRuleProfileFile(entry.name)) {
+      return [entry.name];
+    }
+    if (!entry.isDirectory() || entry.name === 'precompiled' || entry.name === 'shacl-experimental') {
+      return [];
+    }
+    return readdirSync(join('rules', entry.name))
+      .filter(isRuleProfileFile)
+      .map((file) => `${entry.name}/${file}`);
+  })
   .sort()
   .map((file) => `rules/${file}`);
 
@@ -17,8 +33,17 @@ const defaultProfiles = loadDefaultRuleProfiles();
 assert.deepEqual(
   defaultProfiles.map((profile) => profile.label),
   expectedLabels,
-  'loadDefaultRuleProfiles() should load every bundled rules/*.n3 file in sorted order.',
+  'loadDefaultRuleProfiles() should load every bundled rules/*/*.n3 file in sorted order.',
 );
+
+const qudtProfile = defaultProfiles.find((profile) => profile.label === 'rules/qudt/qudt-cdt-normalization.n3');
+assert.ok(qudtProfile?.precompiledRuntime?.includes('Source: https://qudt.org/qudt-all'),
+  'The bundled QUDT/CDT profile should include its precompiled qudt-all dependency.');
+
+const standaloneQudtReasoner = new InferenceEngine();
+standaloneQudtReasoner.load(qudtProfile!, [], { runtimeCompiler: () => '# Dynamic runtime\n' });
+assert.ok(standaloneQudtReasoner.getRuntime().includes('# Precompiled runtime profile: rules/qudt/qudt-cdt-normalization.n3'),
+  'Selecting the QUDT/CDT profile should activate its precompiled dependency automatically.');
 
 let compilerInput: RuntimeCompilerInput | undefined;
 const reasoner = new InferenceEngine();
@@ -30,15 +55,24 @@ reasoner.load([], {
 });
 
 assert.ok(compilerInput, 'Expected the runtime compiler to be called.');
+assert.equal(reasoner.getRuntime().includes('# Precompiled runtime profile: rules/qudt/qudt-cdt-normalization.n3'), false,
+  'An unrelated mixed-profile load should leave the large QUDT runtime dormant.');
+
+const cdtVocabularyReasoner = new InferenceEngine();
+cdtVocabularyReasoner.load(defaultProfiles, parseQuads(`
+@prefix ex: <https://example.org/> .
+@prefix cdt: <https://w3id.org/cdt/> .
+ex:configuration ex:defaultLength "1 m"^^cdt:length .
+`), { runtimeCompiler: () => '# Dynamic runtime\n' });
+assert.ok(cdtVocabularyReasoner.getRuntime().includes('# Precompiled runtime profile: rules/qudt/qudt-cdt-normalization.n3'),
+  'A CDT datatype in mixed-profile load-time vocabulary should activate the QUDT dependency.');
 assert.deepEqual(
   compilerInput.profiles.map((profile) => profile.label),
   expectedLabels,
-  'load(vocabularyDataset) should use every bundled rules/*.n3 file by default.',
+  'load(vocabularyDataset) should use every bundled rules/*/*.n3 file by default.',
 );
 
-const parser = new Parser();
-
-const skosProfile = readFileSync('rules/skos-entailment.n3', 'utf8');
+const skosProfile = readFileSync('rules/skos/skos-entailment.n3', 'utf8');
 const selectedSkosReasoner = new InferenceEngine();
 selectedSkosReasoner.load(skosProfile, []);
 assert.equal(

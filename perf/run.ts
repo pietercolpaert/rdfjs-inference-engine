@@ -323,7 +323,7 @@ function externalCommandReasoners(): Reasoner[] {
         const outputPath = resolve(context.cacheDir, `${safeName(testCase.id)}-${safeName(id)}.out`);
         const command = configuredCommand
           .replaceAll('{input}', shellQuote(inputPath))
-          .replaceAll('{rules}', shellQuote(resolve('rules/owl2rl-eyeling.n3')))
+          .replaceAll('{rules}', shellQuote(resolve('rules/owl2rl/owl2rl-eyeling.n3')))
           .replaceAll('{output}', shellQuote(outputPath));
         const start = performance.now();
         const result = spawnSync(command, {

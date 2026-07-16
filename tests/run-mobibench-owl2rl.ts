@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     throw new Error('No runnable MobiBench OWL2 RL tests discovered. Use --list to inspect the archive.');
   }
 
-  const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
+  const profile = readFileSync('rules/owl2rl/owl2rl-eyeling.n3', 'utf8');
   const outputMode = 'conformance';
   const prepared = new InferenceEngine({ outputMode });
   prepared.load(profile, [], { selectRuntimeRules: false });

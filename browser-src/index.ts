@@ -68,7 +68,13 @@ const INTERNAL_HELPER_PREDICATES = new Set([
   SHACLN3 + 'value',
 ]);
 
-export type RuleProfile = string | { n3?: string; text?: string; label?: string; baseIri?: string };
+export type RuleProfile = string | {
+  n3?: string;
+  text?: string;
+  label?: string;
+  baseIri?: string;
+  precompiledRuntime?: string;
+};
 export type VocabularyDataset = DatasetCore | Iterable<Quad>;
 export type ShaclShapeInput = VocabularyDataset | string | { quads: Iterable<Quad> };
 
@@ -76,6 +82,7 @@ export interface LoadedRuleProfile {
   n3: string;
   label?: string;
   baseIri?: string;
+  precompiledRuntime?: string;
 }
 
 export interface InferenceEngineOptions {
@@ -192,7 +199,10 @@ export class InferenceEngine {
 
   public load(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): string {
     const normalizedProfiles = normalizeProfiles(profiles);
-    const profileN3 = normalizedProfiles.map((profile) => profile.n3).join('\n\n');
+    const profileN3 = normalizedProfiles
+      .filter((profile) => !profile.precompiledRuntime)
+      .map((profile) => profile.n3)
+      .join('\n\n');
     const vocabularyQuads = quadsFromVocabulary(vocabulary);
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
     let closure: ReturnType<typeof reasonStream>;
@@ -211,7 +221,7 @@ export class InferenceEngine {
     this.shapePlanning = compileLoadShapePlanning(options);
 
     const runtimeCompiler = options.runtimeCompiler ?? this.runtimeCompiler;
-    this.runtime = runtimeCompiler({
+    const compiledRuntime = runtimeCompiler({
       profiles: normalizedProfiles,
       profileN3,
       vocabulary: vocabularyQuads,
@@ -220,6 +230,7 @@ export class InferenceEngine {
       options,
       shapePlanning: this.shapePlanning,
     });
+    this.runtime = appendPrecompiledProfileRuntimes(compiledRuntime, normalizedProfiles, vocabularyQuads);
 
     return this.runtime;
   }
@@ -707,6 +718,9 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
   let totalRules = 0;
 
   for (const profile of input.profiles) {
+    if (profile.precompiledRuntime) {
+      continue;
+    }
     const source = profile.n3.trimEnd();
     if (!source) {
       continue;
@@ -1429,8 +1443,37 @@ function normalizeProfiles(profiles: RuleProfile | RuleProfile[]): LoadedRulePro
       n3: profile.n3 ?? profile.text ?? '',
       label: profile.label,
       baseIri: profile.baseIri,
+      precompiledRuntime: profile.precompiledRuntime,
     };
   });
+}
+
+function appendPrecompiledProfileRuntimes(runtime: string, profiles: LoadedRuleProfile[], vocabulary: Quad[]): string {
+  const activatePreparedProfiles = profiles.length === 1 || vocabulary.some((quad) => [quad.subject, quad.predicate, quad.object]
+    .some(isQudtCdtTerm));
+  if (!activatePreparedProfiles) {
+    return runtime;
+  }
+
+  const prepared = profiles
+    .filter((profile) => profile.precompiledRuntime?.trim())
+    .map((profile) => [
+      `# Precompiled runtime profile${profile.label ? `: ${profile.label}` : ''}`,
+      profile.precompiledRuntime!.trim(),
+    ].join('\n'));
+
+  return prepared.length === 0
+    ? runtime
+    : `${[runtime.trimEnd(), ...prepared].filter(Boolean).join('\n\n')}\n`;
+}
+
+function isQudtCdtTerm(term: Term): boolean {
+  const iri = term.termType === 'Literal' ? term.datatype.value : term.value;
+  return (term.termType === 'NamedNode' || term.termType === 'Literal')
+    && (iri.startsWith('http://qudt.org/')
+      || iri.startsWith('https://qudt.org/')
+      || iri.startsWith('https://w3id.org/cdt/')
+      || iri.startsWith('http://w3id.org/lindt/custom_datatypes#'));
 }
 
 function quadsFromVocabulary(vocabulary: VocabularyDataset): Quad[] {

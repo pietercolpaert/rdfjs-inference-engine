@@ -17,6 +17,10 @@ The current SHACL 1.2 additions cover `sh:ShapeClass`, explicit data-side `sh:sh
 
 Full validation-report graph isomorphism and guarantees beyond the W3C boolean-conformance harness remain out of scope.
 
+## Build
+
+The profiles are plain N3 and do not need a separate build step. They are not included in default Node loading or the browser playground's bundled default profiles. Tests and callers that need them load these files explicitly.
+
 ## Tests
 
 The root package keeps these tests available, but they explicitly load the rules from this experimental folder.

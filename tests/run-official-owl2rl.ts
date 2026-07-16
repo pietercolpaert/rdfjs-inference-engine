@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     throw new Error('No official OWL 2 RL tests selected. Use --list to see discovered test identifiers.');
   }
 
-  const profile = readFileSync('rules/owl2rl-eyeling.n3', 'utf8');
+  const profile = readFileSync('rules/owl2rl/owl2rl-eyeling.n3', 'utf8');
   const outputMode = args.conformance || args.all ? 'conformance' : 'application';
   const prepared = new InferenceEngine({ outputMode });
   prepared.load(profile, [], { selectRuntimeRules: false });

@@ -17,7 +17,8 @@
   "files": [
     "dist/src/",
     "browser/",
-    "rules/*.n3",
+    "rules/*/*.n3",
+    "rules/*/README.md",
     "index.html",
     "README.md"
   ],
@@ -29,6 +30,7 @@
     "build": "npm run clean --silent && tsc -p tsconfig.json && npm run build:browser --silent",
     "build:node": "npm run clean --silent && tsc -p tsconfig.json",
     "build:browser": "node scripts/build-browser.mjs",
+    "build:qudt-profile": "npm run build:node --silent && node scripts/build-qudt-profile.mjs",
     "hooks:install": "node scripts/install-hooks.cjs",
     "prepare": "node scripts/install-hooks.cjs",
     "example": "npm run example:transit-fleet",
