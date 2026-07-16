@@ -1,0 +1,57 @@
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix ex: <http://example.com/attributes/> .
+@prefix obs: <http://example.com/observations/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rml: <http://w3id.org/rml/> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix ssn: <http://www.w3.org/ns/ssn/> .
+@prefix waterinfo: <http://example.com/waterinfo/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+VERSION "1.2-messages"
+
+# Waterinfo publishes one observation per message. The raw EC20 feed identifies
+# the sensor and timestamp, but the numeric values arrive without an explicit
+# unit in the original export. This example keeps the original scientific
+# notation and adds the missing unit as a CDT UCUM literal: microsiemens per
+# centimetre, written as uS.cm-1.
+obs:289423042-1735689600 a sosa:Observation;
+  sosa:hasSimpleResult "3.23327E3 uS.cm-1"^^cdt:ucum;
+  sosa:madeBySensor waterinfo:289423042;
+  sosa:resultTime "2025-01-01T00:00:00Z"^^xsd:dateTime .
+MESSAGE
+
+# Fifteen minutes later, the value rises. Downstream applications should not
+# need to know that Waterinfo used microsiemens per centimetre; they ask for a
+# normalized Siemens-per-metre representation in SHACL OUT.
+obs:289423042-1735690500 a sosa:Observation;
+  sosa:hasSimpleResult "3.25081E3 uS.cm-1"^^cdt:ucum;
+  sosa:madeBySensor waterinfo:289423042;
+  sosa:resultTime "2025-01-01T00:15:00Z"^^xsd:dateTime .
+MESSAGE
+
+# EC20 conductivity is already temperature-normalized to 20 degrees Celsius, so
+# this stream is suitable for threshold alerting and comparison between canal
+# stations once the unit is normalized.
+obs:289423042-1735691400 a sosa:Observation;
+  sosa:hasSimpleResult "3.25912E3 uS.cm-1"^^cdt:ucum;
+  sosa:madeBySensor waterinfo:289423042;
+  sosa:resultTime "2025-01-01T00:30:00Z"^^xsd:dateTime .
+MESSAGE
+
+# A local spike near Terneuzen can later be compared with inland stations to
+# estimate time-lagged salt intrusion propagation along the canal.
+obs:289423042-1735692300 a sosa:Observation;
+  sosa:hasSimpleResult "3.28121E3 uS.cm-1"^^cdt:ucum;
+  sosa:madeBySensor waterinfo:289423042;
+  sosa:resultTime "2025-01-01T00:45:00Z"^^xsd:dateTime .
+MESSAGE
+
+# The final message shows that each observation is processed independently while
+# preserving RDF Message boundaries in the output stream.
+obs:289423042-1735693200 a sosa:Observation;
+  sosa:hasSimpleResult "3.27552E3 uS.cm-1"^^cdt:ucum;
+  sosa:madeBySensor waterinfo:289423042;
+  sosa:resultTime "2025-01-01T01:00:00Z"^^xsd:dateTime .
+MESSAGE

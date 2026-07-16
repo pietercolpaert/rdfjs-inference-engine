@@ -1,0 +1,38 @@
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix waterinfo: <http://example.com/waterinfo/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL OUT says what the application can consume: each Waterinfo observation
+# must expose a normalized QUDT quantity in Siemens per metre, plus a compact
+# cdt:ucum literal for systems that prefer literal values over quantity objects.
+waterinfo:Ec20ConductivityOutputShape a sh:NodeShape ;
+  sh:targetClass sosa:Observation ;
+  sh:property [
+    sh:path qcr:normalizedQuantity ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:class qudt:QuantityValue ;
+    sh:unit unit:S-PER-M
+  ] ;
+  sh:property [
+    sh:path qcr:normalizedUcumLiteral ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:datatype cdt:ucum
+  ] .
+
+waterinfo:NormalizedEc20ConductivityShape a sh:NodeShape ;
+  sh:targetObjectsOf qcr:normalizedQuantity ;
+  sh:property [
+    sh:path qudt:numericValue ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:datatype xsd:double
+  ] ;
+  sh:property [
+    sh:path qudt:unit ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:hasValue unit:S-PER-M
+  ] .

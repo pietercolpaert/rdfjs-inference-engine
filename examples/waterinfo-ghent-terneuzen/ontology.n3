@@ -1,0 +1,25 @@
+@prefix ex: <http://example.com/attributes/> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix waterinfo: <http://example.com/waterinfo/> .
+
+# The Gent-Terneuzen canal connects the port of Ghent with the Westerschelde
+# estuary. Salt water can push inland from the North Sea, and conductivity is
+# used as a proxy for salinity because dissolved ions increase electrical
+# conductivity.
+waterinfo:289423042
+  a sosa:Sensor ;
+  rdfs:label "Waterinfo EC20 conductivity sensor on the Gent-Terneuzen canal" .
+
+# The application treats simple SOSA results in this stream as unit-bearing
+# quantities. QUDT normalization can then attach a normalized quantity object to
+# the observation without changing the original Waterinfo result.
+sosa:hasSimpleResult rdfs:range qudt:QuantityValue .
+
+# EC20 means the conductivity is normalized to a reference temperature of 20 C.
+# That makes the readings usable for trend analysis, salinity threshold alerts,
+# cross-border reporting, and spatial-temporal propagation analysis.
+ex:ec20Conductivity
+  rdfs:label "EC20 conductivity" ;
+  rdfs:comment "Conductivity normalized to 20 degrees Celsius, used as a salinity proxy for the Gent-Terneuzen canal." .

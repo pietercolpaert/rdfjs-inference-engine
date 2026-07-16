@@ -1,0 +1,29 @@
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix waterinfo: <http://example.com/waterinfo/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL IN describes what the Waterinfo message contains: independent SOSA
+# observations from one EC20 sensor, with the missing unit restored as a CDT UCUM
+# literal in microsiemens per centimetre.
+waterinfo:Ec20ConductivityInputShape a sh:NodeShape ;
+  sh:targetClass sosa:Observation ;
+  sh:property [
+    sh:path sosa:hasSimpleResult ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:datatype cdt:ucum ;
+    qcr:UcumUnitIn ( unit:MicroS-PER-CentiM )
+  ] ;
+  sh:property [
+    sh:path sosa:madeBySensor ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:hasValue waterinfo:289423042
+  ] ;
+  sh:property [
+    sh:path sosa:resultTime ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:datatype xsd:dateTime
+  ] .
