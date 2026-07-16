@@ -1,5 +1,5 @@
-# QUDT speed normalization with SKOS
+# CDT speed normalization with SKOS and QUDT
 
-The messages use local identifiers for kilometres per hour, miles per hour, and knots. Reverse `skos:exactMatch` assertions in the background become usable local-to-QUDT mappings only when the SKOS profile runs. QUDT then converts each value to metres per second; SKOS itself performs no arithmetic.
+The messages use concise `cdt:speed` literals with local unit tokens for kilometres per hour, miles per hour, and knots. The ontology connects those tokens to local unit IRIs through `qudt:symbol`. Reverse `skos:exactMatch` assertions then become usable local-to-QUDT mappings only when the SKOS profile runs. QUDT converts each value to metres per second; SKOS itself performs no arithmetic.
 
-SHACL IN admits the three local identifiers and preserves the quantity fields. SHACL OUT requires `unit:M-PER-SEC`. Open `index.html#example=qudt-speed-skos` with SKOS and QUDT enabled; disabling SKOS leaves these messages unnormalized.
+SHACL IN admits `cdt:speed` literals containing the three local units through `qcr:UcumUnitIn`. SHACL OUT requires `unit:M-PER-SEC`. Open `index.html#example=qudt-speed-skos` with SKOS and QUDT enabled; disabling SKOS leaves these messages unnormalized.

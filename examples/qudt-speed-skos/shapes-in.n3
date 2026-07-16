@@ -1,12 +1,13 @@
 @prefix ex: <https://example.org/qudt-speed-skos#> .
-@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 
 ex:LocalSpeedInputShape a sh:NodeShape ;
   sh:targetSubjectsOf ex:speed ;
-  sh:property [ sh:path ex:speed ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ] .
-
-ex:LocalSpeedQuantityShape a sh:NodeShape ;
-  sh:targetObjectsOf ex:speed ;
-  sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:maxCount 1 ] ;
-  sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:maxCount 1 ; sh:in ( ex:LocalKmh ex:LocalMph ex:LocalKnot ) ] .
+  sh:property [
+    sh:path ex:speed ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:datatype cdt:speed ;
+    qcr:UcumUnitIn ( ex:LocalKmh ex:LocalMph ex:LocalKnot )
+  ] .

@@ -1,12 +1,18 @@
 @prefix ex: <https://example.org/qudt-speed-skos#> .
+@prefix cdt: <https://w3id.org/cdt/> .
 @prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
 @prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-ex:speed rdfs:range qudt:QuantityValue .
+ex:speed rdfs:range cdt:speed .
 ex:speed qcr:normalizationProfile qcr:SpeedProfile .
+
+# Local unit terms provide the tokens used inside the CDT lexical forms.
+ex:LocalKmh qudt:symbol "local-km/h" .
+ex:LocalMph qudt:symbol "local-mi/h" .
+ex:LocalKnot qudt:symbol "local-kn" .
 
 # Reverse mappings require SKOS exactMatch symmetry before QUDT can resolve the
 # local identifiers. SKOS aligns terms; QUDT performs the arithmetic.

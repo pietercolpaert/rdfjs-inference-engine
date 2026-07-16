@@ -1,7 +1,7 @@
 # Generated QUDT/CDT normalization runtime. Do not edit by hand.
 # Source: https://qudt.org/qudt-all (QUDT Collection 3.4.0)
 # Source SHA-256: 7c3b91806719ce180dc004f9e5c500b1f787eb4cac1685a82c1af72afbbdcfd8
-# Projected 13414/130404 QUDT statements used by the normalization profile.
+# Projected 11645/130404 QUDT statements used by the normalization profile.
 # QUDT is licensed under CC BY 4.0; attribution: QUDT.org.
 # Generated inference runtime. Do not edit by hand.
 
@@ -72,6 +72,7 @@
 # (for example 15, 15.0, or 1.5E1), but the numeric value is equivalent.
 
 @prefix qcr:    <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
+@prefix internal: <https://www.pieter.pm/rdfjs-inference-engine/ns/internal#> .
 @prefix qudt:   <http://qudt.org/schema/qudt/> .
 @prefix unit:   <http://qudt.org/vocab/unit/> .
 @prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
@@ -371,27 +372,27 @@ unit:PH
 # Memoized backward helper predicates
 #################################################################
 
-qcr:unitToken                  log:memoize true .
-qcr:effectiveOffset            log:memoize true .
-qcr:parsedQuantityLiteral      log:memoize true .
-qcr:convertedValue             log:memoize true .
-qcr:linearRatioFromLogValue    log:memoize true .
-qcr:logValueFromLinearRatio    log:memoize true .
-qcr:profileForDatatype         log:memoize true .
-qcr:profileForGenericUcum      log:memoize true .
-qcr:normalizedLexicalForm      log:memoize true .
+internal:unitToken                  log:memoize true .
+internal:effectiveOffset            log:memoize true .
+internal:parsedQuantityLiteral      log:memoize true .
+internal:convertedValue             log:memoize true .
+internal:linearRatioFromLogValue    log:memoize true .
+internal:logValueFromLinearRatio    log:memoize true .
+internal:profileForDatatype         log:memoize true .
+internal:profileForGenericUcum      log:memoize true .
+internal:normalizedLexicalForm      log:memoize true .
 
-qcr:normalizedQuantity                 qcr:normalizationOutputProperty true .
-qcr:normalizedUcumLiteral              qcr:normalizationOutputProperty true .
-qcr:normalizedCdtLiteral               qcr:normalizationOutputProperty true .
-qcr:normalizedLogarithmicQuantity      qcr:normalizationOutputProperty true .
-qcr:normalizedLogarithmicUcumLiteral   qcr:normalizationOutputProperty true .
+qcr:normalizedQuantity                 internal:normalizationOutputProperty true .
+qcr:normalizedUcumLiteral              internal:normalizationOutputProperty true .
+qcr:normalizedCdtLiteral               internal:normalizationOutputProperty true .
+qcr:normalizedLogarithmicQuantity      internal:normalizationOutputProperty true .
+qcr:normalizedLogarithmicUcumLiteral   internal:normalizationOutputProperty true .
 
 # Normalized quantity nodes retain their source for traceability. These
 # provenance predicates must not be treated as fresh measurement properties,
 # otherwise each normalized result recursively normalizes its own source.
-qcr:sourceLiteral                      qcr:normalizationOutputProperty true .
-qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
+qcr:sourceLiteral                      internal:normalizationOutputProperty true .
+qcr:sourceQuantity                     internal:normalizationOutputProperty true .
 
 
 #################################################################
@@ -404,7 +405,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 #################################################################
 
 {
-    ?unit qcr:unitToken ?token .
+    ?unit internal:unitToken ?token .
 }
 <=
 {
@@ -412,7 +413,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?unit qcr:unitToken ?token .
+    ?unit internal:unitToken ?token .
 }
 <=
 {
@@ -420,7 +421,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?unit qcr:unitToken ?token .
+    ?unit internal:unitToken ?token .
 }
 <=
 {
@@ -456,7 +457,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?unit qcr:normalizationUnit ?unit .
+    ?unit internal:normalizationUnit ?unit .
 }
 <=
 {
@@ -464,7 +465,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?unit qcr:normalizationUnit ?unit .
+    ?unit internal:normalizationUnit ?unit .
 }
 <=
 {
@@ -472,7 +473,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?localUnit qcr:normalizationUnit ?qudtUnit .
+    ?localUnit internal:normalizationUnit ?qudtUnit .
 }
 <=
 {
@@ -481,7 +482,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?localUnit qcr:normalizationUnit ?qudtUnit .
+    ?localUnit internal:normalizationUnit ?qudtUnit .
 }
 <=
 {
@@ -495,7 +496,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 #################################################################
 
 {
-    ?unit qcr:effectiveOffset ?offset .
+    ?unit internal:effectiveOffset ?offset .
 }
 <=
 {
@@ -503,7 +504,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?unit qcr:effectiveOffset 0.0 .
+    ?unit internal:effectiveOffset 0.0 .
 }
 <=
 {
@@ -520,7 +521,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 #################################################################
 
 {
-    ?datatype qcr:profileForDatatype ?profile .
+    ?datatype internal:profileForDatatype ?profile .
 }
 <=
 {
@@ -528,7 +529,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    ?datatype qcr:profileForDatatype ?profile .
+    ?datatype internal:profileForDatatype ?profile .
 }
 <=
 {
@@ -542,13 +543,13 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 
 {
     (?literal ?datatype)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 }
 <=
 {
     ?literal dt:datatype ?datatype .
-    ?datatype qcr:profileForDatatype ?profile .
+    ?datatype internal:profileForDatatype ?profile .
 
     ?literal dt:lexicalForm ?lexicalForm .
 
@@ -570,7 +571,10 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         log:dtlit
         ?sourceValue .
 
-    ?sourceUnit qcr:unitToken ?unitToken .
+    # Resolve local lexical units through the same bounded alignment relation
+    # used by QUDT object inputs before conversion metadata is consulted.
+    ?inputUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 } .
 
 
@@ -580,7 +584,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 
 {
     (?literal cdt:ucum)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 }
 <=
@@ -606,12 +610,13 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         log:dtlit
         ?sourceValue .
 
-    ?sourceUnit qcr:unitToken ?unitToken .
+    ?inputUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 } .
 
 {
     (?literal lcdt:ucum)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 }
 <=
@@ -637,7 +642,8 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         log:dtlit
         ?sourceValue .
 
-    ?sourceUnit qcr:unitToken ?unitToken .
+    ?inputUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 } .
 
 
@@ -652,7 +658,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 #################################################################
 
 {
-    ?sourceUnit qcr:profileForGenericUcum ?profile .
+    ?sourceUnit internal:profileForGenericUcum ?profile .
 }
 <=
 {
@@ -668,7 +674,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 #################################################################
 
 {
-    (?sourceProperty ?sourceUnit) qcr:profileForObjectProperty ?profile .
+    (?sourceProperty ?sourceUnit) internal:profileForObjectProperty ?profile .
 }
 <=
 {
@@ -677,20 +683,20 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 } .
 
 {
-    (?sourceProperty ?sourceUnit) qcr:profileForObjectProperty ?profile .
+    (?sourceProperty ?sourceUnit) internal:profileForObjectProperty ?profile .
 }
 <=
 {
     1 log:notIncludes {
         ?sourceProperty qcr:normalizationProfile ?explicitProfile .
     } .
-    ?sourceUnit qcr:profileForGenericUcum ?profile .
+    ?sourceUnit internal:profileForGenericUcum ?profile .
 } .
 
 
 {
     (?sourceValue ?sourceUnit ?targetUnit)
-        qcr:convertedValue
+        internal:convertedValue
         ?targetValue .
 }
 <=
@@ -706,12 +712,12 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?sourceUnit
         qudt:hasDimensionVector ?dimension ;
         qudt:conversionMultiplier ?sourceMultiplier ;
-        qcr:effectiveOffset ?sourceOffset .
+        internal:effectiveOffset ?sourceOffset .
 
     ?targetUnit
         qudt:hasDimensionVector ?dimension ;
         qudt:conversionMultiplier ?targetMultiplier ;
-        qcr:effectiveOffset ?targetOffset .
+        internal:effectiveOffset ?targetOffset .
 
     (?sourceValue ?sourceOffset)
         math:sum
@@ -737,7 +743,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 
 {
     (?numericValue ?ucumCode)
-        qcr:normalizedLexicalForm
+        internal:normalizedLexicalForm
         ?lexicalForm .
 }
 <=
@@ -759,7 +765,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?focusNode ?sourceProperty ?literal .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedUcumLiteral ?literal .
@@ -772,10 +778,10 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     } .
 
     ?literal dt:datatype ?sourceDatatype .
-    ?sourceDatatype qcr:profileForDatatype ?profile .
+    ?sourceDatatype internal:profileForDatatype ?profile .
 
     (?literal ?sourceDatatype)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 
     ?profile
@@ -784,11 +790,11 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qcr:targetUcumCode ?targetUcumCode .
 
     (?sourceValue ?sourceUnit ?targetUnit)
-        qcr:convertedValue
+        internal:convertedValue
         ?targetValue .
 
     (?targetValue ?targetUcumCode)
-        qcr:normalizedLexicalForm
+        internal:normalizedLexicalForm
         ?normalizedLexicalForm .
 
     (?normalizedLexicalForm cdt:ucum)
@@ -824,7 +830,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?focusNode ?sourceProperty ?literal .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedUcumLiteral ?literal .
@@ -839,10 +845,10 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?literal dt:datatype cdt:ucum .
 
     (?literal cdt:ucum)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 
-    ?sourceUnit qcr:profileForGenericUcum ?profile .
+    ?sourceUnit internal:profileForGenericUcum ?profile .
 
     ?profile
         qcr:datatype ?targetDatatype ;
@@ -850,11 +856,11 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qcr:targetUcumCode ?targetUcumCode .
 
     (?sourceValue ?sourceUnit ?targetUnit)
-        qcr:convertedValue
+        internal:convertedValue
         ?targetValue .
 
     (?targetValue ?targetUcumCode)
-        qcr:normalizedLexicalForm
+        internal:normalizedLexicalForm
         ?normalizedLexicalForm .
 
     (?normalizedLexicalForm cdt:ucum)
@@ -887,7 +893,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?focusNode ?sourceProperty ?literal .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedUcumLiteral ?literal .
@@ -902,10 +908,10 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?literal dt:datatype lcdt:ucum .
 
     (?literal lcdt:ucum)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 
-    ?sourceUnit qcr:profileForGenericUcum ?profile .
+    ?sourceUnit internal:profileForGenericUcum ?profile .
 
     ?profile
         qcr:datatype ?targetDatatype ;
@@ -913,11 +919,11 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qcr:targetUcumCode ?targetUcumCode .
 
     (?sourceValue ?sourceUnit ?targetUnit)
-        qcr:convertedValue
+        internal:convertedValue
         ?targetValue .
 
     (?targetValue ?targetUcumCode)
-        qcr:normalizedLexicalForm
+        internal:normalizedLexicalForm
         ?normalizedLexicalForm .
 
     (?normalizedLexicalForm cdt:ucum)
@@ -950,7 +956,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?focusNode ?sourceProperty ?sourceQuantity .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedQuantity ?sourceQuantity .
@@ -963,9 +969,9 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qudt:numericValue ?sourceValue ;
         qudt:unit ?inputUnit .
 
-    ?inputUnit qcr:normalizationUnit ?sourceUnit .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 
-    (?sourceProperty ?sourceUnit) qcr:profileForObjectProperty ?profile .
+    (?sourceProperty ?sourceUnit) internal:profileForObjectProperty ?profile .
 
     ?profile
         qcr:datatype ?targetDatatype ;
@@ -973,11 +979,11 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qcr:targetUcumCode ?targetUcumCode .
 
     (?sourceValue ?sourceUnit ?targetUnit)
-        qcr:convertedValue
+        internal:convertedValue
         ?targetValue .
 
     (?targetValue ?targetUcumCode)
-        qcr:normalizedLexicalForm
+        internal:normalizedLexicalForm
         ?normalizedLexicalForm .
 
     (?normalizedLexicalForm cdt:ucum)
@@ -1008,7 +1014,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 
 {
     (?sourceValue ?sourceUnit)
-        qcr:linearRatioFromLogValue
+        internal:linearRatioFromLogValue
         (?linearRatio ?convention) .
 }
 <=
@@ -1044,7 +1050,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 
 {
     (?linearRatio ?targetUnit)
-        qcr:logValueFromLinearRatio
+        internal:logValueFromLinearRatio
         (?targetValue ?convention) .
 }
 <=
@@ -1074,7 +1080,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?focusNode ?sourceProperty ?literal .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedUcumLiteral ?literal .
@@ -1089,11 +1095,11 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?literal dt:datatype ?sourceDatatype .
 
     (?literal ?sourceDatatype)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?sourceValue ?sourceUnit) .
 
     (?sourceValue ?sourceUnit)
-        qcr:linearRatioFromLogValue
+        internal:linearRatioFromLogValue
         (?linearRatio ?convention) .
 
     ?linearRatio dt:lexicalForm ?linearLexicalForm .
@@ -1133,7 +1139,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?focusNode ?sourceProperty ?sourceQuantity .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedQuantity ?sourceQuantity .
@@ -1146,10 +1152,10 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qudt:numericValue ?sourceValue ;
         qudt:unit ?inputUnit .
 
-    ?inputUnit qcr:normalizationUnit ?sourceUnit .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 
     (?sourceValue ?sourceUnit)
-        qcr:linearRatioFromLogValue
+        internal:linearRatioFromLogValue
         (?linearRatio ?convention) .
 
     ?linearRatio dt:lexicalForm ?linearLexicalForm .
@@ -1199,7 +1205,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qcr:targetLogarithmicUnit ?targetUnit .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedQuantity ?sourceQuantity .
@@ -1213,12 +1219,12 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qudt:unit unit:UNITLESS .
 
     (?linearRatio ?targetUnit)
-        qcr:logValueFromLinearRatio
+        internal:logValueFromLinearRatio
         (?targetValue ?convention) .
 
     ?targetValue dt:lexicalForm ?targetLexicalForm .
 
-    ?targetUnit qcr:unitToken ?targetUnitToken .
+    ?targetUnit internal:unitToken ?targetUnitToken .
 
     (?targetLexicalForm " " ?targetUnitToken)
         string:concatenation
@@ -1258,7 +1264,7 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
         qcr:targetLogarithmicUnit ?targetUnit .
 
     _:normalizationOutputScope log:notIncludes {
-        ?sourceProperty qcr:normalizationOutputProperty true .
+        ?sourceProperty internal:normalizationOutputProperty true .
     } .
     _:normalizationOutputScope log:notIncludes {
         ?focusNode qcr:normalizedUcumLiteral ?literal .
@@ -1273,19 +1279,19 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
     ?literal dt:datatype ?sourceDatatype .
 
     (?literal ?sourceDatatype)
-        qcr:parsedQuantityLiteral
+        internal:parsedQuantityLiteral
         (?linearRatio ?sourceUnit) .
 
     ?sourceUnit qudt:hasDimensionVector ?dimension .
     unit:UNITLESS qudt:hasDimensionVector ?dimension .
 
     (?linearRatio ?targetUnit)
-        qcr:logValueFromLinearRatio
+        internal:logValueFromLinearRatio
         (?targetValue ?convention) .
 
     ?targetValue dt:lexicalForm ?targetLexicalForm .
 
-    ?targetUnit qcr:unitToken ?targetUnitToken .
+    ?targetUnit internal:unitToken ?targetUnitToken .
 
     (?targetLexicalForm " " ?targetUnitToken)
         string:concatenation
@@ -1360,6 +1366,8 @@ qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
 #################################################################
 
 # Precomputed background facts and closure
+<http://qudt.org/vocab/unit/2PiRAD> <http://qudt.org/schema/qudt/conversionMultiplier> "0.0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+<http://qudt.org/vocab/unit/2PiRAD> <http://qudt.org/schema/qudt/hasDimensionVector> <http://qudt.org/vocab/dimensionvector/A0E0L0I0M0H0T0D1> .
 <http://qudt.org/vocab/unit/A> <http://qudt.org/schema/qudt/conversionMultiplier> "1.0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <http://qudt.org/vocab/unit/A> <http://qudt.org/schema/qudt/hasDimensionVector> <http://qudt.org/vocab/dimensionvector/A0E1L0I0M0H0T0D0> .
 <http://qudt.org/vocab/unit/A> <http://qudt.org/schema/qudt/symbol> "A" .

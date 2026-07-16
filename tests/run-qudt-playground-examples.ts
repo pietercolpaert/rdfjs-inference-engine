@@ -82,6 +82,15 @@ const selectedExample = process.env.QUDT_EXAMPLE;
 const examples = expectations
   .filter((expectation) => !selectedExample || expectation.id === selectedExample)
   .map(loadExample);
+
+if (!selectedExample) {
+  const quantityObjectExamples = examples
+    .filter((example) => example.input.quads.some((quad) => quad.predicate.value === QUDT + 'numericValue'))
+    .map((example) => example.expectation.id);
+  assert.deepEqual(quantityObjectExamples, ['qudt-quantity-safety'],
+    'Only the quantity-safety playground fixture should use verbose QUDT quantity-object input.');
+  assertions += 1;
+}
 const background = examples.flatMap((example) => example.background);
 const shaclIn = examples.flatMap((example) => example.shaclIn);
 const shaclOut = examples.flatMap((example) => example.shaclOut);

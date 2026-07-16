@@ -48,6 +48,7 @@ async function downloadQudt() {
 
 function selectNormalizationQuads(quads) {
   const qudt = 'http://qudt.org/schema/qudt/';
+  const unit = 'http://qudt.org/vocab/unit/';
   const predicates = new Set([
     'conversionMultiplier',
     'conversionOffset',
@@ -59,8 +60,10 @@ function selectNormalizationQuads(quads) {
   const rdfType = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
   const logarithmicUnit = qudt + 'LogarithmicUnit';
 
-  return quads.filter((quad) => predicates.has(quad.predicate.value)
-    || (quad.predicate.value === rdfType && quad.object.value === logarithmicUnit));
+  return quads.filter((quad) => quad.subject.termType === 'NamedNode'
+    && quad.subject.value.startsWith(unit)
+    && (predicates.has(quad.predicate.value)
+      || (quad.predicate.value === rdfType && quad.object.value === logarithmicUnit)));
 }
 
 function argumentValue(name) {

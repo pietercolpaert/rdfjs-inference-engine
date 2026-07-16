@@ -1,11 +1,10 @@
 @prefix ex: <https://example.org/qudt-temperature#> .
-@prefix qudt: <http://qudt.org/schema/qudt/> .
-@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix cdt: <https://w3id.org/cdt/> .
 
 VERSION "1.2-messages"
-ex:m1 ex:temperature [ a qudt:QuantityValue ; qudt:numericValue 0 ; qudt:unit unit:DEG_C ] .
+ex:m1 ex:temperature "0 Cel"^^cdt:temperature .
 @message .
-ex:m2 ex:temperature [ a qudt:QuantityValue ; qudt:numericValue 32 ; qudt:unit ex:LocalFahrenheit ] .
+ex:m2 ex:temperature "32 local-degF"^^cdt:temperature .
 @message .
-ex:m3 ex:temperature [ a qudt:QuantityValue ; qudt:numericValue 300 ; qudt:unit unit:K ] .
+ex:m3 ex:temperature "300 K"^^cdt:temperature .
 @message .

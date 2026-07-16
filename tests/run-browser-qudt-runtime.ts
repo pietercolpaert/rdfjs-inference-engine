@@ -43,7 +43,11 @@ try {
   });
 
   assert.ok(runtime.length < 60 * 1024, `Browser QUDT runtime should stay below 60 KiB; got ${runtime.length} bytes.`);
-  assert.match(runtime, /Shape-specialized QUDT projection: 4 unit\(s\), 25\/11809 facts\./);
+  const projectionSummary = runtime.match(/Shape-specialized QUDT projection: (\d+) unit\(s\), (\d+)\/(\d+) facts\./);
+  assert.ok(projectionSummary, 'Browser runtime should report its shape-specialized QUDT projection.');
+  assert.equal(Number(projectionSummary[1]), 4, 'The logarithmic example should retain four QUDT units.');
+  assert.equal(Number(projectionSummary[2]), 25, 'The logarithmic example should retain 25 relevant QUDT facts.');
+  assert.ok(Number(projectionSummary[3]) > 10_000, 'The source QUDT projection should contain its full background fact set.');
   assert.equal(input.messages.length, 4, 'Expected four logarithmic RDF Messages.');
   for (const [index, message] of input.messages.entries()) {
     const output = Array.from(reasoner.infer(message));

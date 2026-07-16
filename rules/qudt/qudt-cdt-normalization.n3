@@ -563,7 +563,10 @@ qcr:sourceQuantity                     internal:normalizationOutputProperty true
         log:dtlit
         ?sourceValue .
 
-    ?sourceUnit internal:unitToken ?unitToken .
+    # Resolve local lexical units through the same bounded alignment relation
+    # used by QUDT object inputs before conversion metadata is consulted.
+    ?inputUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 } .
 
 
@@ -599,7 +602,8 @@ qcr:sourceQuantity                     internal:normalizationOutputProperty true
         log:dtlit
         ?sourceValue .
 
-    ?sourceUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 } .
 
 {
@@ -630,7 +634,8 @@ qcr:sourceQuantity                     internal:normalizationOutputProperty true
         log:dtlit
         ?sourceValue .
 
-    ?sourceUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:unitToken ?unitToken .
+    ?inputUnit internal:normalizationUnit ?sourceUnit .
 } .
 
 
