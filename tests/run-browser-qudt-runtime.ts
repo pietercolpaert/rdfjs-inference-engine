@@ -42,11 +42,13 @@ try {
     shaclOut: readFileSync(join(directory, 'shapes-out.n3'), 'utf8'),
   });
 
-  assert.ok(runtime.length < 60 * 1024, `Browser QUDT runtime should stay below 60 KiB; got ${runtime.length} bytes.`);
+  assert.ok(runtime.length < 40 * 1024, `Browser QUDT runtime should stay below 40 KiB; got ${runtime.length} bytes.`);
+  assert.match(runtime, /Shape-specialized QUDT kernel: forward rule\(s\) 5\./,
+    'The logarithmic example should retain only the log-literal-to-linear forward rule.');
   const projectionSummary = runtime.match(/Shape-specialized QUDT projection: (\d+) unit\(s\), (\d+)\/(\d+) facts\./);
   assert.ok(projectionSummary, 'Browser runtime should report its shape-specialized QUDT projection.');
   assert.equal(Number(projectionSummary[1]), 4, 'The logarithmic example should retain four QUDT units.');
-  assert.equal(Number(projectionSummary[2]), 25, 'The logarithmic example should retain 25 relevant QUDT facts.');
+  assert.equal(Number(projectionSummary[2]), 26, 'The logarithmic example should retain 26 relevant QUDT facts.');
   assert.ok(Number(projectionSummary[3]) > 10_000, 'The source QUDT projection should contain its full background fact set.');
   assert.equal(input.messages.length, 4, 'Expected four logarithmic RDF Messages.');
   for (const [index, message] of input.messages.entries()) {

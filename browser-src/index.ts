@@ -40,6 +40,10 @@ const QCR = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#';
 const QUDT = 'http://qudt.org/schema/qudt/';
 const QUDT_UNIT = 'http://qudt.org/vocab/unit/';
 const QUDT_DIMENSION = QUDT + 'hasDimensionVector';
+const QUDT_LOGARITHMIC_UNIT = QUDT + 'LogarithmicUnit';
+const QUDT_QUANTITY_VALUE = QUDT + 'QuantityValue';
+const CDT = 'https://w3id.org/cdt/';
+const LEGACY_CDT = 'http://w3id.org/lindt/custom_datatypes#';
 const PRECOMPILED_BACKGROUND_MARKER = '# Precomputed background facts and closure';
 
 export type RuleProfile = string | {
@@ -1558,14 +1562,160 @@ function specializeQudtPreparedRuntime(runtime: string, planning: ShapePlanning 
     return runtime;
   }
 
-  return [
+  const profileAndRules = specializeQudtPreparedKernel(
     runtime.slice(0, markerIndex).trimEnd(),
+    planning,
+    selectedUnits,
+    resolvedInputs,
+    resolvedTargets,
+    facts,
+  );
+  return [
+    profileAndRules,
     '',
     PRECOMPILED_BACKGROUND_MARKER,
     `# Shape-specialized QUDT projection: ${selectedUnits.size} unit(s), ${selectedFacts.length}/${facts.length} facts.`,
     serializeQuadsAsN3(selectedFacts),
     '',
   ].join('\n');
+}
+
+function specializeQudtPreparedKernel(
+  kernel: string,
+  planning: ShapePlanning,
+  selectedUnits: Set<string>,
+  inputUnits: Set<string>,
+  targetUnits: Set<string>,
+  qudtFacts: Quad[],
+): string {
+  const inputDatatypes = shapePlanDatatypes(planning.input);
+  const hasQuantityObjectInput = planning.input?.relevantClasses.includes(QUDT_QUANTITY_VALUE) ?? false;
+  if (inputDatatypes.size === 0 && !hasQuantityObjectInput) {
+    return kernel;
+  }
+
+  const logarithmicUnits = new Set(qudtFacts
+    .filter((quad) => quad.predicate.value === RDF_TYPE && quad.object.value === QUDT_LOGARITHMIC_UNIT)
+    .map((quad) => quad.subject.value));
+  const memoizedMarker = kernel.indexOf('# Memoized backward helper predicates');
+  if (memoizedMarker >= 0) {
+    try {
+      for (const quad of parseShapeQuads(kernel.slice(0, memoizedMarker))) {
+        if (quad.predicate.value === QCR + 'logBase') {
+          logarithmicUnits.add(quad.subject.value);
+        }
+      }
+    } catch {
+      // Keep the conservative QUDT rdf:type classification when configuration parsing fails.
+    }
+  }
+  const sourceKinds = unitKinds(inputUnits, logarithmicUnits);
+  const targetKinds = unitKinds(targetUnits, logarithmicUnits);
+  const retainedRules = new Set<number>();
+
+  if (inputDatatypes.size > 0) {
+    const hasCurrentUcum = inputDatatypes.has(CDT + 'ucum');
+    const hasLegacyUcum = inputDatatypes.has(LEGACY_CDT + 'ucum');
+    const hasSpecificDatatype = Array.from(inputDatatypes)
+      .some((datatype) => datatype !== CDT + 'ucum' && datatype !== LEGACY_CDT + 'ucum');
+
+    if (sourceKinds.linear && targetKinds.linear) {
+      if (hasSpecificDatatype) retainedRules.add(1);
+      if (hasCurrentUcum) retainedRules.add(2);
+      if (hasLegacyUcum) retainedRules.add(3);
+    }
+    if (sourceKinds.logarithmic && targetKinds.linear) retainedRules.add(5);
+    if (targetKinds.logarithmic) retainedRules.add(8);
+  }
+
+  if (hasQuantityObjectInput) {
+    if (sourceKinds.linear && targetKinds.linear) retainedRules.add(4);
+    if (sourceKinds.logarithmic && targetKinds.linear) retainedRules.add(6);
+    if (targetKinds.logarithmic) retainedRules.add(7);
+  }
+
+  if (retainedRules.size === 0) {
+    return kernel;
+  }
+
+  const configuredKernel = specializeQudtPreparedConfiguration(kernel, planning, selectedUnits, targetUnits);
+  const ruleSection = /\n#{20,}\n# Forward normalization rule (\d+):[\s\S]*?(?=\n#{20,}\n# )/g;
+  const selectedKernel = configuredKernel.replace(ruleSection, (section, ruleNumber: string) => (
+    retainedRules.has(Number(ruleNumber)) ? section : ''
+  ));
+  return `${selectedKernel.trimEnd()}\n\n# Shape-specialized QUDT kernel: forward rule(s) ${Array.from(retainedRules).sort((a, b) => a - b).join(', ')}.`;
+}
+
+function specializeQudtPreparedConfiguration(
+  kernel: string,
+  planning: ShapePlanning,
+  selectedUnits: Set<string>,
+  targetUnits: Set<string>,
+): string {
+  const memoizedMarker = '# Memoized backward helper predicates';
+  const markerIndex = kernel.indexOf(memoizedMarker);
+  if (markerIndex < 0) {
+    return kernel;
+  }
+  const suffixStart = kernel.lastIndexOf('#################################################################', markerIndex);
+  if (suffixStart < 0) {
+    return kernel;
+  }
+
+  let configuration: Quad[];
+  try {
+    configuration = parseShapeQuads(kernel.slice(0, suffixStart));
+  } catch {
+    return kernel;
+  }
+
+  const inputDatatypes = shapePlanDatatypes(planning.input);
+  const selectedProfiles = new Set(configuration
+    .filter((quad) => (quad.predicate.value === QCR + 'datatype' || quad.predicate.value === QCR + 'legacyDatatype')
+      && inputDatatypes.has(quad.object.value))
+    .map((quad) => quad.subject.value));
+  for (const quad of configuration) {
+    if (quad.predicate.value === QCR + 'targetUnit' && targetUnits.has(quad.object.value)) {
+      selectedProfiles.add(quad.subject.value);
+    }
+  }
+
+  const selectedConfiguration = configuration.filter((quad) => selectedProfiles.has(quad.subject.value)
+    || selectedUnits.has(quad.subject.value));
+  if (selectedConfiguration.length === 0) {
+    return kernel;
+  }
+
+  const prefixes = extractPrefixDeclarations(kernel);
+  return [
+    '# Shape-specialized QUDT normalization configuration.',
+    ...prefixes,
+    '',
+    serializeQuadsAsN3(selectedConfiguration),
+    '',
+    kernel.slice(suffixStart).trimStart(),
+  ].join('\n');
+}
+
+function shapePlanDatatypes(plan: ShapePlanning['input'] | ShapePlanning['output']): Set<string> {
+  const datatypes = new Set<string>();
+  for (const shape of plan?.shapes ?? []) {
+    for (const property of shape.propertyPlans) {
+      if (property.datatype) {
+        datatypes.add(property.datatype);
+      }
+    }
+  }
+  return datatypes;
+}
+
+function unitKinds(units: Set<string>, logarithmicUnits: Set<string>): { linear: boolean; logarithmic: boolean } {
+  if (units.size === 0) {
+    return { linear: true, logarithmic: true };
+  }
+  const logarithmic = Array.from(units).some((unit) => logarithmicUnits.has(unit));
+  const linear = Array.from(units).some((unit) => !logarithmicUnits.has(unit));
+  return { linear, logarithmic };
 }
 
 function qudtUnitsFromShapePlan(plan: ShapePlanning['input'] | ShapePlanning['output']): string[] {

@@ -338,31 +338,37 @@ qcr:VolumeProfile
 #################################################################
 
 unit:B
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:PowerRatio .
 
 unit:DeciB
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier 0.1 ;
     qcr:logarithmicConvention qcr:PowerRatio .
 
 unit:NP
+    a qudt:LogarithmicUnit ;
     qcr:logBase 2.718281828459045 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:FieldRatio .
 
 unit:OCT
+    a qudt:LogarithmicUnit ;
     qcr:logBase 2.0 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:FrequencyRatio .
 
 unit:DECADE
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:FrequencyRatio .
 
 unit:PH
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier -1.0 ;
     qcr:logarithmicConvention qcr:HydrogenIonActivity .
@@ -13158,6 +13164,7 @@ qcr:sourceQuantity                     internal:normalizationOutputProperty true
 <http://qudt.org/vocab/unit/DECADE> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#logBase> "10.0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <http://qudt.org/vocab/unit/DECADE> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#logExponentMultiplier> "1.0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <http://qudt.org/vocab/unit/DECADE> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#logarithmicConvention> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#FrequencyRatio> .
+<http://qudt.org/vocab/unit/PH> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://qudt.org/schema/qudt/LogarithmicUnit> .
 <http://qudt.org/vocab/unit/PH> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#logBase> "10.0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <http://qudt.org/vocab/unit/PH> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#logExponentMultiplier> "-1.0"^^<http://www.w3.org/2001/XMLSchema#decimal> .
 <http://qudt.org/vocab/unit/PH> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#logarithmicConvention> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#HydrogenIonActivity> .

@@ -57,6 +57,13 @@ type ActiveRun = {
   elapsedTimer?: number;
   runtimeMessage?: string;
   statusMessage?: string;
+  averageMessageProcessingMs?: number;
+};
+
+type WorkerMetrics = {
+  processedMessageCount: number;
+  messageProcessingMs: number;
+  averageMessageProcessingMs: number;
 };
 
 type WorkerRequest = {
@@ -80,7 +87,7 @@ type WorkerMessage =
   | { type: 'status'; message: string }
   | { type: 'runtime'; message: string; runtime?: string }
   | { type: 'append'; chunk: string }
-  | { type: 'result'; output?: string; status: string }
+  | { type: 'result'; output?: string; status: string; metrics?: WorkerMetrics }
   | { type: 'error'; message: string };
 
 const defaultState = {
@@ -297,6 +304,7 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
         appendOutput(message.chunk);
       } else if (message.type === 'result') {
         run.statusMessage = message.status;
+        run.averageMessageProcessingMs = message.metrics?.averageMessageProcessingMs;
         if (message.output !== undefined) {
           clearOutputAppendBuffer();
           editors.outputText.setValue(message.output);
@@ -469,6 +477,7 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
     currentMessageCounter: 0,
     parsedQuadCount: 0,
     processedMessageCount: 0,
+    messageProcessingMs: 0,
     inferredCount: 0,
     inconsistencyComments: [],
     lastStatusAt: 0,
@@ -503,7 +512,11 @@ async function finishStreamingState(state) {
       await endWriter(state.writer);
     }
     appendInconsistencyComments(state.inconsistencyComments);
-    self.postMessage({ type: 'result', status: 'Done · RDF Messages: ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' quad(s), ' + state.inferredCount + ' inferred' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state) });
+    self.postMessage({
+      type: 'result',
+      status: 'Done · RDF Messages: ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' quad(s), ' + state.inferredCount + ' inferred' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state),
+      metrics: messageTimingMetrics(state),
+    });
     return;
   }
 
@@ -522,6 +535,7 @@ async function processCurrentMessage(state) {
   }
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
+  const messageStartedAt = performance.now();
   const inference = state.statefulMaterialization
     ? await state.reasoner.inferAsyncWithDiagnostics(state.currentMessage, {
         store: {
@@ -530,11 +544,23 @@ async function processCurrentMessage(state) {
         },
       })
     : state.reasoner.inferWithDiagnostics(state.currentMessage);
+  state.messageProcessingMs += performance.now() - messageStartedAt;
   state.inconsistencyComments.push(formatInconsistencyComments(inference.inconsistencies, 'message ' + messageNumber));
   state.writer.addMessage(inference.quads);
   state.inferredCount += inference.quads.length;
   state.processedMessageCount += 1;
   postProgressStatus(state, 'Processed message ' + messageNumber + '; ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' input quad(s), ' + state.inferredCount + ' inferred' + statefulStoreSummary(state) + '…');
+}
+
+function messageTimingMetrics(state) {
+  if (state.processedMessageCount === 0) {
+    return undefined;
+  }
+  return {
+    processedMessageCount: state.processedMessageCount,
+    messageProcessingMs: state.messageProcessingMs,
+    averageMessageProcessingMs: state.messageProcessingMs / state.processedMessageCount,
+  };
 }
 
 function statefulStoreSummary(state) {
@@ -998,6 +1024,9 @@ function renderRunStatus(run: ActiveRun): void {
   }
   const label = run.finishedAt === undefined ? 'Elapsed' : 'Total elapsed';
   const parts = [trimDiagnosticSentence(run.statusMessage), `${label} ${formatDuration(getElapsedMs(run))}`];
+  if (run.averageMessageProcessingMs !== undefined) {
+    parts.push(`Avg message inference ${formatMessageDuration(run.averageMessageProcessingMs)}`);
+  }
   if (run.runtimeMessage) {
     parts.push(trimDiagnosticSentence(run.runtimeMessage));
   }
@@ -1056,6 +1085,20 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor(seconds / 60);
   const wholeSeconds = Math.floor(seconds % 60).toString().padStart(2, '0');
   return `${minutes} min ${wholeSeconds} s`;
+}
+
+function formatMessageDuration(ms: number): string {
+  const duration = Math.max(0, ms);
+  if (duration < 1) {
+    return `${duration.toFixed(2)} ms`;
+  }
+  if (duration < 100) {
+    return `${duration.toFixed(1)} ms`;
+  }
+  if (duration < 1000) {
+    return `${duration.toFixed(0)} ms`;
+  }
+  return formatDuration(duration);
 }
 
 function throwIfAborted(signal: AbortSignal): void {

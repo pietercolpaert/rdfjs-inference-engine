@@ -330,31 +330,37 @@ qcr:VolumeProfile
 #################################################################
 
 unit:B
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:PowerRatio .
 
 unit:DeciB
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier 0.1 ;
     qcr:logarithmicConvention qcr:PowerRatio .
 
 unit:NP
+    a qudt:LogarithmicUnit ;
     qcr:logBase 2.718281828459045 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:FieldRatio .
 
 unit:OCT
+    a qudt:LogarithmicUnit ;
     qcr:logBase 2.0 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:FrequencyRatio .
 
 unit:DECADE
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier 1.0 ;
     qcr:logarithmicConvention qcr:FrequencyRatio .
 
 unit:PH
+    a qudt:LogarithmicUnit ;
     qcr:logBase 10.0 ;
     qcr:logExponentMultiplier -1.0 ;
     qcr:logarithmicConvention qcr:HydrogenIonActivity .

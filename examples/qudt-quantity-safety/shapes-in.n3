@@ -1,6 +1,7 @@
 @prefix ex: <https://example.org/qudt-quantity-safety#> .
 @prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
 
 ex:LengthEnvelopeShape a sh:NodeShape ;
   sh:targetSubjectsOf ex:length ;
@@ -11,4 +12,4 @@ ex:LengthEnvelopeShape a sh:NodeShape ;
 ex:QuantityEnvelopeShape a sh:NodeShape ;
   sh:targetObjectsOf ex:length ;
   sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:maxCount 1 ] ;
-  sh:property [ sh:path qudt:unit ; sh:maxCount 1 ] .
+  sh:property [ sh:path qudt:unit ; sh:maxCount 1 ; sh:in ( unit:CentiM unit:M unit:SEC ) ] .

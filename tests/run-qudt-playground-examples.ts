@@ -97,6 +97,32 @@ const shaclOut = examples.flatMap((example) => example.shaclOut);
 
 const preparedReasoner = new InferenceEngine();
 const defaultProfiles = loadDefaultRuleProfiles();
+const runtimeExpectations: Record<string, { maxKiB: number; units: number; forwardRules: string }> = {
+  'qudt-mixed-speed': { maxKiB: 26, units: 4, forwardRules: '1' },
+  'qudt-temperature-owl': { maxKiB: 27, units: 3, forwardRules: '1' },
+  'qudt-speed-skos': { maxKiB: 36, units: 4, forwardRules: '1' },
+  'qudt-logarithmic': { maxKiB: 40, units: 4, forwardRules: '5' },
+  'qudt-quantity-safety': { maxKiB: 26, units: 3, forwardRules: '4' },
+};
+
+for (const example of examples) {
+  const expectedRuntime = runtimeExpectations[example.expectation.id];
+  const specializedReasoner = new InferenceEngine();
+  specializedReasoner.load(defaultProfiles, example.background, {
+    shaclIn: example.shaclIn,
+    shaclOut: example.shaclOut,
+  });
+  const runtime = specializedReasoner.getRuntime();
+  const projection = runtime.match(/Shape-specialized QUDT projection: (\d+) unit\(s\), (\d+)\/(\d+) facts\./);
+  assert.ok(projection, `${example.expectation.id}: expected a shape-specialized QUDT fact projection.`);
+  assert.equal(Number(projection[1]), expectedRuntime.units,
+    `${example.expectation.id}: SHACL unit constraints should retain exactly ${expectedRuntime.units} units.`);
+  assert.match(runtime, new RegExp(`Shape-specialized QUDT kernel: forward rule\\(s\\) ${expectedRuntime.forwardRules}\\.`),
+    `${example.expectation.id}: unexpected QUDT forward-rule specialization.`);
+  assert.ok(runtime.length < expectedRuntime.maxKiB * 1024,
+    `${example.expectation.id}: specialized runtime should stay below ${expectedRuntime.maxKiB} KiB; got ${(runtime.length / 1024).toFixed(1)} KiB.`);
+  assertions += 4;
+}
 const fullQudtRuntimeLength = defaultProfiles.find((profile) => profile.label === 'rules/qudt/qudt-cdt-normalization.n3')
   ?.precompiledRuntime?.length ?? 0;
 preparedReasoner.load(defaultProfiles, background, { shaclIn, shaclOut });
