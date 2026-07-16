@@ -462,15 +462,16 @@ function requestStatefulStoreName() {
 }
 
 function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization, statefulStoreName) {
-  return {
+  const state = {
     api,
     reasoner,
-    parser: new api.IncrementalParser({ factory: api.DataFactory }),
+    parser: null,
     sourceLabel,
     compiledAt,
     started,
     statefulMaterialization,
     statefulStoreName,
+    outputPrefixes: outputPrefixes(),
     messagesMode: false,
     ordinaryQuads: [],
     currentMessage: [],
@@ -482,6 +483,44 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
     inconsistencyComments: [],
     lastStatusAt: 0,
     writer: null,
+  };
+  state.parser = new api.IncrementalParser({ factory: api.DataFactory }, {
+    prefix: (prefix, iri) => addInputPrefix(state, prefix, iri),
+  });
+  return state;
+}
+
+function addInputPrefix(state, prefix, iri) {
+  if (!prefix && prefix !== '') {
+    return;
+  }
+  const value = typeof iri === 'string' ? iri : iri && iri.value;
+  if (!value) {
+    return;
+  }
+  state.outputPrefixes[prefix] = value;
+  if (state.writer && typeof state.writer.addPrefix === 'function') {
+    state.writer.addPrefix(prefix, value);
+  }
+}
+
+function outputPrefixes() {
+  return {
+    transit: 'https://example.org/transit#',
+    logistics: 'https://example.org/logistics#',
+    subjects: 'https://example.org/subjects#',
+    catalog: 'https://example.org/catalog#',
+    family: 'https://example.org/family#',
+    test: 'https://example.org/test#',
+    inconsistencies: 'https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#',
+    qcr: 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#',
+    shacl: 'https://example.org/shacl#',
+    gen: 'https://eyereasoner.github.io/.well-known/genid/',
+    skos: 'http://www.w3.org/2004/02/skos/core#',
+    sh: 'http://www.w3.org/ns/shacl#',
+    rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
+    owl: 'http://www.w3.org/2002/07/owl#',
+    xsd: 'http://www.w3.org/2001/XMLSchema#',
   };
 }
 
@@ -525,13 +564,13 @@ async function finishStreamingState(state) {
   const inference = state.reasoner.inferWithDiagnostics(state.ordinaryQuads);
   const comments = formatInconsistencyComments(inference.inconsistencies);
   self.postMessage({ type: 'status', message: 'Processed ' + total + ' input quad(s). Serializing ' + inference.quads.length + ' inferred quad(s)…' });
-  const output = await state.api.writeQuads(inference.quads, outputPrefixes());
+  const output = await state.api.writeQuads(inference.quads, state.outputPrefixes);
   self.postMessage({ type: 'result', output: comments + output, status: 'Done · RDF input: ' + total + ' quad(s), ' + inference.quads.length + ' inferred' + diagnosticStatusSuffix(comments) });
 }
 
 async function processCurrentMessage(state) {
   if (!state.writer) {
-    state.writer = createMessageWriter(state.api);
+    state.writer = createMessageWriter(state.api, state.outputPrefixes);
   }
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
@@ -593,7 +632,7 @@ function formatWorkerDuration(ms) {
   return minutes + ' min ' + wholeSeconds + ' s';
 }
 
-function createMessageWriter(api) {
+function createMessageWriter(api, prefixes) {
   return new api.Writer({
     write(chunk, _encoding, callback) {
       self.postMessage({ type: 'append', chunk });
@@ -602,7 +641,7 @@ function createMessageWriter(api) {
     end(callback) {
       callback?.(null, '');
     },
-  }, { prefixes: outputPrefixes(), rdfMessages: true });
+  }, { prefixes, rdfMessages: true });
 }
 
 function endWriter(writer) {
@@ -932,25 +971,6 @@ function progressMessage(state, prefix) {
   return prefix + '; parsed ' + state.parsedQuadCount + ' input quad(s)…';
 }
 
-function outputPrefixes() {
-  return {
-    transit: 'https://example.org/transit#',
-    logistics: 'https://example.org/logistics#',
-    subjects: 'https://example.org/subjects#',
-    catalog: 'https://example.org/catalog#',
-    family: 'https://example.org/family#',
-    test: 'https://example.org/test#',
-    inconsistencies: 'https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#',
-    qcr: 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#',
-    shacl: 'https://example.org/shacl#',
-    gen: 'https://eyereasoner.github.io/.well-known/genid/',
-    skos: 'http://www.w3.org/2004/02/skos/core#',
-    sh: 'http://www.w3.org/ns/shacl#',
-    rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
-    owl: 'http://www.w3.org/2002/07/owl#',
-    xsd: 'http://www.w3.org/2001/XMLSchema#',
-  };
-}
 `;
   const blob = new Blob([source], { type: 'text/javascript' });
   return new Worker(URL.createObjectURL(blob));
