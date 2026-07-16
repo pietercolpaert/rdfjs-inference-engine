@@ -147,6 +147,7 @@ function humanizeExampleId(id) {
     'shacl-shape-planning': 'SHACL shape planning (SHACL in/out hints)',
     'transit-messages': 'Transit stream (RDF Messages)',
     'stateful-materialization': 'Stateful materialization (RDF Messages)',
+    'waterinfo-ghent-terneuzen': 'Waterinfo Gent-Terneuzen canal (QUDT/CDT)',
   };
   return overrides[id] ?? id.replace(/-/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

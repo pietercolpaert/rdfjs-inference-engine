@@ -76,6 +76,7 @@ ex:quantity_object_explicit_property_profile ex:temperature [ a qudt:QuantityVal
     tolerance: 1e-10,
   },
   literal('generic-ucum-speed', 'speed', '10 mi/h', 'ucum', 'M-PER-SEC', 4.4704, 1e-12, CDT + 'speed'),
+  literal('generic-ucum-electric-conductivity', 'conductivity', '3.23327E3 uS.cm-1', 'ucum', 'S-PER-M', 0.323327, 1e-12, CDT + 'electricConductivity'),
   literal('legacy-generic-ucum-length', 'distance', '2 cm', 'ucum', 'M', 0.02, 1e-12, CDT + 'length', LCDT),
 ];
 
@@ -204,6 +205,8 @@ unit:J qudt:hasDimensionVector ex:EnergyDimension ; qudt:conversionMultiplier 1.
 unit:KiloJ qudt:hasDimensionVector ex:EnergyDimension ; qudt:conversionMultiplier 1000.0 ; qudt:symbol "kJ" ; qudt:ucumCode "kJ"^^qudt:UCUMcs .
 unit:W qudt:hasDimensionVector ex:PowerDimension ; qudt:conversionMultiplier 1.0 ; qudt:symbol "W" ; qudt:ucumCode "W"^^qudt:UCUMcs .
 unit:KiloW qudt:hasDimensionVector ex:PowerDimension ; qudt:conversionMultiplier 1000.0 ; qudt:symbol "kW" ; qudt:ucumCode "kW"^^qudt:UCUMcs .
+unit:S-PER-M qudt:hasDimensionVector ex:ElectricConductivityDimension ; qudt:conversionMultiplier 1.0 ; qudt:symbol "S/m" ; qudt:ucumCode "S.m-1"^^qudt:UCUMcs .
+unit:MicroS-PER-CentiM qudt:hasDimensionVector ex:ElectricConductivityDimension ; qudt:conversionMultiplier 0.0001 ; qudt:symbol "μS/cm" ; qudt:ucumCode "uS.cm-1"^^qudt:UCUMcs .
 unit:K qudt:hasDimensionVector ex:TemperatureDimension ; qudt:conversionMultiplier 1.0 ; qudt:symbol "K" ; qudt:ucumCode "K"^^qudt:UCUMcs .
 unit:DEG_C qudt:hasDimensionVector ex:TemperatureDimension ; qudt:conversionMultiplier 1.0 ; qudt:conversionOffset 273.15 ; qudt:symbol "°C" ; qudt:ucumCode "Cel"^^qudt:UCUMcs .
 unit:DEG_F qudt:hasDimensionVector ex:TemperatureDimension ; qudt:conversionMultiplier 0.55555555555555555556 ; qudt:conversionOffset 459.67 ; qudt:symbol "°F" ; qudt:ucumCode "[degF]"^^qudt:UCUMcs .

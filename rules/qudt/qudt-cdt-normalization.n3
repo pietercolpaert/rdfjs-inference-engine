@@ -144,6 +144,12 @@ qcr:ElectricConductanceProfile
     qcr:targetUnit unit:S ;
     qcr:targetUcumCode "S" .
 
+qcr:ElectricConductivityProfile
+    qcr:datatype cdt:electricConductivity ;
+    qcr:legacyDatatype lcdt:electricConductivity ;
+    qcr:targetUnit unit:S-PER-M ;
+    qcr:targetUcumCode "S.m-1" .
+
 qcr:ElectricCurrentProfile
     qcr:datatype cdt:electricCurrent ;
     qcr:legacyDatatype lcdt:electricCurrent ;

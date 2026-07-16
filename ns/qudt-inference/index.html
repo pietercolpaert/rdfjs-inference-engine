@@ -14,75 +14,76 @@
 
   <h2>Configuration</h2>
   <dl>
-    <div resource="#UcumUnitIn" typeof="rdf:Property"><dt property="rdfs:label">UcumUnitIn</dt><dd property="rdfs:comment">An RDF list of alternative QUDT units accepted from a CDT literal.</dd></div>
-    <div resource="#normalizationProfile" typeof="rdf:Property"><dt property="rdfs:label">normalizationProfile</dt><dd property="rdfs:comment">Selects the normalization profile for an input property.</dd></div>
-    <div resource="#alignedQudtUnit" typeof="rdf:Property"><dt property="rdfs:label">alignedQudtUnit</dt><dd property="rdfs:comment">Relates a local unit identifier to the corresponding QUDT unit.</dd></div>
-    <div resource="#targetLogarithmicUnit" typeof="rdf:Property"><dt property="rdfs:label">targetLogarithmicUnit</dt><dd property="rdfs:comment">Selects a logarithmic target unit for a reversible linear-to-logarithmic conversion.</dd></div>
-    <div resource="#datatype" typeof="rdf:Property"><dt property="rdfs:label">datatype</dt><dd property="rdfs:comment">Current CDT datatype accepted by a profile.</dd></div>
-    <div resource="#legacyDatatype" typeof="rdf:Property"><dt property="rdfs:label">legacyDatatype</dt><dd property="rdfs:comment">Legacy LINDT datatype accepted by a profile.</dd></div>
-    <div resource="#targetUnit" typeof="rdf:Property"><dt property="rdfs:label">targetUnit</dt><dd property="rdfs:comment">Canonical QUDT unit emitted by a profile.</dd></div>
-    <div resource="#targetUcumCode" typeof="rdf:Property"><dt property="rdfs:label">targetUcumCode</dt><dd property="rdfs:comment">Canonical UCUM code emitted by a profile.</dd></div>
-    <div resource="#logBase" typeof="rdf:Property"><dt property="rdfs:label">logBase</dt><dd property="rdfs:comment">Base used by a logarithmic unit conversion.</dd></div>
-    <div resource="#logExponentMultiplier" typeof="rdf:Property"><dt property="rdfs:label">logExponentMultiplier</dt><dd property="rdfs:comment">Multiplier applied to the logarithmic exponent.</dd></div>
-    <div resource="#logarithmicConvention" typeof="rdf:Property"><dt property="rdfs:label">logarithmicConvention</dt><dd property="rdfs:comment">Semantic convention associated with a logarithmic unit.</dd></div>
+    <div resource="#UcumUnitIn" typeof="rdf:Property"><dt property="rdfs:label">UcumUnitIn</dt><dd property="rdfs:comment">An RDF list of alternative QUDT units accepted from a CDT literal in SHACL IN shapes. It avoids multiple sh:unit values implying that one literal is simultaneously expressed in every listed unit.</dd></div>
+    <div resource="#normalizationProfile" typeof="rdf:Property"><dt property="rdfs:label">normalizationProfile</dt><dd property="rdfs:comment">Selects the normalization profile for an input property when dimension-only selection would be ambiguous or when an application wants a specific target quantity kind.</dd></div>
+    <div resource="#alignedQudtUnit" typeof="rdf:Property"><dt property="rdfs:label">alignedQudtUnit</dt><dd property="rdfs:comment">Relates a local unit identifier, code, or mapped vocabulary term to the corresponding QUDT unit used by the conversion rules.</dd></div>
+    <div resource="#targetLogarithmicUnit" typeof="rdf:Property"><dt property="rdfs:label">targetLogarithmicUnit</dt><dd property="rdfs:comment">Selects a logarithmic target unit for reversible linear-to-logarithmic conversion, for example turning a dimensionless ratio into decibels.</dd></div>
+    <div resource="#datatype" typeof="rdf:Property"><dt property="rdfs:label">datatype</dt><dd property="rdfs:comment">Current CDT datatype accepted by a normalization profile and used for quantity-specific normalized literals.</dd></div>
+    <div resource="#legacyDatatype" typeof="rdf:Property"><dt property="rdfs:label">legacyDatatype</dt><dd property="rdfs:comment">Legacy LINDT datatype accepted by a profile so older data can normalize to the same target representation as current CDT data.</dd></div>
+    <div resource="#targetUnit" typeof="rdf:Property"><dt property="rdfs:label">targetUnit</dt><dd property="rdfs:comment">Canonical QUDT unit emitted by a profile in qcr:normalizedQuantity objects.</dd></div>
+    <div resource="#targetUcumCode" typeof="rdf:Property"><dt property="rdfs:label">targetUcumCode</dt><dd property="rdfs:comment">Canonical UCUM code emitted by a profile in qcr:normalizedUcumLiteral and qcr:normalizedCdtLiteral lexical forms.</dd></div>
+    <div resource="#logBase" typeof="rdf:Property"><dt property="rdfs:label">logBase</dt><dd property="rdfs:comment">Base used by a logarithmic unit conversion, such as 10 for bel/decibel and 2 for octave.</dd></div>
+    <div resource="#logExponentMultiplier" typeof="rdf:Property"><dt property="rdfs:label">logExponentMultiplier</dt><dd property="rdfs:comment">Multiplier applied to the logarithmic source value before exponentiation, such as 0.1 for the documented decibel power-ratio convention.</dd></div>
+    <div resource="#logarithmicConvention" typeof="rdf:Property"><dt property="rdfs:label">logarithmicConvention</dt><dd property="rdfs:comment">Semantic convention associated with a logarithmic unit, used to document whether the conversion represents a power ratio, field ratio, frequency ratio, or hydrogen-ion activity.</dd></div>
   </dl>
 
   <h2>Results</h2>
   <dl>
-    <div resource="#normalizedQuantity" typeof="rdf:Property"><dt property="rdfs:label">normalizedQuantity</dt><dd property="rdfs:comment">A normalized QUDT QuantityValue.</dd></div>
-    <div resource="#normalizedUcumLiteral" typeof="rdf:Property"><dt property="rdfs:label">normalizedUcumLiteral</dt><dd property="rdfs:comment">A normalized cdt:ucum literal.</dd></div>
-    <div resource="#normalizedCdtLiteral" typeof="rdf:Property"><dt property="rdfs:label">normalizedCdtLiteral</dt><dd property="rdfs:comment">A normalized quantity-specific CDT literal.</dd></div>
-    <div resource="#normalizedLogarithmicQuantity" typeof="rdf:Property"><dt property="rdfs:label">normalizedLogarithmicQuantity</dt><dd property="rdfs:comment">A normalized logarithmic QUDT QuantityValue.</dd></div>
-    <div resource="#normalizedLogarithmicUcumLiteral" typeof="rdf:Property"><dt property="rdfs:label">normalizedLogarithmicUcumLiteral</dt><dd property="rdfs:comment">A normalized logarithmic cdt:ucum literal.</dd></div>
-    <div resource="#sourceProperty" typeof="rdf:Property"><dt property="rdfs:label">sourceProperty</dt><dd property="rdfs:comment">Input RDF property from which a normalized result was derived.</dd></div>
-    <div resource="#sourceLiteral" typeof="rdf:Property"><dt property="rdfs:label">sourceLiteral</dt><dd property="rdfs:comment">Input CDT literal from which a normalized result was derived.</dd></div>
-    <div resource="#sourceQuantity" typeof="rdf:Property"><dt property="rdfs:label">sourceQuantity</dt><dd property="rdfs:comment">Input QUDT QuantityValue from which a normalized result was derived.</dd></div>
-    <div resource="#sourceUnit" typeof="rdf:Property"><dt property="rdfs:label">sourceUnit</dt><dd property="rdfs:comment">Resolved QUDT source unit used for conversion.</dd></div>
+    <div resource="#normalizedQuantity" typeof="rdf:Property"><dt property="rdfs:label">normalizedQuantity</dt><dd property="rdfs:comment">Links the input focus node to a generated qudt:QuantityValue in the target unit requested by the active normalization profile.</dd></div>
+    <div resource="#normalizedUcumLiteral" typeof="rdf:Property"><dt property="rdfs:label">normalizedUcumLiteral</dt><dd property="rdfs:comment">Provides the same normalized value as a compact cdt:ucum literal for applications that prefer literal values over QUDT quantity objects.</dd></div>
+    <div resource="#normalizedCdtLiteral" typeof="rdf:Property"><dt property="rdfs:label">normalizedCdtLiteral</dt><dd property="rdfs:comment">Provides the normalized value as a quantity-specific CDT literal when the profile has a known CDT datatype for that quantity kind.</dd></div>
+    <div resource="#normalizedLogarithmicQuantity" typeof="rdf:Property"><dt property="rdfs:label">normalizedLogarithmicQuantity</dt><dd property="rdfs:comment">Links a linear input ratio to a generated logarithmic qudt:QuantityValue, such as a ratio converted to decibels.</dd></div>
+    <div resource="#normalizedLogarithmicUcumLiteral" typeof="rdf:Property"><dt property="rdfs:label">normalizedLogarithmicUcumLiteral</dt><dd property="rdfs:comment">Provides the logarithmic normalized value as a cdt:ucum literal using the configured logarithmic unit code.</dd></div>
+    <div resource="#sourceProperty" typeof="rdf:Property"><dt property="rdfs:label">sourceProperty</dt><dd property="rdfs:comment">Records the input RDF property from which a normalized quantity or literal was derived.</dd></div>
+    <div resource="#sourceLiteral" typeof="rdf:Property"><dt property="rdfs:label">sourceLiteral</dt><dd property="rdfs:comment">Records the input CDT or UCUM literal from which a normalized result was derived.</dd></div>
+    <div resource="#sourceQuantity" typeof="rdf:Property"><dt property="rdfs:label">sourceQuantity</dt><dd property="rdfs:comment">Records the input QUDT QuantityValue object from which a normalized result was derived.</dd></div>
+    <div resource="#sourceUnit" typeof="rdf:Property"><dt property="rdfs:label">sourceUnit</dt><dd property="rdfs:comment">Records the resolved QUDT source unit used for conversion, after UCUM code, symbol, local unit, or SKOS alignment resolution.</dd></div>
   </dl>
 
   <h2>Profiles</h2>
   <ul class="profiles">
-    <li resource="#AccelerationProfile" typeof="skos:Concept" property="rdfs:label">AccelerationProfile</li>
-    <li resource="#AmountOfSubstanceProfile" typeof="skos:Concept" property="rdfs:label">AmountOfSubstanceProfile</li>
-    <li resource="#AngleProfile" typeof="skos:Concept" property="rdfs:label">AngleProfile</li>
-    <li resource="#AreaProfile" typeof="skos:Concept" property="rdfs:label">AreaProfile</li>
-    <li resource="#CatalyticActivityProfile" typeof="skos:Concept" property="rdfs:label">CatalyticActivityProfile</li>
-    <li resource="#DimensionlessProfile" typeof="skos:Concept" property="rdfs:label">DimensionlessProfile</li>
-    <li resource="#ElectricCapacitanceProfile" typeof="skos:Concept" property="rdfs:label">ElectricCapacitanceProfile</li>
-    <li resource="#ElectricChargeProfile" typeof="skos:Concept" property="rdfs:label">ElectricChargeProfile</li>
-    <li resource="#ElectricConductanceProfile" typeof="skos:Concept" property="rdfs:label">ElectricConductanceProfile</li>
-    <li resource="#ElectricCurrentProfile" typeof="skos:Concept" property="rdfs:label">ElectricCurrentProfile</li>
-    <li resource="#ElectricInductanceProfile" typeof="skos:Concept" property="rdfs:label">ElectricInductanceProfile</li>
-    <li resource="#ElectricPotentialProfile" typeof="skos:Concept" property="rdfs:label">ElectricPotentialProfile</li>
-    <li resource="#ElectricResistanceProfile" typeof="skos:Concept" property="rdfs:label">ElectricResistanceProfile</li>
-    <li resource="#EnergyProfile" typeof="skos:Concept" property="rdfs:label">EnergyProfile</li>
-    <li resource="#ForceProfile" typeof="skos:Concept" property="rdfs:label">ForceProfile</li>
-    <li resource="#FrequencyProfile" typeof="skos:Concept" property="rdfs:label">FrequencyProfile</li>
-    <li resource="#IlluminanceProfile" typeof="skos:Concept" property="rdfs:label">IlluminanceProfile</li>
-    <li resource="#LengthProfile" typeof="skos:Concept" property="rdfs:label">LengthProfile</li>
-    <li resource="#LuminousFluxProfile" typeof="skos:Concept" property="rdfs:label">LuminousFluxProfile</li>
-    <li resource="#LuminousIntensityProfile" typeof="skos:Concept" property="rdfs:label">LuminousIntensityProfile</li>
-    <li resource="#MagneticFluxProfile" typeof="skos:Concept" property="rdfs:label">MagneticFluxProfile</li>
-    <li resource="#MagneticFluxDensityProfile" typeof="skos:Concept" property="rdfs:label">MagneticFluxDensityProfile</li>
-    <li resource="#MassProfile" typeof="skos:Concept" property="rdfs:label">MassProfile</li>
-    <li resource="#PowerProfile" typeof="skos:Concept" property="rdfs:label">PowerProfile</li>
-    <li resource="#PressureProfile" typeof="skos:Concept" property="rdfs:label">PressureProfile</li>
-    <li resource="#RadiationDoseAbsorbedProfile" typeof="skos:Concept" property="rdfs:label">RadiationDoseAbsorbedProfile</li>
-    <li resource="#RadiationDoseEffectiveProfile" typeof="skos:Concept" property="rdfs:label">RadiationDoseEffectiveProfile</li>
-    <li resource="#RadioactivityProfile" typeof="skos:Concept" property="rdfs:label">RadioactivityProfile</li>
-    <li resource="#SolidAngleProfile" typeof="skos:Concept" property="rdfs:label">SolidAngleProfile</li>
-    <li resource="#SpeedProfile" typeof="skos:Concept" property="rdfs:label">SpeedProfile</li>
-    <li resource="#TemperatureProfile" typeof="skos:Concept" property="rdfs:label">TemperatureProfile</li>
-    <li resource="#TimeProfile" typeof="skos:Concept" property="rdfs:label">TimeProfile</li>
-    <li resource="#VolumeProfile" typeof="skos:Concept" property="rdfs:label">VolumeProfile</li>
+    <li resource="#AccelerationProfile" typeof="skos:Concept"><span property="rdfs:label">AccelerationProfile</span><span property="rdfs:comment"> normalizes acceleration values to metres per second squared.</span></li>
+    <li resource="#AmountOfSubstanceProfile" typeof="skos:Concept"><span property="rdfs:label">AmountOfSubstanceProfile</span><span property="rdfs:comment"> normalizes amount-of-substance values to moles.</span></li>
+    <li resource="#AngleProfile" typeof="skos:Concept"><span property="rdfs:label">AngleProfile</span><span property="rdfs:comment"> normalizes plane angle values to radians.</span></li>
+    <li resource="#AreaProfile" typeof="skos:Concept"><span property="rdfs:label">AreaProfile</span><span property="rdfs:comment"> normalizes area values to square metres.</span></li>
+    <li resource="#CatalyticActivityProfile" typeof="skos:Concept"><span property="rdfs:label">CatalyticActivityProfile</span><span property="rdfs:comment"> normalizes catalytic activity values to katal.</span></li>
+    <li resource="#DimensionlessProfile" typeof="skos:Concept"><span property="rdfs:label">DimensionlessProfile</span><span property="rdfs:comment"> normalizes ratios and other dimensionless values to QUDT unit:UNITLESS.</span></li>
+    <li resource="#ElectricCapacitanceProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricCapacitanceProfile</span><span property="rdfs:comment"> normalizes electric capacitance values to farads.</span></li>
+    <li resource="#ElectricChargeProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricChargeProfile</span><span property="rdfs:comment"> normalizes electric charge values to coulombs.</span></li>
+    <li resource="#ElectricConductanceProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricConductanceProfile</span><span property="rdfs:comment"> normalizes electric conductance values to siemens.</span></li>
+    <li resource="#ElectricConductivityProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricConductivityProfile</span><span property="rdfs:comment"> normalizes electric conductivity values to siemens per metre.</span></li>
+    <li resource="#ElectricCurrentProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricCurrentProfile</span><span property="rdfs:comment"> normalizes electric current values to amperes.</span></li>
+    <li resource="#ElectricInductanceProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricInductanceProfile</span><span property="rdfs:comment"> normalizes electric inductance values to henries.</span></li>
+    <li resource="#ElectricPotentialProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricPotentialProfile</span><span property="rdfs:comment"> normalizes electric potential values to volts.</span></li>
+    <li resource="#ElectricResistanceProfile" typeof="skos:Concept"><span property="rdfs:label">ElectricResistanceProfile</span><span property="rdfs:comment"> normalizes electric resistance values to ohms.</span></li>
+    <li resource="#EnergyProfile" typeof="skos:Concept"><span property="rdfs:label">EnergyProfile</span><span property="rdfs:comment"> normalizes energy values to joules.</span></li>
+    <li resource="#ForceProfile" typeof="skos:Concept"><span property="rdfs:label">ForceProfile</span><span property="rdfs:comment"> normalizes force values to newtons.</span></li>
+    <li resource="#FrequencyProfile" typeof="skos:Concept"><span property="rdfs:label">FrequencyProfile</span><span property="rdfs:comment"> normalizes frequency values to hertz.</span></li>
+    <li resource="#IlluminanceProfile" typeof="skos:Concept"><span property="rdfs:label">IlluminanceProfile</span><span property="rdfs:comment"> normalizes illuminance values to lux.</span></li>
+    <li resource="#LengthProfile" typeof="skos:Concept"><span property="rdfs:label">LengthProfile</span><span property="rdfs:comment"> normalizes length values to metres.</span></li>
+    <li resource="#LuminousFluxProfile" typeof="skos:Concept"><span property="rdfs:label">LuminousFluxProfile</span><span property="rdfs:comment"> normalizes luminous flux values to lumens.</span></li>
+    <li resource="#LuminousIntensityProfile" typeof="skos:Concept"><span property="rdfs:label">LuminousIntensityProfile</span><span property="rdfs:comment"> normalizes luminous intensity values to candela.</span></li>
+    <li resource="#MagneticFluxProfile" typeof="skos:Concept"><span property="rdfs:label">MagneticFluxProfile</span><span property="rdfs:comment"> normalizes magnetic flux values to webers.</span></li>
+    <li resource="#MagneticFluxDensityProfile" typeof="skos:Concept"><span property="rdfs:label">MagneticFluxDensityProfile</span><span property="rdfs:comment"> normalizes magnetic flux density values to tesla.</span></li>
+    <li resource="#MassProfile" typeof="skos:Concept"><span property="rdfs:label">MassProfile</span><span property="rdfs:comment"> normalizes mass values to kilograms.</span></li>
+    <li resource="#PowerProfile" typeof="skos:Concept"><span property="rdfs:label">PowerProfile</span><span property="rdfs:comment"> normalizes power values to watts.</span></li>
+    <li resource="#PressureProfile" typeof="skos:Concept"><span property="rdfs:label">PressureProfile</span><span property="rdfs:comment"> normalizes pressure values to pascals.</span></li>
+    <li resource="#RadiationDoseAbsorbedProfile" typeof="skos:Concept"><span property="rdfs:label">RadiationDoseAbsorbedProfile</span><span property="rdfs:comment"> normalizes absorbed radiation dose values to gray.</span></li>
+    <li resource="#RadiationDoseEffectiveProfile" typeof="skos:Concept"><span property="rdfs:label">RadiationDoseEffectiveProfile</span><span property="rdfs:comment"> normalizes effective radiation dose values to sieverts.</span></li>
+    <li resource="#RadioactivityProfile" typeof="skos:Concept"><span property="rdfs:label">RadioactivityProfile</span><span property="rdfs:comment"> normalizes radioactivity values to becquerels.</span></li>
+    <li resource="#SolidAngleProfile" typeof="skos:Concept"><span property="rdfs:label">SolidAngleProfile</span><span property="rdfs:comment"> normalizes solid angle values to steradians.</span></li>
+    <li resource="#SpeedProfile" typeof="skos:Concept"><span property="rdfs:label">SpeedProfile</span><span property="rdfs:comment"> normalizes speed values to metres per second.</span></li>
+    <li resource="#TemperatureProfile" typeof="skos:Concept"><span property="rdfs:label">TemperatureProfile</span><span property="rdfs:comment"> normalizes absolute temperature values to kelvin using QUDT affine offsets.</span></li>
+    <li resource="#TimeProfile" typeof="skos:Concept"><span property="rdfs:label">TimeProfile</span><span property="rdfs:comment"> normalizes duration and time-quantity values to seconds.</span></li>
+    <li resource="#VolumeProfile" typeof="skos:Concept"><span property="rdfs:label">VolumeProfile</span><span property="rdfs:comment"> normalizes volume values to cubic metres.</span></li>
   </ul>
 
   <h2>Logarithmic conventions</h2>
   <ul>
-    <li resource="#PowerRatio" typeof="skos:Concept" property="rdfs:label">Power ratio</li>
-    <li resource="#FieldRatio" typeof="skos:Concept" property="rdfs:label">Field ratio</li>
-    <li resource="#FrequencyRatio" typeof="skos:Concept" property="rdfs:label">Frequency ratio</li>
-    <li resource="#HydrogenIonActivity" typeof="skos:Concept" property="rdfs:label">Hydrogen-ion activity</li>
+    <li resource="#PowerRatio" typeof="skos:Concept"><span property="rdfs:label">Power ratio</span><span property="rdfs:comment"> convention used for bel and decibel conversions where the linear ratio is computed with a power-ratio exponent.</span></li>
+    <li resource="#FieldRatio" typeof="skos:Concept"><span property="rdfs:label">Field ratio</span><span property="rdfs:comment"> convention used for neper conversions and documented separately from decibel power ratios.</span></li>
+    <li resource="#FrequencyRatio" typeof="skos:Concept"><span property="rdfs:label">Frequency ratio</span><span property="rdfs:comment"> convention used for octave and decade conversions where the linear ratio represents a frequency ratio.</span></li>
+    <li resource="#HydrogenIonActivity" typeof="skos:Concept"><span property="rdfs:label">Hydrogen-ion activity</span><span property="rdfs:comment"> convention used for pH conversion where the linear output represents hydrogen-ion activity.</span></li>
   </ul>
 </body>
 </html>

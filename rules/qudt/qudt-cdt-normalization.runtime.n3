@@ -152,6 +152,12 @@ qcr:ElectricConductanceProfile
     qcr:targetUnit unit:S ;
     qcr:targetUcumCode "S" .
 
+qcr:ElectricConductivityProfile
+    qcr:datatype cdt:electricConductivity ;
+    qcr:legacyDatatype lcdt:electricConductivity ;
+    qcr:targetUnit unit:S-PER-M ;
+    qcr:targetUcumCode "S.m-1" .
+
 qcr:ElectricCurrentProfile
     qcr:datatype cdt:electricCurrent ;
     qcr:legacyDatatype lcdt:electricCurrent ;
@@ -13053,6 +13059,10 @@ qcr:sourceQuantity                     internal:normalizationOutputProperty true
 <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductanceProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#legacyDatatype> <http://w3id.org/lindt/custom_datatypes#electricConductance> .
 <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductanceProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUnit> <http://qudt.org/vocab/unit/S> .
 <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductanceProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUcumCode> "S" .
+<https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductivityProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#datatype> <https://w3id.org/cdt/electricConductivity> .
+<https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductivityProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#legacyDatatype> <http://w3id.org/lindt/custom_datatypes#electricConductivity> .
+<https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductivityProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUnit> <http://qudt.org/vocab/unit/S-PER-M> .
+<https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricConductivityProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUcumCode> "S.m-1" .
 <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricCurrentProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#datatype> <https://w3id.org/cdt/electricCurrent> .
 <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricCurrentProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#legacyDatatype> <http://w3id.org/lindt/custom_datatypes#electricCurrent> .
 <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#ElectricCurrentProfile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUnit> <http://qudt.org/vocab/unit/A> .

@@ -5,56 +5,56 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <base href="https://www.pieter.pm/rdfjs-inference-engine/ns/internal">
   <title>RDF-JS inference internal vocabulary</title>
-  <style>body{max-width:58rem;margin:3rem auto;padding:0 1rem;font:16px/1.55 system-ui,sans-serif;color:#18202a}code{background:#f1f3f5;padding:.1rem .25rem}li{margin:.25rem 0}.note{border-left:3px solid #8a6547;padding-left:1rem;color:#46515d}</style>
+  <style>body{max-width:58rem;margin:3rem auto;padding:0 1rem;font:16px/1.55 system-ui,sans-serif;color:#18202a}code{background:#f1f3f5;padding:.1rem .25rem}dt{font-weight:700;margin-top:1rem}dd{margin:.2rem 0 0 1rem}.note{border-left:3px solid #8a6547;padding-left:1rem;color:#46515d}</style>
 </head>
 <body about="https://www.pieter.pm/rdfjs-inference-engine/ns/internal" typeof="owl:Ontology">
   <h1 property="dct:title">RDF-JS inference internal vocabulary</h1>
   <p property="dct:description">Implementation predicates used while evaluating bundled OWL, SHACL, and QUDT N3 profiles.</p>
   <p class="note">These terms are unstable implementation details and are normally filtered from application output. The HTML is also RDFa.</p>
   <h2>Terms</h2>
-  <ul>
-    <li resource="#listRoot" typeof="rdf:Property" property="rdfs:label">listRoot</li>
-    <li resource="#intersectionListRoot" typeof="rdf:Property" property="rdfs:label">intersectionListRoot</li>
-    <li resource="#longIntersectionListRoot" typeof="rdf:Property" property="rdfs:label">longIntersectionListRoot</li>
-    <li resource="#keyListRoot" typeof="rdf:Property" property="rdfs:label">keyListRoot</li>
-    <li resource="#propertyChainRoot" typeof="rdf:Property" property="rdfs:label">propertyChainRoot</li>
-    <li resource="#listPair" typeof="rdf:Property" property="rdfs:label">listPair</li>
-    <li resource="#left" typeof="rdf:Property" property="rdfs:label">left</li>
-    <li resource="#right" typeof="rdf:Property" property="rdfs:label">right</li>
-    <li resource="#allListClassTypes" typeof="rdf:Property" property="rdfs:label">allListClassTypes</li>
-    <li resource="#propertyChainHolds" typeof="rdf:Property" property="rdfs:label">propertyChainHolds</li>
-    <li resource="#pathChain" typeof="rdf:Property" property="rdfs:label">pathChain</li>
-    <li resource="#pathSubject" typeof="rdf:Property" property="rdfs:label">pathSubject</li>
-    <li resource="#pathObject" typeof="rdf:Property" property="rdfs:label">pathObject</li>
-    <li resource="#sameValuesForProperties" typeof="rdf:Property" property="rdfs:label">sameValuesForProperties</li>
-    <li resource="#term" typeof="rdf:Property" property="rdfs:label">term</li>
-    <li resource="#canonicalLiteral" typeof="rdf:Property" property="rdfs:label">canonicalLiteral</li>
-    <li resource="#complement" typeof="rdf:Property" property="rdfs:label">complement</li>
-    <li resource="#literal" typeof="rdf:Property" property="rdfs:label">literal</li>
-    <li resource="#active" typeof="rdf:Property" property="rdfs:label">active</li>
-    <li resource="#focusFor" typeof="rdf:Property" property="rdfs:label">focusFor</li>
-    <li resource="#focus" typeof="rdf:Property" property="rdfs:label">focus</li>
-    <li resource="#shape" typeof="rdf:Property" property="rdfs:label">shape</li>
-    <li resource="#path" typeof="rdf:Property" property="rdfs:label">path</li>
-    <li resource="#pathValue" typeof="rdf:Property" property="rdfs:label">pathValue</li>
-    <li resource="#value" typeof="rdf:Property" property="rdfs:label">value</li>
-    <li resource="#self" typeof="rdf:Property" property="rdfs:label">self</li>
-    <li resource="#reifies" typeof="rdf:Property" property="rdfs:label">reifies</li>
-    <li resource="#reifiesSubject" typeof="rdf:Property" property="rdfs:label">reifiesSubject</li>
-    <li resource="#reifiesPredicate" typeof="rdf:Property" property="rdfs:label">reifiesPredicate</li>
-    <li resource="#reifiesObject" typeof="rdf:Property" property="rdfs:label">reifiesObject</li>
-    <li resource="#unitToken" typeof="rdf:Property" property="rdfs:label">unitToken</li>
-    <li resource="#effectiveOffset" typeof="rdf:Property" property="rdfs:label">effectiveOffset</li>
-    <li resource="#parsedQuantityLiteral" typeof="rdf:Property" property="rdfs:label">parsedQuantityLiteral</li>
-    <li resource="#convertedValue" typeof="rdf:Property" property="rdfs:label">convertedValue</li>
-    <li resource="#linearRatioFromLogValue" typeof="rdf:Property" property="rdfs:label">linearRatioFromLogValue</li>
-    <li resource="#logValueFromLinearRatio" typeof="rdf:Property" property="rdfs:label">logValueFromLinearRatio</li>
-    <li resource="#normalizationUnit" typeof="rdf:Property" property="rdfs:label">normalizationUnit</li>
-    <li resource="#normalizationOutputProperty" typeof="rdf:Property" property="rdfs:label">normalizationOutputProperty</li>
-    <li resource="#normalizedLexicalForm" typeof="rdf:Property" property="rdfs:label">normalizedLexicalForm</li>
-    <li resource="#profileForDatatype" typeof="rdf:Property" property="rdfs:label">profileForDatatype</li>
-    <li resource="#profileForGenericUcum" typeof="rdf:Property" property="rdfs:label">profileForGenericUcum</li>
-    <li resource="#profileForObjectProperty" typeof="rdf:Property" property="rdfs:label">profileForObjectProperty</li>
-  </ul>
+  <dl>
+    <div resource="#listRoot" typeof="rdf:Property"><dt property="rdfs:label">listRoot</dt><dd property="rdfs:comment">Marks the root cell of an RDF list so list-oriented OWL rules can share one traversal result.</dd></div>
+    <div resource="#intersectionListRoot" typeof="rdf:Property"><dt property="rdfs:label">intersectionListRoot</dt><dd property="rdfs:comment">Identifies the list that defines an owl:intersectionOf expression.</dd></div>
+    <div resource="#longIntersectionListRoot" typeof="rdf:Property"><dt property="rdfs:label">longIntersectionListRoot</dt><dd property="rdfs:comment">Flags intersection lists that need iterative handling because they contain more than the compact direct case.</dd></div>
+    <div resource="#keyListRoot" typeof="rdf:Property"><dt property="rdfs:label">keyListRoot</dt><dd property="rdfs:comment">Identifies the property list used by an owl:hasKey axiom.</dd></div>
+    <div resource="#propertyChainRoot" typeof="rdf:Property"><dt property="rdfs:label">propertyChainRoot</dt><dd property="rdfs:comment">Identifies the list that defines an owl:propertyChainAxiom.</dd></div>
+    <div resource="#listPair" typeof="rdf:Property"><dt property="rdfs:label">listPair</dt><dd property="rdfs:comment">Stores adjacent list members as a pair for rules that compare or join consecutive values.</dd></div>
+    <div resource="#left" typeof="rdf:Property"><dt property="rdfs:label">left</dt><dd property="rdfs:comment">Left-hand value in an internal pair structure.</dd></div>
+    <div resource="#right" typeof="rdf:Property"><dt property="rdfs:label">right</dt><dd property="rdfs:comment">Right-hand value in an internal pair structure.</dd></div>
+    <div resource="#allListClassTypes" typeof="rdf:Property"><dt property="rdfs:label">allListClassTypes</dt><dd property="rdfs:comment">Memoized result saying that every class in a list types a candidate individual.</dd></div>
+    <div resource="#propertyChainHolds" typeof="rdf:Property"><dt property="rdfs:label">propertyChainHolds</dt><dd property="rdfs:comment">Intermediate assertion that a property chain connects a subject to an object.</dd></div>
+    <div resource="#pathChain" typeof="rdf:Property"><dt property="rdfs:label">pathChain</dt><dd property="rdfs:comment">Internal representation of a SHACL property path chain.</dd></div>
+    <div resource="#pathSubject" typeof="rdf:Property"><dt property="rdfs:label">pathSubject</dt><dd property="rdfs:comment">Subject node currently being evaluated for a SHACL path.</dd></div>
+    <div resource="#pathObject" typeof="rdf:Property"><dt property="rdfs:label">pathObject</dt><dd property="rdfs:comment">Object node reached by evaluating a SHACL path.</dd></div>
+    <div resource="#sameValuesForProperties" typeof="rdf:Property"><dt property="rdfs:label">sameValuesForProperties</dt><dd property="rdfs:comment">Memoized comparison used by OWL key rules to determine whether two resources share all key values.</dd></div>
+    <div resource="#term" typeof="rdf:Property"><dt property="rdfs:label">term</dt><dd property="rdfs:comment">Generic slot for an RDF term carried through an internal diagnostic or validation structure.</dd></div>
+    <div resource="#canonicalLiteral" typeof="rdf:Property"><dt property="rdfs:label">canonicalLiteral</dt><dd property="rdfs:comment">Canonical lexical representation used when comparing datatype literals.</dd></div>
+    <div resource="#complement" typeof="rdf:Property"><dt property="rdfs:label">complement</dt><dd property="rdfs:comment">Internal link to the complement class used by OWL complement consistency checks.</dd></div>
+    <div resource="#literal" typeof="rdf:Property"><dt property="rdfs:label">literal</dt><dd property="rdfs:comment">Literal value carried by an internal datatype validation result.</dd></div>
+    <div resource="#active" typeof="rdf:Property"><dt property="rdfs:label">active</dt><dd property="rdfs:comment">Marks an internal SHACL validation task that should be expanded by the rules.</dd></div>
+    <div resource="#focusFor" typeof="rdf:Property"><dt property="rdfs:label">focusFor</dt><dd property="rdfs:comment">Associates a focus node with the shape currently being evaluated.</dd></div>
+    <div resource="#focus" typeof="rdf:Property"><dt property="rdfs:label">focus</dt><dd property="rdfs:comment">Focus node of an internal SHACL validation result.</dd></div>
+    <div resource="#shape" typeof="rdf:Property"><dt property="rdfs:label">shape</dt><dd property="rdfs:comment">Shape node responsible for an internal SHACL validation result.</dd></div>
+    <div resource="#path" typeof="rdf:Property"><dt property="rdfs:label">path</dt><dd property="rdfs:comment">SHACL path being evaluated by an internal validation rule.</dd></div>
+    <div resource="#pathValue" typeof="rdf:Property"><dt property="rdfs:label">pathValue</dt><dd property="rdfs:comment">Value reached through a SHACL path before constraint checks are applied.</dd></div>
+    <div resource="#value" typeof="rdf:Property"><dt property="rdfs:label">value</dt><dd property="rdfs:comment">Value node that triggered or satisfied an internal validation step.</dd></div>
+    <div resource="#self" typeof="rdf:Property"><dt property="rdfs:label">self</dt><dd property="rdfs:comment">Marker used for SHACL self paths and self-referential path evaluations.</dd></div>
+    <div resource="#reifies" typeof="rdf:Property"><dt property="rdfs:label">reifies</dt><dd property="rdfs:comment">Connects an internal statement resource to the RDF triple it represents.</dd></div>
+    <div resource="#reifiesSubject" typeof="rdf:Property"><dt property="rdfs:label">reifiesSubject</dt><dd property="rdfs:comment">Subject component of an internally reified triple.</dd></div>
+    <div resource="#reifiesPredicate" typeof="rdf:Property"><dt property="rdfs:label">reifiesPredicate</dt><dd property="rdfs:comment">Predicate component of an internally reified triple.</dd></div>
+    <div resource="#reifiesObject" typeof="rdf:Property"><dt property="rdfs:label">reifiesObject</dt><dd property="rdfs:comment">Object component of an internally reified triple.</dd></div>
+    <div resource="#unitToken" typeof="rdf:Property"><dt property="rdfs:label">unitToken</dt><dd property="rdfs:comment">Lexical unit token resolved from a QUDT symbol or UCUM code.</dd></div>
+    <div resource="#effectiveOffset" typeof="rdf:Property"><dt property="rdfs:label">effectiveOffset</dt><dd property="rdfs:comment">QUDT conversion offset after defaulting missing offsets to zero.</dd></div>
+    <div resource="#parsedQuantityLiteral" typeof="rdf:Property"><dt property="rdfs:label">parsedQuantityLiteral</dt><dd property="rdfs:comment">Parsed numeric value and source unit extracted from a CDT or UCUM literal.</dd></div>
+    <div resource="#convertedValue" typeof="rdf:Property"><dt property="rdfs:label">convertedValue</dt><dd property="rdfs:comment">Numeric result of a dimension-compatible QUDT conversion.</dd></div>
+    <div resource="#linearRatioFromLogValue" typeof="rdf:Property"><dt property="rdfs:label">linearRatioFromLogValue</dt><dd property="rdfs:comment">Linear ratio calculated from a logarithmic quantity using the configured convention.</dd></div>
+    <div resource="#logValueFromLinearRatio" typeof="rdf:Property"><dt property="rdfs:label">logValueFromLinearRatio</dt><dd property="rdfs:comment">Logarithmic value calculated from a positive linear ratio.</dd></div>
+    <div resource="#normalizationUnit" typeof="rdf:Property"><dt property="rdfs:label">normalizationUnit</dt><dd property="rdfs:comment">Canonical QUDT unit selected as a possible normalization source or target.</dd></div>
+    <div resource="#normalizationOutputProperty" typeof="rdf:Property"><dt property="rdfs:label">normalizationOutputProperty</dt><dd property="rdfs:comment">Marks properties produced by normalization rules so they are not recursively normalized.</dd></div>
+    <div resource="#normalizedLexicalForm" typeof="rdf:Property"><dt property="rdfs:label">normalizedLexicalForm</dt><dd property="rdfs:comment">Lexical form assembled for a normalized CDT or UCUM literal.</dd></div>
+    <div resource="#profileForDatatype" typeof="rdf:Property"><dt property="rdfs:label">profileForDatatype</dt><dd property="rdfs:comment">Maps a current or legacy CDT datatype to the normalization profile that handles it.</dd></div>
+    <div resource="#profileForGenericUcum" typeof="rdf:Property"><dt property="rdfs:label">profileForGenericUcum</dt><dd property="rdfs:comment">Selects a normalization profile for generic cdt:ucum input by matching QUDT dimensions.</dd></div>
+    <div resource="#profileForObjectProperty" typeof="rdf:Property"><dt property="rdfs:label">profileForObjectProperty</dt><dd property="rdfs:comment">Selects a normalization profile for QUDT quantity objects based on explicit property configuration or unit dimension.</dd></div>
+  </dl>
 </body>
 </html>

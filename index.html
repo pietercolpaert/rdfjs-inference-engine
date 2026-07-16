@@ -687,6 +687,25 @@
       height: 30rem;
     }
 
+    .site-footer {
+      padding: 0.25rem 0 0.75rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .site-footer a,
+    .runtime-body a {
+      color: var(--accent-dark);
+      text-decoration: none;
+    }
+
+    .site-footer a:hover,
+    .runtime-body a:hover {
+      text-decoration: underline;
+    }
+
     @media (max-width: 900px) {
       .contract-flow,
       .message-flow {
@@ -891,12 +910,15 @@
         <details id="generatedRuntimePanel" class="advanced-panel generated-runtime" hidden>
           <summary>Generated N3 runtime</summary>
           <div class="advanced-panel-body runtime-body">
-            <p class="meta">Exact N3 runtime compiled from the selected profiles, ontology, and SHACL contracts.</p>
+            <p class="meta">Exact <a href="https://w3c.github.io/N3/spec/" target="_blank" rel="noopener">Notation3</a> runtime compiled from the selected profiles, ontology, and SHACL contracts.</p>
             <textarea id="generatedRuntimeText" spellcheck="false" readonly></textarea>
           </div>
         </details>
       </section>
     </main>
+    <footer class="site-footer">
+      This work is a demo for the <a href="https://www.imec-int.com/en/research-portfolio/dishacled" target="_blank" rel="noopener">DiSHACLed imec.icon project</a>.
+    </footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>

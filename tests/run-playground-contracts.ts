@@ -21,7 +21,7 @@ async function main(): Promise<void> {
     .map((entry) => entry.name)
     .sort();
 
-  assert.equal(directories.length, 13, 'Expected all thirteen repository examples in the playground contract suite.');
+  assert.equal(directories.length, 14, 'Expected all fourteen repository examples in the playground contract suite.');
 
   let messages = 0;
   for (const name of directories) {

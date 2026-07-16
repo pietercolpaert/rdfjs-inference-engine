@@ -6,6 +6,7 @@ import { RdfaParser } from 'rdfa-streaming-parser';
 
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const RDF_PROPERTY = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#Property';
+const RDFS_COMMENT = 'http://www.w3.org/2000/01/rdf-schema#comment';
 const RDFS_CLASS = 'http://www.w3.org/2000/01/rdf-schema#Class';
 const OWL_ONTOLOGY = 'http://www.w3.org/2002/07/owl#Ontology';
 const SKOS_CONCEPT = 'http://www.w3.org/2004/02/skos/core#Concept';
@@ -52,8 +53,10 @@ async function main(): Promise<void> {
     assertionCount += 1;
 
     for (const term of sourceTerms(vocabulary.sourcePaths, vocabulary.prefixes)) {
-      assert.ok(subjects.has(namespace + term), `${vocabulary.name} RDFa does not define #${term}.`);
-      assertionCount += 1;
+      const termIri = namespace + term;
+      assert.ok(subjects.has(termIri), `${vocabulary.name} RDFa does not define #${term}.`);
+      assert.ok(hasPredicate(quads, termIri, RDFS_COMMENT), `${vocabulary.name} RDFa does not explain #${term} with rdfs:comment.`);
+      assertionCount += 2;
     }
   }
 
@@ -98,6 +101,10 @@ function hasTriple(quads: Quad[], subject: string, predicate: string, object: st
   return quads.some((quad) => quad.subject.value === subject
     && quad.predicate.value === predicate
     && quad.object.value === object);
+}
+
+function hasPredicate(quads: Quad[], subject: string, predicate: string): boolean {
+  return quads.some((quad) => quad.subject.value === subject && quad.predicate.value === predicate);
 }
 
 void main().catch((error) => {

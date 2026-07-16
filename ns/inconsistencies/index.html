@@ -26,24 +26,24 @@
   <h2>Rules</h2>
   <p>The following identifiers are values of <code>rule</code>. Their local names follow the OWL 2 RL/RDF rules.</p>
   <ul>
-    <li resource="#eq-diff1" typeof="skos:Concept" property="rdfs:label">eq-diff1</li>
-    <li resource="#eq-diff2" typeof="skos:Concept" property="rdfs:label">eq-diff2</li>
-    <li resource="#eq-diff3" typeof="skos:Concept" property="rdfs:label">eq-diff3</li>
-    <li resource="#prp-irp" typeof="skos:Concept" property="rdfs:label">prp-irp</li>
-    <li resource="#prp-asyp" typeof="skos:Concept" property="rdfs:label">prp-asyp</li>
-    <li resource="#prp-pdw" typeof="skos:Concept" property="rdfs:label">prp-pdw</li>
-    <li resource="#prp-adp" typeof="skos:Concept" property="rdfs:label">prp-adp</li>
-    <li resource="#prp-npa1" typeof="skos:Concept" property="rdfs:label">prp-npa1</li>
-    <li resource="#prp-npa2" typeof="skos:Concept" property="rdfs:label">prp-npa2</li>
-    <li resource="#cls-nothing2" typeof="skos:Concept" property="rdfs:label">cls-nothing2</li>
-    <li resource="#cls-com" typeof="skos:Concept" property="rdfs:label">cls-com</li>
-    <li resource="#cls-maxc1" typeof="skos:Concept" property="rdfs:label">cls-maxc1</li>
-    <li resource="#cls-maxqc1" typeof="skos:Concept" property="rdfs:label">cls-maxqc1</li>
-    <li resource="#cls-maxqc2" typeof="skos:Concept" property="rdfs:label">cls-maxqc2</li>
-    <li resource="#cls-maxqd1" typeof="skos:Concept" property="rdfs:label">cls-maxqd1</li>
-    <li resource="#cax-dw" typeof="skos:Concept" property="rdfs:label">cax-dw</li>
-    <li resource="#cax-adc" typeof="skos:Concept" property="rdfs:label">cax-adc</li>
-    <li resource="#dt-not-type" typeof="skos:Concept" property="rdfs:label">dt-not-type</li>
+    <li resource="#eq-diff1" typeof="skos:Concept"><span property="rdfs:label">eq-diff1</span><span property="rdfs:comment"> reports that two resources are both owl:sameAs and owl:differentFrom.</span></li>
+    <li resource="#eq-diff2" typeof="skos:Concept"><span property="rdfs:label">eq-diff2</span><span property="rdfs:comment"> reports that members of an owl:AllDifferent list are inferred to be the same individual.</span></li>
+    <li resource="#eq-diff3" typeof="skos:Concept"><span property="rdfs:label">eq-diff3</span><span property="rdfs:comment"> reports that members of an owl:AllDifferent distinctMembers list are inferred to be the same individual.</span></li>
+    <li resource="#prp-irp" typeof="skos:Concept"><span property="rdfs:label">prp-irp</span><span property="rdfs:comment"> reports a reflexive use of a property declared owl:IrreflexiveProperty.</span></li>
+    <li resource="#prp-asyp" typeof="skos:Concept"><span property="rdfs:label">prp-asyp</span><span property="rdfs:comment"> reports that an owl:AsymmetricProperty is used in both directions for the same pair of resources.</span></li>
+    <li resource="#prp-pdw" typeof="skos:Concept"><span property="rdfs:label">prp-pdw</span><span property="rdfs:comment"> reports that two owl:propertyDisjointWith properties hold for the same subject and object.</span></li>
+    <li resource="#prp-adp" typeof="skos:Concept"><span property="rdfs:label">prp-adp</span><span property="rdfs:comment"> reports that two properties from an owl:AllDisjointProperties axiom hold for the same subject and object.</span></li>
+    <li resource="#prp-npa1" typeof="skos:Concept"><span property="rdfs:label">prp-npa1</span><span property="rdfs:comment"> reports that an owl:NegativePropertyAssertion for an object property is contradicted by a positive assertion.</span></li>
+    <li resource="#prp-npa2" typeof="skos:Concept"><span property="rdfs:label">prp-npa2</span><span property="rdfs:comment"> reports that an owl:NegativePropertyAssertion for a data property is contradicted by a positive assertion.</span></li>
+    <li resource="#cls-nothing2" typeof="skos:Concept"><span property="rdfs:label">cls-nothing2</span><span property="rdfs:comment"> reports that a resource is typed as owl:Nothing.</span></li>
+    <li resource="#cls-com" typeof="skos:Concept"><span property="rdfs:label">cls-com</span><span property="rdfs:comment"> reports that a resource belongs to a class and its owl:complementOf class.</span></li>
+    <li resource="#cls-maxc1" typeof="skos:Concept"><span property="rdfs:label">cls-maxc1</span><span property="rdfs:comment"> reports a value for a property restricted by owl:maxCardinality 0.</span></li>
+    <li resource="#cls-maxqc1" typeof="skos:Concept"><span property="rdfs:label">cls-maxqc1</span><span property="rdfs:comment"> reports a qualified cardinality violation where maxQualifiedCardinality 0 excludes a value of the qualified class.</span></li>
+    <li resource="#cls-maxqc2" typeof="skos:Concept"><span property="rdfs:label">cls-maxqc2</span><span property="rdfs:comment"> reports a qualified cardinality violation where maxQualifiedCardinality 0 excludes an asserted value.</span></li>
+    <li resource="#cls-maxqd1" typeof="skos:Concept"><span property="rdfs:label">cls-maxqd1</span><span property="rdfs:comment"> reports a qualified data cardinality violation for maxQualifiedCardinality 0.</span></li>
+    <li resource="#cax-dw" typeof="skos:Concept"><span property="rdfs:label">cax-dw</span><span property="rdfs:comment"> reports that a resource is typed with two classes declared owl:disjointWith.</span></li>
+    <li resource="#cax-adc" typeof="skos:Concept"><span property="rdfs:label">cax-adc</span><span property="rdfs:comment"> reports that a resource is typed with two classes from an owl:AllDisjointClasses axiom.</span></li>
+    <li resource="#dt-not-type" typeof="skos:Concept"><span property="rdfs:label">dt-not-type</span><span property="rdfs:comment"> reports a literal that does not satisfy the datatype constraints inferred for it.</span></li>
   </ul>
 </body>
 </html>
