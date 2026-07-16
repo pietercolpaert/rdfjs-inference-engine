@@ -1,0 +1,14 @@
+@prefix ex: <https://example.org/qudt-speed#> .
+@prefix cdt: <https://w3id.org/cdt/> .
+
+VERSION "1.2-messages"
+ex:m1 ex:speed "12 m/s"^^cdt:speed .
+@message .
+ex:m2 ex:speed "36 km/h"^^cdt:speed .
+@message .
+ex:m3 ex:speed "10 mi/h"^^cdt:speed .
+@message .
+ex:m4 ex:speed "10 kn"^^cdt:speed .
+@message .
+ex:m5 ex:speed "not-a-speed"^^cdt:speed .
+@message .

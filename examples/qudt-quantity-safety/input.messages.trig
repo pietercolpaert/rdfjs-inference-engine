@@ -1,0 +1,13 @@
+@prefix ex: <https://example.org/qudt-quantity-safety#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+
+VERSION "1.2-messages"
+ex:m1 ex:length [ a qudt:QuantityValue ; qudt:numericValue 150 ; qudt:unit unit:CentiM ] .
+@message .
+ex:m2 ex:length [ a qudt:QuantityValue ; qudt:numericValue 2 ; qudt:unit unit:M ] .
+@message .
+ex:m3 ex:length [ a qudt:QuantityValue ; qudt:numericValue 5 ; qudt:unit unit:SEC ] .
+@message .
+ex:m4 ex:length [ a qudt:QuantityValue ; qudt:numericValue 12 ] .
+@message .

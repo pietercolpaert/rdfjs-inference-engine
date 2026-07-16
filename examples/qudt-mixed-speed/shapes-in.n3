@@ -1,0 +1,13 @@
+@prefix ex: <https://example.org/qudt-speed#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+
+ex:SpeedInputShape a sh:NodeShape ;
+  sh:targetSubjectsOf ex:speed ;
+  sh:property [
+    sh:path ex:speed ;
+    sh:minCount 1 ; sh:maxCount 1 ;
+    sh:datatype cdt:speed ;
+    sh:unit ( unit:M-PER-SEC unit:KiloM-PER-HR unit:MI-PER-HR unit:KN )
+  ] .

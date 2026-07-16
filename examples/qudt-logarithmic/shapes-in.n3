@@ -1,0 +1,11 @@
+@prefix ex: <https://example.org/qudt-logarithmic#> .
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+
+ex:DecibelInputShape a sh:NodeShape ; sh:targetSubjectsOf ex:decibelLevel ;
+  sh:property [ sh:path ex:decibelLevel ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype cdt:ucum ; sh:unit unit:DeciB ] .
+ex:OctaveInputShape a sh:NodeShape ; sh:targetSubjectsOf ex:octaveSpan ;
+  sh:property [ sh:path ex:octaveSpan ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype cdt:ucum ; sh:unit unit:OCT ] .
+ex:PhInputShape a sh:NodeShape ; sh:targetSubjectsOf ex:phValue ;
+  sh:property [ sh:path ex:phValue ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype cdt:ucum ; sh:unit unit:PH ] .

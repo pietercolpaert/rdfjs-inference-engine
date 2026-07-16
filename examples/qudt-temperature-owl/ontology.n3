@@ -1,0 +1,13 @@
+@prefix ex: <https://example.org/qudt-temperature#> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:temperature rdfs:range qudt:QuantityValue .
+ex:temperature qcr:normalizationProfile qcr:TemperatureProfile .
+
+# The direction is intentional: OWL sameAs symmetry must infer the local-to-QUDT
+# assertion consumed by the QUDT normalization profile.
+unit:DEG_F owl:sameAs ex:LocalFahrenheit .

@@ -12,20 +12,24 @@ const sourceArgument = process.argv.indexOf('--source');
 const qudtSource = sourceArgument >= 0
   ? await readFile(resolve(process.argv[sourceArgument + 1]), 'utf8')
   : await downloadQudt();
-const sourceHash = createHash('sha256').update(qudtSource).digest('hex');
-const sourceLabel = /rdfs:label\s+"([^"]*QUDT[^"\n]*)"/.exec(qudtSource)?.[1] ?? 'QUDT';
+const sourceHash = argumentValue('--source-hash') ?? createHash('sha256').update(qudtSource).digest('hex');
+const sourceLabel = argumentValue('--source-label')
+  ?? /rdfs:label\s+"([^"]*QUDT[^"\n]*)"/.exec(qudtSource)?.[1]
+  ?? 'QUDT';
 const qudtQuads = Array.from(new Parser().parse(qudtSource) ?? []);
 const runtimeQuads = selectNormalizationQuads(qudtQuads);
+const sourceStatementCount = Number(argumentValue('--source-statements') ?? qudtQuads.length);
+const projectedStatementCount = Number(argumentValue('--projected-statements') ?? runtimeQuads.length);
 const profileN3 = await readFile(PROFILE_PATH, 'utf8');
 const engine = new InferenceEngine();
 
-engine.load({ n3: profileN3, label: 'rules/qudt/qudt-cdt-normalization.n3' }, runtimeQuads);
+engine.load({ n3: profileN3, label: 'rules/qudt/qudt-cdt-normalization.n3' }, runtimeQuads, { selectRuntimeRules: false });
 
 const header = [
   '# Generated QUDT/CDT normalization runtime. Do not edit by hand.',
   `# Source: ${QUDT_URL} (${sourceLabel})`,
   `# Source SHA-256: ${sourceHash}`,
-  `# Projected ${runtimeQuads.length}/${qudtQuads.length} QUDT statements used by the normalization profile.`,
+  `# Projected ${projectedStatementCount}/${sourceStatementCount} QUDT statements used by the normalization profile.`,
   '# QUDT is licensed under CC BY 4.0; attribution: QUDT.org.',
   '',
 ].join('\n');
@@ -57,4 +61,9 @@ function selectNormalizationQuads(quads) {
 
   return quads.filter((quad) => predicates.has(quad.predicate.value)
     || (quad.predicate.value === rdfType && quad.object.value === logarithmicUnit));
+}
+
+function argumentValue(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : undefined;
 }

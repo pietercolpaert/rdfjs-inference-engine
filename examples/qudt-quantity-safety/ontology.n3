@@ -1,0 +1,7 @@
+@prefix ex: <https://example.org/qudt-quantity-safety#> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:length rdfs:range qudt:QuantityValue .
+ex:length qcr:normalizationProfile qcr:LengthProfile .

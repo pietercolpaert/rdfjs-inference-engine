@@ -67,6 +67,8 @@
 @prefix qudt:   <http://qudt.org/schema/qudt/> .
 @prefix unit:   <http://qudt.org/vocab/unit/> .
 @prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix skos:   <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
 
 @prefix cdt:    <https://w3id.org/cdt/> .
@@ -371,6 +373,18 @@ qcr:profileForDatatype         log:memoize true .
 qcr:profileForGenericUcum      log:memoize true .
 qcr:normalizedLexicalForm      log:memoize true .
 
+qcr:normalizedQuantity                 qcr:normalizationOutputProperty true .
+qcr:normalizedUcumLiteral              qcr:normalizationOutputProperty true .
+qcr:normalizedCdtLiteral               qcr:normalizationOutputProperty true .
+qcr:normalizedLogarithmicQuantity      qcr:normalizationOutputProperty true .
+qcr:normalizedLogarithmicUcumLiteral   qcr:normalizationOutputProperty true .
+
+# Normalized quantity nodes retain their source for traceability. These
+# provenance predicates must not be treated as fresh measurement properties,
+# otherwise each normalized result recursively normalizes its own source.
+qcr:sourceLiteral                      qcr:normalizationOutputProperty true .
+qcr:sourceQuantity                     qcr:normalizationOutputProperty true .
+
 
 #################################################################
 # QUDT unit-token resolution
@@ -404,6 +418,67 @@ qcr:normalizedLexicalForm      log:memoize true .
 {
     ?unit qudt:ucumCode ?ucumLiteral .
     ?ucumLiteral dt:lexicalForm ?token .
+} .
+
+
+#################################################################
+# Local unit alignment
+#
+# OWL and SKOS profiles can derive the forward alignment triples below from
+# inverse declarations. The non-recursive normalizationUnit relation resolves
+# a local identifier at the input boundary; core QUDT metadata predicates must
+# not be redefined in terms of themselves because that creates an unbounded
+# backward-proof path for ordinary units.
+#################################################################
+
+{
+    ?localUnit qcr:alignedQudtUnit ?qudtUnit .
+}
+<=
+{
+    ?localUnit owl:sameAs ?qudtUnit .
+} .
+
+{
+    ?localUnit qcr:alignedQudtUnit ?qudtUnit .
+}
+<=
+{
+    ?localUnit skos:exactMatch ?qudtUnit .
+} .
+
+{
+    ?unit qcr:normalizationUnit ?unit .
+}
+<=
+{
+    ?unit qudt:conversionMultiplier ?multiplier .
+} .
+
+{
+    ?unit qcr:normalizationUnit ?unit .
+}
+<=
+{
+    ?unit a qudt:LogarithmicUnit .
+} .
+
+{
+    ?localUnit qcr:normalizationUnit ?qudtUnit .
+}
+<=
+{
+    ?localUnit qcr:alignedQudtUnit ?qudtUnit .
+    ?qudtUnit qudt:conversionMultiplier ?multiplier .
+} .
+
+{
+    ?localUnit qcr:normalizationUnit ?qudtUnit .
+}
+<=
+{
+    ?localUnit qcr:alignedQudtUnit ?qudtUnit .
+    ?qudtUnit a qudt:LogarithmicUnit .
 } .
 
 
@@ -585,6 +660,27 @@ qcr:normalizedLexicalForm      log:memoize true .
 #################################################################
 
 {
+    (?sourceProperty ?sourceUnit) qcr:profileForObjectProperty ?profile .
+}
+<=
+{
+    ?sourceProperty qcr:normalizationProfile ?profile .
+    ?sourceUnit qudt:conversionMultiplier ?sourceMultiplier .
+} .
+
+{
+    (?sourceProperty ?sourceUnit) qcr:profileForObjectProperty ?profile .
+}
+<=
+{
+    1 log:notIncludes {
+        ?sourceProperty qcr:normalizationProfile ?explicitProfile .
+    } .
+    ?sourceUnit qcr:profileForGenericUcum ?profile .
+} .
+
+
+{
     (?sourceValue ?sourceUnit ?targetUnit)
         qcr:convertedValue
         ?targetValue .
@@ -654,6 +750,19 @@ qcr:normalizedLexicalForm      log:memoize true .
 {
     ?focusNode ?sourceProperty ?literal .
 
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedUcumLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedCdtLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicUcumLiteral ?literal .
+    } .
+
     ?literal dt:datatype ?sourceDatatype .
     ?sourceDatatype qcr:profileForDatatype ?profile .
 
@@ -681,19 +790,20 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm ?targetDatatype)
         log:dtlit
         ?normalizedSpecificLiteral .
+
+    (qcr:normalizedQuantity ?focusNode ?sourceProperty ?literal ?targetUnit)
+        log:skolem
+        ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?targetValue ;
-            qudt:unit ?targetUnit ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceLiteral ?literal
-        ] ;
+        qcr:normalizedQuantity ?normalizedQuantity ;
         qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
         qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?targetValue ; qudt:unit ?targetUnit ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceLiteral ?literal .
 } .
 
 
@@ -704,6 +814,19 @@ qcr:normalizedLexicalForm      log:memoize true .
 
 {
     ?focusNode ?sourceProperty ?literal .
+
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedUcumLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedCdtLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicUcumLiteral ?literal .
+    } .
 
     ?literal dt:datatype cdt:ucum .
 
@@ -733,19 +856,17 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm ?targetDatatype)
         log:dtlit
         ?normalizedSpecificLiteral .
+
+    (qcr:normalizedQuantity ?focusNode ?sourceProperty ?literal ?targetUnit) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?targetValue ;
-            qudt:unit ?targetUnit ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceLiteral ?literal
-        ] ;
+        qcr:normalizedQuantity ?normalizedQuantity ;
         qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
         qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?targetValue ; qudt:unit ?targetUnit ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceLiteral ?literal .
 } .
 
 
@@ -756,6 +877,19 @@ qcr:normalizedLexicalForm      log:memoize true .
 
 {
     ?focusNode ?sourceProperty ?literal .
+
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedUcumLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedCdtLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicUcumLiteral ?literal .
+    } .
 
     ?literal dt:datatype lcdt:ucum .
 
@@ -785,19 +919,17 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm ?targetDatatype)
         log:dtlit
         ?normalizedSpecificLiteral .
+
+    (qcr:normalizedQuantity ?focusNode ?sourceProperty ?literal ?targetUnit) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?targetValue ;
-            qudt:unit ?targetUnit ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceLiteral ?literal
-        ] ;
+        qcr:normalizedQuantity ?normalizedQuantity ;
         qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
         qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?targetValue ; qudt:unit ?targetUnit ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceLiteral ?literal .
 } .
 
 
@@ -809,11 +941,23 @@ qcr:normalizedLexicalForm      log:memoize true .
 {
     ?focusNode ?sourceProperty ?sourceQuantity .
 
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedQuantity ?sourceQuantity .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicQuantity ?sourceQuantity .
+    } .
+
     ?sourceQuantity
         qudt:numericValue ?sourceValue ;
-        qudt:unit ?sourceUnit .
+        qudt:unit ?inputUnit .
 
-    ?sourceUnit qcr:profileForGenericUcum ?profile .
+    ?inputUnit qcr:normalizationUnit ?sourceUnit .
+
+    (?sourceProperty ?sourceUnit) qcr:profileForObjectProperty ?profile .
 
     ?profile
         qcr:datatype ?targetDatatype ;
@@ -835,19 +979,17 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm ?targetDatatype)
         log:dtlit
         ?normalizedSpecificLiteral .
+
+    (qcr:normalizedQuantity ?focusNode ?sourceProperty ?sourceQuantity ?targetUnit) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?targetValue ;
-            qudt:unit ?targetUnit ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceQuantity ?sourceQuantity
-        ] ;
+        qcr:normalizedQuantity ?normalizedQuantity ;
         qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
         qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?targetValue ; qudt:unit ?targetUnit ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceQuantity ?sourceQuantity .
 } .
 
 
@@ -923,6 +1065,19 @@ qcr:normalizedLexicalForm      log:memoize true .
 {
     ?focusNode ?sourceProperty ?literal .
 
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedUcumLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedCdtLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicUcumLiteral ?literal .
+    } .
+
     ?literal dt:datatype ?sourceDatatype .
 
     (?literal ?sourceDatatype)
@@ -946,21 +1101,18 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm cdt:dimensionless)
         log:dtlit
         ?normalizedSpecificLiteral .
+
+    (qcr:normalizedQuantity ?focusNode ?sourceProperty ?literal unit:UNITLESS) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?linearRatio ;
-            qudt:unit unit:UNITLESS ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceLiteral ?literal ;
-            qcr:sourceUnit ?sourceUnit ;
-            qcr:logarithmicConvention ?convention
-        ] ;
+        qcr:normalizedQuantity ?normalizedQuantity ;
         qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
         qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?linearRatio ; qudt:unit unit:UNITLESS ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceLiteral ?literal ; qcr:sourceUnit ?sourceUnit ;
+        qcr:logarithmicConvention ?convention .
 } .
 
 
@@ -972,9 +1124,21 @@ qcr:normalizedLexicalForm      log:memoize true .
 {
     ?focusNode ?sourceProperty ?sourceQuantity .
 
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedQuantity ?sourceQuantity .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicQuantity ?sourceQuantity .
+    } .
+
     ?sourceQuantity
         qudt:numericValue ?sourceValue ;
-        qudt:unit ?sourceUnit .
+        qudt:unit ?inputUnit .
+
+    ?inputUnit qcr:normalizationUnit ?sourceUnit .
 
     (?sourceValue ?sourceUnit)
         qcr:linearRatioFromLogValue
@@ -993,21 +1157,18 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm cdt:dimensionless)
         log:dtlit
         ?normalizedSpecificLiteral .
+
+    (qcr:normalizedQuantity ?focusNode ?sourceProperty ?sourceQuantity unit:UNITLESS) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?linearRatio ;
-            qudt:unit unit:UNITLESS ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceQuantity ?sourceQuantity ;
-            qcr:sourceUnit ?sourceUnit ;
-            qcr:logarithmicConvention ?convention
-        ] ;
+        qcr:normalizedQuantity ?normalizedQuantity ;
         qcr:normalizedUcumLiteral ?normalizedUcumLiteral ;
         qcr:normalizedCdtLiteral ?normalizedSpecificLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?linearRatio ; qudt:unit unit:UNITLESS ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceQuantity ?sourceQuantity ; qcr:sourceUnit ?sourceUnit ;
+        qcr:logarithmicConvention ?convention .
 } .
 
 
@@ -1029,6 +1190,16 @@ qcr:normalizedLexicalForm      log:memoize true .
         ?sourceProperty ?sourceQuantity ;
         qcr:targetLogarithmicUnit ?targetUnit .
 
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedQuantity ?sourceQuantity .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicQuantity ?sourceQuantity .
+    } .
+
     ?sourceQuantity
         qudt:numericValue ?linearRatio ;
         qudt:unit unit:UNITLESS .
@@ -1048,19 +1219,17 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm cdt:ucum)
         log:dtlit
         ?normalizedUcumLiteral .
+
+    (qcr:normalizedLogarithmicQuantity ?focusNode ?sourceProperty ?sourceQuantity ?targetUnit) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedLogarithmicQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?targetValue ;
-            qudt:unit ?targetUnit ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceQuantity ?sourceQuantity ;
-            qcr:logarithmicConvention ?convention
-        ] ;
+        qcr:normalizedLogarithmicQuantity ?normalizedQuantity ;
         qcr:normalizedLogarithmicUcumLiteral ?normalizedUcumLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?targetValue ; qudt:unit ?targetUnit ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceQuantity ?sourceQuantity ;
+        qcr:logarithmicConvention ?convention .
 } .
 
 
@@ -1079,6 +1248,19 @@ qcr:normalizedLexicalForm      log:memoize true .
     ?focusNode
         ?sourceProperty ?literal ;
         qcr:targetLogarithmicUnit ?targetUnit .
+
+    _:normalizationOutputScope log:notIncludes {
+        ?sourceProperty qcr:normalizationOutputProperty true .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedUcumLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedCdtLiteral ?literal .
+    } .
+    _:normalizationOutputScope log:notIncludes {
+        ?focusNode qcr:normalizedLogarithmicUcumLiteral ?literal .
+    } .
 
     ?literal dt:datatype ?sourceDatatype .
 
@@ -1104,19 +1286,17 @@ qcr:normalizedLexicalForm      log:memoize true .
     (?normalizedLexicalForm cdt:ucum)
         log:dtlit
         ?normalizedUcumLiteral .
+
+    (qcr:normalizedLogarithmicQuantity ?focusNode ?sourceProperty ?literal ?targetUnit) log:skolem ?normalizedQuantity .
 }
 =>
 {
     ?focusNode
-        qcr:normalizedLogarithmicQuantity [
-            a qudt:QuantityValue ;
-            qudt:numericValue ?targetValue ;
-            qudt:unit ?targetUnit ;
-            qcr:sourceProperty ?sourceProperty ;
-            qcr:sourceLiteral ?literal ;
-            qcr:logarithmicConvention ?convention
-        ] ;
+        qcr:normalizedLogarithmicQuantity ?normalizedQuantity ;
         qcr:normalizedLogarithmicUcumLiteral ?normalizedUcumLiteral .
+    ?normalizedQuantity a qudt:QuantityValue ; qudt:numericValue ?targetValue ; qudt:unit ?targetUnit ;
+        qcr:sourceProperty ?sourceProperty ; qcr:sourceLiteral ?literal ;
+        qcr:logarithmicConvention ?convention .
 } .
 
 

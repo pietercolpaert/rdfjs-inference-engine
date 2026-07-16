@@ -1,0 +1,16 @@
+@prefix ex: <https://example.org/qudt-logarithmic#> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:PowerRatioOutputShape a sh:NodeShape ; sh:targetSubjectsOf ex:decibelLevel ;
+  sh:property [ sh:path qcr:normalizedQuantity ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ; sh:unit unit:UNITLESS ] .
+ex:FrequencyRatioOutputShape a sh:NodeShape ; sh:targetSubjectsOf ex:octaveSpan ;
+  sh:property [ sh:path qcr:normalizedQuantity ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ; sh:unit unit:UNITLESS ] .
+ex:HydrogenActivityOutputShape a sh:NodeShape ; sh:targetSubjectsOf ex:phValue ;
+  sh:property [ sh:path qcr:normalizedQuantity ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ; sh:unit unit:UNITLESS ] .
+
+ex:LinearRatioShape a sh:NodeShape ; sh:targetObjectsOf qcr:normalizedQuantity ;
+  sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:maxCount 1 ; sh:hasValue unit:UNITLESS ] .

@@ -1,0 +1,5 @@
+@prefix ex: <https://example.org/qudt-speed#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:speed rdfs:range qudt:QuantityValue .

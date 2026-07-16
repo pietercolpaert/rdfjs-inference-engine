@@ -1,0 +1,7 @@
+@prefix ex: <https://example.org/qudt-logarithmic#> .
+@prefix cdt: <https://w3id.org/cdt/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:decibelLevel rdfs:range cdt:ucum .
+ex:octaveSpan rdfs:range cdt:ucum .
+ex:phValue rdfs:range cdt:ucum .

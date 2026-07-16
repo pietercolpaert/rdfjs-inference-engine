@@ -32,6 +32,11 @@ const OWLRL_INCONSISTENCY = OWLRL + 'Inconsistency';
 const SHACL = 'http://www.w3.org/ns/shacl#';
 const SHACL_VALIDATION_RESULT = SHACL + 'ValidationResult';
 const SHACLN3 = 'https://example.org/shacl-n3#';
+const QCR = 'https://w3id.org/qudt-inference#';
+const QUDT = 'http://qudt.org/schema/qudt/';
+const QUDT_UNIT = 'http://qudt.org/vocab/unit/';
+const QUDT_DIMENSION = QUDT + 'hasDimensionVector';
+const PRECOMPILED_BACKGROUND_MARKER = '# Precomputed background facts and closure';
 const NON_DEFAULT_RULE_DIRS = new Set(['precompiled', 'shacl-experimental']);
 const INTERNAL_HELPER_PREDICATES = new Set([
   OWLRL + 'listRoot',
@@ -229,7 +234,13 @@ export class InferenceEngine {
       options: loadOptions,
       shapePlanning: this.shapePlanning,
     });
-    this.runtime = appendPrecompiledProfileRuntimes(compiledRuntime, normalizedProfiles, vocabularyQuads);
+    this.runtime = appendPrecompiledProfileRuntimes(
+      compiledRuntime,
+      normalizedProfiles,
+      vocabularyQuads,
+      this.staticClosure,
+      this.shapePlanning,
+    );
 
     return this.runtime;
   }
@@ -596,7 +607,7 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   }
 
   if (includeStaticClosure) {
-    const backgroundClosure = uniqueQuads([...input.vocabulary, ...input.closure]);
+    const backgroundClosure = runtimeBackgroundClosure(input);
     if (backgroundClosure.length > 0) {
       sections.push('', '# Precomputed background facts and closure', serializeQuadsAsN3(backgroundClosure).trimEnd());
     }
@@ -605,9 +616,33 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   return `${sections.join('\n')}\n`;
 }
 
+function runtimeBackgroundClosure(input: RuntimeCompilerInput): Quad[] {
+  if (!activatesPreparedProfile(input) || !input.shapePlanning?.input || !input.shapePlanning.output) {
+    return uniqueQuads([...input.vocabulary, ...input.closure]);
+  }
+
+  const vocabularyTerms = new Set<string>();
+  for (const quad of input.vocabulary) {
+    vocabularyTerms.add(termKey(quad.subject));
+    vocabularyTerms.add(termKey(quad.object));
+  }
+  return uniqueQuads([
+    ...input.vocabulary,
+    ...input.closure.filter((quad) => vocabularyTerms.has(termKey(quad.subject))
+      || vocabularyTerms.has(termKey(quad.object))),
+  ]);
+}
+
 function shouldIncludeStaticClosure(input: RuntimeCompilerInput, runtimeProfileN3: string): boolean {
   if (input.options.includeStaticClosure !== undefined) {
     return input.options.includeStaticClosure;
+  }
+
+  // Prepared profiles are appended after runtime compilation. Keep the
+  // load-time closure so those rules can consume OWL/SKOS consequences even
+  // when SHACL planning selected only a partial dynamic rule projection.
+  if (activatesPreparedProfile(input)) {
+    return true;
   }
 
   if (!input.shapePlanning?.input || !input.shapePlanning.output) {
@@ -615,6 +650,12 @@ function shouldIncludeStaticClosure(input: RuntimeCompilerInput, runtimeProfileN
   }
 
   return hasNonPartialRuntimeRuleSource(runtimeProfileN3);
+}
+
+function activatesPreparedProfile(input: RuntimeCompilerInput): boolean {
+  return input.profiles.some((profile) => profile.precompiledRuntime?.trim())
+    && (input.profiles.length === 1 || input.vocabulary.some((quad) => [quad.subject, quad.predicate, quad.object]
+      .some(isQudtCdtTerm)));
 }
 
 function hasNonPartialRuntimeRuleSource(runtimeProfileN3: string): boolean {
@@ -1505,7 +1546,13 @@ function normalizeProfiles(profiles: RuleProfile | RuleProfile[]): LoadedRulePro
   });
 }
 
-function appendPrecompiledProfileRuntimes(runtime: string, profiles: LoadedRuleProfile[], vocabulary: Quad[]): string {
+function appendPrecompiledProfileRuntimes(
+  runtime: string,
+  profiles: LoadedRuleProfile[],
+  vocabulary: Quad[],
+  closure: Quad[],
+  shapePlanning?: ShapePlanning,
+): string {
   const activatePreparedProfiles = profiles.length === 1 || vocabulary.some((quad) => [quad.subject, quad.predicate, quad.object]
     .some(isQudtCdtTerm));
   if (!activatePreparedProfiles) {
@@ -1516,12 +1563,139 @@ function appendPrecompiledProfileRuntimes(runtime: string, profiles: LoadedRuleP
     .filter((profile) => profile.precompiledRuntime?.trim())
     .map((profile) => [
       `# Precompiled runtime profile${profile.label ? `: ${profile.label}` : ''}`,
-      profile.precompiledRuntime!.trim(),
+      specializeQudtPreparedRuntime(profile.precompiledRuntime!, shapePlanning, [...vocabulary, ...closure]).trim(),
     ].join('\n'));
 
   return prepared.length === 0
     ? runtime
     : `${[runtime.trimEnd(), ...prepared].filter(Boolean).join('\n\n')}\n`;
+}
+
+function specializeQudtPreparedRuntime(runtime: string, planning: ShapePlanning | undefined, staticQuads: Quad[]): string {
+  if (!planning) {
+    return runtime;
+  }
+  const targetUnits = qudtUnitsFromShapePlan(planning.output);
+  if (targetUnits.length === 0) {
+    return runtime;
+  }
+
+  const markerIndex = runtime.indexOf(PRECOMPILED_BACKGROUND_MARKER);
+  if (markerIndex < 0) {
+    return runtime;
+  }
+
+  const factsStart = runtime.indexOf('\n', markerIndex);
+  if (factsStart < 0) {
+    return runtime;
+  }
+
+  let facts: Quad[];
+  try {
+    facts = parseShapeQuads(runtime.slice(factsStart + 1));
+  } catch {
+    return runtime;
+  }
+
+  const inputUnitHints = qudtUnitsFromShapePlan(planning.input);
+  const mappings = collectQudtUnitMappings(staticQuads);
+  const resolvedTargets = resolveQudtUnits(targetUnits, mappings);
+  const resolvedInputs = resolveQudtUnits(inputUnitHints, mappings);
+  if (resolvedTargets.size === 0) {
+    return runtime;
+  }
+
+  const selectedUnits = new Set<string>([...resolvedTargets, ...resolvedInputs]);
+  const hasUnresolvedInputUnit = inputUnitHints.some((unit) => !unit.startsWith(QUDT_UNIT) && !mappings.has(unit));
+  // An open source contract needs every source unit that can reach the target
+  // dimension; exact SHACL IN constraints can use the much smaller explicit set.
+  if (inputUnitHints.length === 0 || hasUnresolvedInputUnit) {
+    const targetDimensions = new Set(facts
+      .filter((quad) => quad.predicate.value === QUDT_DIMENSION && resolvedTargets.has(quad.subject.value))
+      .map((quad) => quad.object.value));
+    for (const quad of facts) {
+      if (quad.predicate.value === QUDT_DIMENSION && targetDimensions.has(quad.object.value)) {
+        selectedUnits.add(quad.subject.value);
+      }
+    }
+  }
+
+  const selectedFacts = facts.filter((quad) => selectedUnits.has(quad.subject.value));
+  if (selectedFacts.length === 0 || selectedFacts.length === facts.length) {
+    return runtime;
+  }
+
+  const profileAndRules = runtime.slice(0, markerIndex).trimEnd();
+  return [
+    profileAndRules,
+    '',
+    PRECOMPILED_BACKGROUND_MARKER,
+    `# Shape-specialized QUDT projection: ${selectedUnits.size} unit(s), ${selectedFacts.length}/${facts.length} facts.`,
+    serializeQuadsAsN3(selectedFacts),
+    '',
+  ].join('\n');
+}
+
+function qudtUnitsFromShapePlan(plan: ShapePlanning['input'] | ShapePlanning['output']): string[] {
+  if (!plan) {
+    return [];
+  }
+
+  const units = new Set<string>();
+  for (const shape of plan.shapes) {
+    for (const property of shape.propertyPlans) {
+      for (const unit of property.units ?? []) {
+        units.add(unit);
+      }
+      if (property.path.type === 'predicate' && property.path.predicate === QUDT + 'unit') {
+        for (const unit of [...property.hasValues, ...property.inValues]) {
+          units.add(unit);
+        }
+      }
+    }
+  }
+  return Array.from(units).sort();
+}
+
+function collectQudtUnitMappings(quads: Iterable<Quad>): Map<string, Set<string>> {
+  const mappingPredicates = new Set([
+    OWL_SAME_AS,
+    'http://www.w3.org/2004/02/skos/core#exactMatch',
+    QCR + 'alignedQudtUnit',
+    QCR + 'normalizationUnit',
+  ]);
+  const mappings = new Map<string, Set<string>>();
+
+  for (const quad of quads) {
+    if (!mappingPredicates.has(quad.predicate.value)
+      || quad.subject.termType !== 'NamedNode'
+      || quad.object.termType !== 'NamedNode') {
+      continue;
+    }
+    const pair = [quad.subject.value, quad.object.value];
+    const qudtUnit = pair.find((value) => value.startsWith(QUDT_UNIT));
+    const localUnit = pair.find((value) => value !== qudtUnit);
+    if (!qudtUnit || !localUnit) {
+      continue;
+    }
+    const values = mappings.get(localUnit) ?? new Set<string>();
+    values.add(qudtUnit);
+    mappings.set(localUnit, values);
+  }
+  return mappings;
+}
+
+function resolveQudtUnits(units: Iterable<string>, mappings: Map<string, Set<string>>): Set<string> {
+  const resolved = new Set<string>();
+  for (const unit of units) {
+    if (unit.startsWith(QUDT_UNIT)) {
+      resolved.add(unit);
+    }
+    for (const mapped of mappings.get(unit) ?? []) {
+      resolved.add(mapped);
+    }
+  }
+  return resolved;
 }
 
 function isQudtCdtTerm(term: Term): boolean {
@@ -1612,7 +1786,10 @@ function shouldEmitQuad(quad: Quad, outputMode: InferenceOutputMode): boolean {
   if (isReflexiveSameAs(quad)) {
     return false;
   }
-  if (outputMode !== 'conformance' && hasGeneratedSkolemTerm(quad) && !isShaclValidationResultQuad(quad)) {
+  if (outputMode !== 'conformance'
+    && hasGeneratedSkolemTerm(quad)
+    && !isShaclValidationResultQuad(quad)
+    && !isPublicQudtNormalizationQuad(quad)) {
     return false;
   }
   if (outputMode !== 'conformance' && isAnonymousClassType(quad)) {
@@ -1621,6 +1798,15 @@ function shouldEmitQuad(quad: Quad, outputMode: InferenceOutputMode): boolean {
 
   return outputMode === 'conformance'
     || !hasLiteralSubject(quad);
+}
+
+function isPublicQudtNormalizationQuad(quad: Quad): boolean {
+  return quad.predicate.termType === 'NamedNode'
+    && (quad.predicate.value.startsWith(QCR)
+      || quad.predicate.value.startsWith(QUDT)
+      || (quad.predicate.value === RDF_TYPE
+        && quad.object.termType === 'NamedNode'
+        && quad.object.value === QUDT + 'QuantityValue'));
 }
 
 function isReflexiveSameAs(quad: Quad): boolean {

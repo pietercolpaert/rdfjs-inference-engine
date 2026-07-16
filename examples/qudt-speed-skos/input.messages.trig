@@ -1,0 +1,10 @@
+@prefix ex: <https://example.org/qudt-speed-skos#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+
+VERSION "1.2-messages"
+ex:m1 ex:speed [ a qudt:QuantityValue ; qudt:numericValue 36 ; qudt:unit ex:LocalKmh ] .
+@message .
+ex:m2 ex:speed [ a qudt:QuantityValue ; qudt:numericValue 10 ; qudt:unit ex:LocalMph ] .
+@message .
+ex:m3 ex:speed [ a qudt:QuantityValue ; qudt:numericValue 10 ; qudt:unit ex:LocalKnot ] .
+@message .

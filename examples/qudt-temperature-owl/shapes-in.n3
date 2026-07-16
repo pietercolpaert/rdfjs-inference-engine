@@ -1,0 +1,12 @@
+@prefix ex: <https://example.org/qudt-temperature#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:TemperatureInputShape a sh:NodeShape ;
+  sh:targetSubjectsOf ex:temperature ;
+  sh:property [ sh:path ex:temperature ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ] .
+
+ex:QuantityInputShape a sh:NodeShape ;
+  sh:targetObjectsOf ex:temperature ;
+  sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:maxCount 1 ] .

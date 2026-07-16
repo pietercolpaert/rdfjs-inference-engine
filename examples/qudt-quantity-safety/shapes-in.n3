@@ -1,0 +1,14 @@
+@prefix ex: <https://example.org/qudt-quantity-safety#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:LengthEnvelopeShape a sh:NodeShape ;
+  sh:targetSubjectsOf ex:length ;
+  sh:property [ sh:path ex:length ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ] .
+
+# Unit has maxCount but no minCount so the input contract can demonstrate a
+# partially formed message that normalization must leave untouched.
+ex:QuantityEnvelopeShape a sh:NodeShape ;
+  sh:targetObjectsOf ex:length ;
+  sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:maxCount 1 ] ;
+  sh:property [ sh:path qudt:unit ; sh:maxCount 1 ] .

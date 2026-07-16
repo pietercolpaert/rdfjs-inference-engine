@@ -1,0 +1,12 @@
+@prefix ex: <https://example.org/qudt-logarithmic#> .
+@prefix cdt: <https://w3id.org/cdt/> .
+
+VERSION "1.2-messages"
+ex:m1 ex:decibelLevel "20 dB"^^cdt:ucum .
+@message .
+ex:m2 ex:decibelLevel "10 dB"^^cdt:ucum .
+@message .
+ex:m3 ex:octaveSpan "3 octave"^^cdt:ucum .
+@message .
+ex:m4 ex:phValue "7 pH"^^cdt:ucum .
+@message .

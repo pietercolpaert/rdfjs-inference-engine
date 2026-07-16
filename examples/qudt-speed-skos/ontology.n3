@@ -1,0 +1,15 @@
+@prefix ex: <https://example.org/qudt-speed-skos#> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:speed rdfs:range qudt:QuantityValue .
+ex:speed qcr:normalizationProfile qcr:SpeedProfile .
+
+# Reverse mappings require SKOS exactMatch symmetry before QUDT can resolve the
+# local identifiers. SKOS aligns terms; QUDT performs the arithmetic.
+unit:KiloM-PER-HR skos:exactMatch ex:LocalKmh .
+unit:MI-PER-HR skos:exactMatch ex:LocalMph .
+unit:KN skos:exactMatch ex:LocalKnot .

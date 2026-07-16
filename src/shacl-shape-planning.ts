@@ -1,6 +1,6 @@
 import type { Quad, Term } from '@rdfjs/types';
 
-export const SHACL_SHAPE_PLANNING_VERSION = 1;
+export const SHACL_SHAPE_PLANNING_VERSION = 2;
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
@@ -43,6 +43,7 @@ export interface PropertyShapePlan {
   nodeKind?: string;
   hasValues: string[];
   inValues: string[];
+  units: string[];
   scalar: boolean;
   required: boolean;
   indexSpecs: IndexSpec[];
@@ -139,6 +140,41 @@ interface ShapeGraphIndex {
   bySubjectPredicate: Map<string, Term[]>;
 }
 
+interface RuntimeShapePlanning {
+  v: number;
+  i?: RuntimeShapeGraph;
+  o?: RuntimeShapeGraph;
+}
+
+interface RuntimeShapeGraph {
+  d: ShapeDirection;
+  s: RuntimeShape[];
+}
+
+interface RuntimeShape {
+  s: string;
+  tc: string[];
+  tn: string[];
+  ts: string[];
+  to: string[];
+  p: RuntimePropertyShape[];
+  ip: string[];
+  c: boolean;
+}
+
+interface RuntimePropertyShape {
+  s: string;
+  p: CompiledShaclPath;
+  min?: number;
+  max?: number;
+  dt?: string;
+  cl?: string;
+  nk?: string;
+  h: string[];
+  i: string[];
+  u: string[];
+}
+
 export function compileShaclShapeGraph(quads: Iterable<Quad>, direction: ShapeDirection): ShapeGraphPlan {
   const graphQuads = Array.from(quads);
   const index = buildShapeGraphIndex(graphQuads);
@@ -181,7 +217,7 @@ export function createShapePlanning(input?: ShapeGraphPlan, output?: ShapeGraphP
 export function shapePlanningSummary(planning: ShapePlanning): string[] {
   const lines = [
     `# Shape-guided rule selection: version ${planning.version}`,
-    `# rdfjs-inference-engine shapePlanning=${encodeURIComponent(JSON.stringify(planning))}`,
+    `# rdfjs-inference-engine shapePlanning=${JSON.stringify(compactRuntimeShapePlanning(planning))}`,
   ];
 
   appendGraphPlanSummary(lines, 'Input SHACL shape plan', planning.input);
@@ -262,10 +298,140 @@ export function parseShapePlanningFromRuntime(runtime: string): ShapePlanning | 
   }
 
   try {
-    const parsed = JSON.parse(decodeURIComponent(match[1])) as ShapePlanning;
+    const source = match[1].startsWith('%') ? decodeURIComponent(match[1]) : match[1];
+    const parsed = JSON.parse(source) as ShapePlanning | RuntimeShapePlanning;
+    if ('v' in parsed) {
+      return expandRuntimeShapePlanning(parsed);
+    }
     return parsed && parsed.version === SHACL_SHAPE_PLANNING_VERSION ? parsed : undefined;
   } catch {
     return undefined;
+  }
+}
+
+function compactRuntimeShapePlanning(planning: ShapePlanning): RuntimeShapePlanning {
+  return {
+    v: planning.version,
+    i: planning.input ? compactRuntimeShapeGraph(planning.input) : undefined,
+    o: planning.output ? compactRuntimeShapeGraph(planning.output) : undefined,
+  };
+}
+
+function compactRuntimeShapeGraph(plan: ShapeGraphPlan): RuntimeShapeGraph {
+  return {
+    d: plan.direction,
+    s: plan.shapes.map((shape) => ({
+      s: shape.shape,
+      tc: shape.targetClasses,
+      tn: shape.targetNodes,
+      ts: shape.targetSubjectsOf,
+      to: shape.targetObjectsOf,
+      p: shape.propertyPlans.map((property) => ({
+        s: property.propertyShape,
+        p: property.path,
+        min: property.minCount,
+        max: property.maxCount,
+        dt: property.datatype,
+        cl: property.class,
+        nk: property.nodeKind,
+        h: property.hasValues,
+        i: property.inValues,
+        u: property.units,
+      })),
+      ip: shape.ignoredPredicates,
+      c: shape.closed,
+    })),
+  };
+}
+
+function expandRuntimeShapePlanning(compact: RuntimeShapePlanning): ShapePlanning | undefined {
+  if (compact.v !== SHACL_SHAPE_PLANNING_VERSION) {
+    return undefined;
+  }
+  return createShapePlanning(
+    compact.i ? expandRuntimeShapeGraph(compact.i) : undefined,
+    compact.o ? expandRuntimeShapeGraph(compact.o) : undefined,
+  );
+}
+
+function expandRuntimeShapeGraph(compact: RuntimeShapeGraph): ShapeGraphPlan {
+  const shapes = compact.s.map(expandRuntimeShape);
+  return {
+    direction: compact.d,
+    shapes,
+    relevantPredicates: sortedUnion(shapes.flatMap((shape) => shape.relevantPredicates)),
+    relevantClasses: sortedUnion(shapes.flatMap((shape) => shape.relevantClasses)),
+    pathTexts: sortedUnion(shapes.flatMap((shape) => shape.propertyPlans.map((property) => property.pathText))),
+    scalarPaths: sortedUnion(shapes.flatMap((shape) => shape.scalarPaths)),
+    repeatedPaths: sortedUnion(shapes.flatMap((shape) => shape.repeatedPaths)),
+    recommendedMessageIndexes: dedupeIndexSpecs(shapes.flatMap((shape) => shape.recommendedMessageIndexes)),
+    recommendedJoinOrderHints: sortJoinOrderHints(shapes.flatMap((shape) => shape.recommendedJoinOrderHints)),
+  };
+}
+
+function expandRuntimeShape(compact: RuntimeShape): ShapePlan {
+  const propertyPlans = compact.p.map((property): PropertyShapePlan => {
+    const metadata = pathMetadata(property.p);
+    const pathText = pathToText(property.p);
+    return {
+      propertyShape: property.s,
+      path: property.p,
+      pathText,
+      metadata,
+      minCount: property.min,
+      maxCount: property.max,
+      datatype: property.dt,
+      class: property.cl,
+      nodeKind: property.nk,
+      hasValues: property.h,
+      inValues: property.i,
+      units: property.u,
+      scalar: property.max === 1,
+      required: property.min !== undefined && property.min > 0,
+      indexSpecs: indexSpecsForPath(property.p, pathText, metadata),
+      joinOrderHints: joinOrderHintsForPath(property.p, pathText, property.max === 1, property.min !== undefined && property.min > 0),
+    };
+  });
+  const relevantPredicates = new Set<string>([...compact.ts, ...compact.to]);
+  const relevantClasses = new Set<string>(compact.tc);
+  if (compact.tc.length > 0) {
+    relevantPredicates.add(RDF_TYPE);
+  }
+  for (const property of propertyPlans) {
+    addValues(relevantPredicates, property.metadata.predicates);
+    if (property.class) relevantClasses.add(property.class);
+    if (property.datatype) relevantClasses.add(property.datatype);
+    if (property.metadata.predicates.includes(RDF_TYPE)) {
+      addValues(relevantClasses, [...property.hasValues, ...property.inValues]);
+    }
+  }
+  const allowedPredicates = compact.c
+    ? sortedUnion([...relevantPredicates, ...compact.ip])
+    : sortedUnion(relevantPredicates);
+  return {
+    shape: compact.s,
+    targetClasses: compact.tc,
+    targetNodes: compact.tn,
+    targetSubjectsOf: compact.ts,
+    targetObjectsOf: compact.to,
+    propertyPlans,
+    allowedPredicates,
+    ignoredPredicates: compact.ip,
+    requiredPaths: sortedUnion(propertyPlans.filter((property) => property.required).map((property) => property.pathText)),
+    optionalPaths: sortedUnion(propertyPlans.filter((property) => !property.required).map((property) => property.pathText)),
+    scalarPaths: sortedUnion(propertyPlans.filter((property) => property.scalar).map((property) => property.pathText)),
+    repeatedPaths: sortedUnion(propertyPlans.filter((property) => property.metadata.mayRepeat).map((property) => property.pathText)),
+    relevantPredicates: sortedUnion(relevantPredicates),
+    relevantClasses: sortedUnion(relevantClasses),
+    recommendedMessageIndexes: dedupeIndexSpecs(propertyPlans.flatMap((property) => property.indexSpecs)),
+    recommendedJoinOrderHints: sortJoinOrderHints(propertyPlans.flatMap((property) => property.joinOrderHints)),
+    closed: compact.c,
+  };
+}
+
+function addValues<T>(target: Set<T>, values: Iterable<T>): void {
+  for (const value of values) {
+    target.add(value);
   }
 }
 
@@ -323,6 +489,7 @@ function appendGraphPlanSummary(lines: string[], label: string, plan: ShapeGraph
 
   lines.push(`# ${label}: ${plan.shapes.length} shape(s)`);
   appendList(lines, `${label} paths`, plan.pathTexts);
+  appendList(lines, `${label} units`, sortedUnion(plan.shapes.flatMap((shape) => shape.propertyPlans.flatMap((property) => property.units))));
   appendList(lines, `${label} scalar paths`, plan.scalarPaths);
   appendList(lines, `${label} repeated paths`, plan.repeatedPaths);
 }
@@ -430,6 +597,7 @@ function compilePropertyShapePlan(propertyShape: Term, index: ShapeGraphIndex): 
   const nodeKind = namedNodeValue(objects(index, propertyShape, SH + 'nodeKind')[0]);
   const hasValues = termIds(objects(index, propertyShape, SH + 'hasValue'));
   const inValues = termIds(readListObjects(index, objects(index, propertyShape, SH + 'in')));
+  const units = namedNodeValues(readValueOrListObjects(index, objects(index, propertyShape, SH + 'unit')));
 
   return {
     propertyShape: termId(propertyShape),
@@ -443,6 +611,7 @@ function compilePropertyShapePlan(propertyShape: Term, index: ShapeGraphIndex): 
     nodeKind,
     hasValues,
     inValues,
+    units,
     scalar: maxCount === 1,
     required: minCount !== undefined && minCount > 0,
     indexSpecs: indexSpecsForPath(path, pathToText(path), metadata),
@@ -1065,6 +1234,13 @@ function objects(index: ShapeGraphIndex, subject: Term, predicate: string): Term
 
 function readListObjects(index: ShapeGraphIndex, heads: Term[]): Term[] {
   return heads.flatMap((head) => readList(index, head));
+}
+
+function readValueOrListObjects(index: ShapeGraphIndex, values: Term[]): Term[] {
+  return values.flatMap((value) => {
+    const items = readList(index, value);
+    return items.length > 0 ? items : [value];
+  });
 }
 
 function readList(index: ShapeGraphIndex, head: Term): Term[] {

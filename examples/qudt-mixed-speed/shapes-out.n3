@@ -1,0 +1,15 @@
+@prefix ex: <https://example.org/qudt-speed#> .
+@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:SpeedOutputShape a sh:NodeShape ;
+  sh:targetSubjectsOf ex:speed ;
+  sh:property [ sh:path qcr:normalizedQuantity ; sh:minCount 1 ; sh:maxCount 1 ; sh:class qudt:QuantityValue ; sh:unit unit:M-PER-SEC ] .
+
+ex:NormalizedSpeedShape a sh:NodeShape ;
+  sh:targetObjectsOf qcr:normalizedQuantity ;
+  sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:double ] ;
+  sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:maxCount 1 ; sh:hasValue unit:M-PER-SEC ] .

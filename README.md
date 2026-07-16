@@ -94,7 +94,7 @@ npm run build:browser
 
 ## Examples
 
-Examples are self-contained folders under `examples/`. Each runnable example keeps its own `README.md`, `run.ts`, ontology/background file, input file, and expected output fixture.
+Examples are self-contained folders under `examples/`, with their own README and input/background fixtures.
 
 - [Transit fleet](examples/transit-fleet/README.md)
 - [Shipment logistics](examples/shipment-logistics/README.md)
@@ -104,6 +104,11 @@ Examples are self-contained folders under `examples/`. Each runnable example kee
 - [Inconsistency diagnostics](examples/inconsistency-diagnostics/README.md)
 - [Transit RDF Messages](examples/transit-messages/README.md)
 - [Stateful RDF Messages materialization](examples/stateful-materialization/README.md)
+- [QUDT mixed speeds](examples/qudt-mixed-speed/README.md)
+- [QUDT temperatures with OWL](examples/qudt-temperature-owl/README.md)
+- [QUDT units with SKOS](examples/qudt-speed-skos/README.md)
+- [QUDT logarithmic measurements](examples/qudt-logarithmic/README.md)
+- [QUDT quantity-object safety](examples/qudt-quantity-safety/README.md)
 
 Run all example output checks with:
 
@@ -117,13 +122,14 @@ npm run test:examples
 npm test
 ```
 
-The default test command builds the Node output, checks default rule loading, stateful skolemization, the MARC list fixture, SKOS entailment, and the compatible OWL 2 RL MobiBench and W3C subsets.
+The default test command builds the Node output, checks default rule loading, stateful skolemization, the MARC list fixture, SKOS and QUDT inference, and the compatible OWL 2 RL MobiBench and W3C subsets.
 
 Useful focused commands:
 
 ```bash
 npm run test:default-rules
 npm run test:skos
+npm run test:qudt
 npm run test:owl
 npm run test:owl:mobibench
 npm run test:owl:official
