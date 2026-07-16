@@ -5,7 +5,7 @@ import { InferenceEngine } from '../src';
 import { addReflexiveSameAsClosure, graphContainsAll, parseRdf, readCachedBinaryUrl } from './utils';
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-const OWLRL = 'https://example.org/owlrl-n3#';
+const OWLRL = 'https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#';
 const DEFAULT_ARCHIVE_URL = 'https://william-vw.github.io/mobibench/web/res/owl/conf/testsuite-owl2-rdfbased.zip';
 const DEFAULT_CACHE_PATH = '.cache/mobibench/testsuite-owl2-rdfbased.zip';
 const OWL2RL_SUBSUITE_PREFIX = 'testsuite-owl2-rdfbased/subsuites/owl2rl/';

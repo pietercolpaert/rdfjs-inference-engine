@@ -283,7 +283,7 @@ function rewriteRdf12Annotations(source: string): string {
   let reifierIndex = 0;
 
   if (!source.includes('@prefix shn:')) {
-    rewritten.push('@prefix shn: <https://example.org/shacl-n3#> .');
+    rewritten.push('@prefix shn: <https://www.pieter.pm/rdfjs-inference-engine/ns/internal#> .');
   }
 
   for (let index = 0; index < lines.length; index += 1) {

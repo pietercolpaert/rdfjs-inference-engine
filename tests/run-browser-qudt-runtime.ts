@@ -3,8 +3,8 @@ import { readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildSync } from 'esbuild';
 
-const QCR_NORMALIZED_QUANTITY = 'https://w3id.org/qudt-inference#normalizedQuantity';
-const QCR_NORMALIZED_UCUM_LITERAL = 'https://w3id.org/qudt-inference#normalizedUcumLiteral';
+const QCR_NORMALIZED_QUANTITY = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#normalizedQuantity';
+const QCR_NORMALIZED_UCUM_LITERAL = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#normalizedUcumLiteral';
 const CDT_UCUM = 'https://w3id.org/cdt/ucum';
 const bundlePath = `/tmp/rdfjs-browser-engine-qudt-${process.pid}.cjs`;
 

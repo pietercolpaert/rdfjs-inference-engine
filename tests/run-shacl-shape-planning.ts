@@ -10,7 +10,7 @@ const SOSA = 'http://www.w3.org/ns/sosa/';
 const pathShape = parseQuads(`
 @prefix ex: <${EX}> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 

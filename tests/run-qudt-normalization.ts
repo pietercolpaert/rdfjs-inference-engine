@@ -5,7 +5,7 @@ import { InferenceEngine, loadDefaultRuleProfiles, type LoadedRuleProfile } from
 import { parseRdfOrMessages, parseToQuads } from '../examples/util';
 
 const EX = 'https://example.org/qudt-test#';
-const QCR = 'https://w3id.org/qudt-inference#';
+const QCR = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#';
 const QUDT = 'http://qudt.org/schema/qudt/';
 const UNIT = 'http://qudt.org/vocab/unit/';
 const CDT = 'https://w3id.org/cdt/';

@@ -1,5 +1,5 @@
 @prefix ex: <https://example.org/qudt-speed#> .
-@prefix qcr: <https://w3id.org/qudt-inference#> .
+@prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
 @prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .

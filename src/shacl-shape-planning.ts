@@ -4,7 +4,7 @@ export const SHACL_SHAPE_PLANNING_VERSION = 3;
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
-const QCR = 'https://w3id.org/qudt-inference#';
+const QCR = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#';
 
 const RDF_TYPE = RDF + 'type';
 const RDF_FIRST = RDF + 'first';

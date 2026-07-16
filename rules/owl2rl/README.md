@@ -9,7 +9,7 @@ The profile materializes RDFS and OWL 2 RL consequences used by ingest-time RDF 
 - `rdfs:subClassOf`, `rdfs:subPropertyOf`, `rdfs:domain`, and `rdfs:range`;
 - `owl:sameAs`, equivalent classes/properties, inverse properties, property characteristics, property chains, keys, and selected class expressions;
 - datatype recognition, validation, canonicalization, equality, and inequality through Eyeling's `dt:` builtins;
-- explicit inconsistency diagnostics as `owlrl:Inconsistency` resources.
+- explicit inconsistency diagnostics as RDF resources in the [inconsistency vocabulary](https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies).
 
 The runtime compiler can partially evaluate stable ontology facts loaded through `load()`. For example, static domain/range, subclass, subproperty, equivalence, and inverse-property axioms can become direct runtime rules over incoming data.
 
@@ -17,7 +17,7 @@ The runtime compiler can partially evaluate stable ontology facts loaded through
 
 The profile is a materialization profile, not a complete OWL reasoner. It does not aim to cover OWL DL reasoning outside OWL 2 RL/RDF rule consequences.
 
-Application-mode output filters closure-maintenance facts that are usually not useful application triples, including reflexive `owl:sameAs`, internal helper predicates, generated Skolem helper triples, anonymous class-expression type triples, and datatype helper facts with literals in subject position.
+Application-mode output filters closure-maintenance facts that are usually not useful application triples, including reflexive `owl:sameAs`, predicates in the [internal namespace](https://www.pieter.pm/rdfjs-inference-engine/ns/internal), generated Skolem helper triples, anonymous class-expression type triples, and datatype helper facts with literals in subject position. Public inconsistency resources are retained as inferred RDF and are also exposed through `InferenceResult.inconsistencies`.
 
 ## Building
 
@@ -63,4 +63,4 @@ The OWL profile uses Eyeling's datatype builtins:
 @prefix dt: <https://eyereasoner.github.io/eyeling/datatype#> .
 ```
 
-This lets datatype rules compare values such as `"01"^^xsd:integer` and `"1.0"^^xsd:decimal` by value instead of by lexical string. The profile also emits explicit inconsistency resources instead of deriving bare `false`, which lets ingest systems log or quarantine bad input without stopping the whole processor.
+This lets datatype rules compare values such as `"01"^^xsd:integer` and `"1.0"^^xsd:decimal` by value instead of by lexical string. The profile also emits explicit inconsistency resources instead of deriving bare `false`, which lets ingest systems log or quarantine bad input without stopping the whole processor. Each report has `rdf:type`, `inconsistencies:rule`, and ordered `inconsistencies:term1` through `inconsistencies:term5` evidence triples where applicable.

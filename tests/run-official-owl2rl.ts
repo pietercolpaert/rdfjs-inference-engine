@@ -6,7 +6,7 @@ import { addReflexiveSameAsClosure, graphContainsAll, parseRdfXml, readCachedUrl
 const TEST = 'http://www.w3.org/2007/OWL/testOntology#';
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const OWL = 'http://www.w3.org/2002/07/owl#';
-const OWLRL = 'https://example.org/owlrl-n3#';
+const OWLRL = 'https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#';
 const DEFAULT_MANIFEST_BASE_URL = 'https://www.w3.org/';
 const DEFAULT_CACHE_DIR = '.cache/owl2rl';
 const DEFAULT_MANIFEST_PATHS = [

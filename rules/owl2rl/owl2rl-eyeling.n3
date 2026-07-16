@@ -13,7 +13,7 @@
 #   * This is an OWL 2 RL materialization ruleset, not an OWL 2 DL tableau reasoner.
 #   * Some OWL 2 RL features require RDF list/property-chain helper rules and can be
 #     expensive on large graphs.
-#   * Inconsistency rules derive owlrl:Inconsistency resources instead of false.
+#   * Inconsistency rules derive inconsistencies:Inconsistency resources instead of false.
 
 @prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
@@ -23,35 +23,41 @@
 @prefix math:  <http://www.w3.org/2000/10/swap/math#> .
 @prefix dt:    <https://eyereasoner.github.io/eyeling/datatype#> .
 @prefix list:  <http://www.w3.org/2000/10/swap/list#> .
-@prefix owlrl: <https://example.org/owlrl-n3#> .
+@prefix inconsistencies: <https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#> .
+@prefix internal: <https://www.pieter.pm/rdfjs-inference-engine/ns/internal#> .
 
 #################################################################
 # 0. Vocabulary used by this ruleset
 #################################################################
 
-owlrl:Inconsistency a rdfs:Class .
-owlrl:listRoot a rdf:Property .
-owlrl:intersectionListRoot a rdf:Property .
-owlrl:longIntersectionListRoot a rdf:Property .
-owlrl:keyListRoot a rdf:Property .
-owlrl:propertyChainRoot a rdf:Property .
-owlrl:listPair a rdf:Property .
-owlrl:left a rdf:Property .
-owlrl:right a rdf:Property .
-owlrl:allListClassTypes a rdf:Property .
-owlrl:sameValuesForProperties a rdf:Property .
-owlrl:propertyChainHolds a rdf:Property .
-owlrl:pathChain a rdf:Property .
-owlrl:pathSubject a rdf:Property .
-owlrl:pathObject a rdf:Property .
-owlrl:term a rdf:Property .
-owlrl:canonicalLiteral a rdf:Property .
-owlrl:rule a rdf:Property .
-owlrl:term1 a rdf:Property .
-owlrl:term2 a rdf:Property .
-owlrl:term3 a rdf:Property .
-owlrl:term4 a rdf:Property .
-owlrl:term5 a rdf:Property .
+inconsistencies:Inconsistency a rdfs:Class .
+inconsistencies:rule a rdf:Property .
+inconsistencies:term1 a rdf:Property .
+inconsistencies:term2 a rdf:Property .
+inconsistencies:term3 a rdf:Property .
+inconsistencies:term4 a rdf:Property .
+inconsistencies:term5 a rdf:Property .
+
+# Rule-maintenance predicates are implementation details shared through the
+# engine's internal namespace and are filtered from application output.
+internal:listRoot a rdf:Property .
+internal:intersectionListRoot a rdf:Property .
+internal:longIntersectionListRoot a rdf:Property .
+internal:keyListRoot a rdf:Property .
+internal:propertyChainRoot a rdf:Property .
+internal:listPair a rdf:Property .
+internal:left a rdf:Property .
+internal:right a rdf:Property .
+internal:allListClassTypes a rdf:Property .
+internal:sameValuesForProperties a rdf:Property .
+internal:propertyChainHolds a rdf:Property .
+internal:pathChain a rdf:Property .
+internal:pathSubject a rdf:Property .
+internal:pathObject a rdf:Property .
+internal:term a rdf:Property .
+internal:canonicalLiteral a rdf:Property .
+internal:complement a rdf:Property .
+internal:literal a rdf:Property .
 
 # Axiomatic OWL facts used by conformance tests. Application output filters remove
 # reflexive equality and internal helper facts by default.
@@ -138,7 +144,7 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 
 # Mark OWL/RDF list roots that this ruleset needs to inspect.  This keeps
 # builtins such as rdf:first/rdf:rest called with a bound list term in Eyeling.
-{ ?x owl:intersectionOf ?list . } => { ?list owlrl:listRoot true ; owlrl:intersectionListRoot true . } .
+{ ?x owl:intersectionOf ?list . } => { ?list internal:listRoot true ; internal:intersectionListRoot true . } .
 
 # Short intersections are handled directly.  Mark only intersections of length
 # >= 5 for the recursive allListClassTypes helper and propagate that mark to
@@ -149,14 +155,14 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?tail2 rdf:rest ?tail3 .
   ?tail3 rdf:rest ?tail4 .
   ?tail4 rdf:first ?class5 . }
-=> { ?list owlrl:longIntersectionListRoot true . } .
+=> { ?list internal:longIntersectionListRoot true . } .
 
-{ ?x owl:unionOf ?list . }        => { ?list owlrl:listRoot true . } .
-{ ?x owl:oneOf ?list . }          => { ?list owlrl:listRoot true . } .
-{ ?x owl:members ?list . }        => { ?list owlrl:listRoot true . } .
-{ ?x owl:distinctMembers ?list . }=> { ?list owlrl:listRoot true . } .
-{ ?x owl:hasKey ?list . }         => { ?list owlrl:listRoot true ; owlrl:keyListRoot true . } .
-{ ?x owl:propertyChainAxiom ?list . } => { ?list owlrl:listRoot true . } .
+{ ?x owl:unionOf ?list . }        => { ?list internal:listRoot true . } .
+{ ?x owl:oneOf ?list . }          => { ?list internal:listRoot true . } .
+{ ?x owl:members ?list . }        => { ?list internal:listRoot true . } .
+{ ?x owl:distinctMembers ?list . }=> { ?list internal:listRoot true . } .
+{ ?x owl:hasKey ?list . }         => { ?list internal:listRoot true ; internal:keyListRoot true . } .
+{ ?x owl:propertyChainAxiom ?list . } => { ?list internal:listRoot true . } .
 
 # The common short property-chain cases are handled directly below.  Mark only
 # chains of length >= 4 for the generic recursive helper, otherwise list-heavy
@@ -166,120 +172,120 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?tail1 rdf:rest ?tail2 .
   ?tail2 rdf:rest ?tail3 .
   ?tail3 rdf:first ?p4 . }
-=> { ?list owlrl:propertyChainRoot true . } .
+=> { ?list internal:propertyChainRoot true . } .
 
 # Propagate list-root status to non-empty tails.
-{ ?list owlrl:listRoot true .
+{ ?list internal:listRoot true .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
-=> { ?tail owlrl:listRoot true . } .
+=> { ?tail internal:listRoot true . } .
 
-{ ?list owlrl:intersectionListRoot true .
+{ ?list internal:intersectionListRoot true .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
-=> { ?tail owlrl:intersectionListRoot true . } .
+=> { ?tail internal:intersectionListRoot true . } .
 
-{ ?list owlrl:longIntersectionListRoot true .
+{ ?list internal:longIntersectionListRoot true .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
-=> { ?tail owlrl:longIntersectionListRoot true . } .
+=> { ?tail internal:longIntersectionListRoot true . } .
 
-{ ?list owlrl:keyListRoot true .
+{ ?list internal:keyListRoot true .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
-=> { ?tail owlrl:keyListRoot true . } .
+=> { ?tail internal:keyListRoot true . } .
 
-{ ?list owlrl:propertyChainRoot true .
+{ ?list internal:propertyChainRoot true .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?head . }
-=> { ?tail owlrl:propertyChainRoot true . } .
+=> { ?tail internal:propertyChainRoot true . } .
 
 # ordered pairs i<j in a list. The pair node is stable via log:skolem.
-{ ?list owlrl:listRoot true .
+{ ?list internal:listRoot true .
   ?list rdf:first ?left .
   ?list rdf:rest ?tail .
   ?tail list:member ?right .
-  (owlrl:listPair ?list ?left ?right) log:skolem ?pair . }
-=> { ?list owlrl:listPair ?pair .
-     ?pair owlrl:left ?left ;
-           owlrl:right ?right . } .
+  (internal:listPair ?list ?left ?right) log:skolem ?pair . }
+=> { ?list internal:listPair ?pair .
+     ?pair internal:left ?left ;
+           internal:right ?right . } .
 
-{ ?list owlrl:listRoot true .
+{ ?list internal:listRoot true .
   ?list rdf:rest ?tail .
-  ?tail owlrl:listPair ?pair . }
-=> { ?list owlrl:listPair ?pair . } .
+  ?tail internal:listPair ?pair . }
+=> { ?list internal:listPair ?pair . } .
 
 # allListClassTypes: tuple (?individual ?list) is true iff the individual
 # is rdf:type every class in the non-empty RDF list.
-{ ?list owlrl:longIntersectionListRoot true .
+{ ?list internal:longIntersectionListRoot true .
   ?list rdf:first ?class .
   ?list rdf:rest rdf:nil .
   ?individual rdf:type ?class .
-  (owlrl:allListClassTypes ?individual ?list) log:skolem ?state . }
-=> { ?state owlrl:allListClassTypes true ;
-           owlrl:pathSubject ?individual ;
-           owlrl:pathObject ?list . } .
+  (internal:allListClassTypes ?individual ?list) log:skolem ?state . }
+=> { ?state internal:allListClassTypes true ;
+           internal:pathSubject ?individual ;
+           internal:pathObject ?list . } .
 
-{ ?list owlrl:longIntersectionListRoot true .
+{ ?list internal:longIntersectionListRoot true .
   ?list rdf:first ?class .
   ?list rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
   ?individual rdf:type ?class .
-  (owlrl:allListClassTypes ?individual ?tail) log:skolem ?tailState .
-  ?tailState owlrl:allListClassTypes true .
-  (owlrl:allListClassTypes ?individual ?list) log:skolem ?state . }
-=> { ?state owlrl:allListClassTypes true ;
-           owlrl:pathSubject ?individual ;
-           owlrl:pathObject ?list . } .
+  (internal:allListClassTypes ?individual ?tail) log:skolem ?tailState .
+  ?tailState internal:allListClassTypes true .
+  (internal:allListClassTypes ?individual ?list) log:skolem ?state . }
+=> { ?state internal:allListClassTypes true ;
+           internal:pathSubject ?individual ;
+           internal:pathObject ?list . } .
 
 # sameValuesForProperties: tuple (?x ?y ?propertyList) is true iff ?x and ?y
 # share at least one identical value for every property in the non-empty list.
 # Equality replacement rules make sameAs-equal values count as identical after closure.
-{ ?plist owlrl:keyListRoot true .
+{ ?plist internal:keyListRoot true .
   ?plist rdf:first ?p .
   ?plist rdf:rest rdf:nil .
   ?x ?p ?z .
   ?y ?p ?z .
-  (owlrl:sameValuesForProperties ?x ?y ?plist) log:skolem ?state . }
-=> { ?state owlrl:sameValuesForProperties true . } .
+  (internal:sameValuesForProperties ?x ?y ?plist) log:skolem ?state . }
+=> { ?state internal:sameValuesForProperties true . } .
 
-{ ?plist owlrl:keyListRoot true .
+{ ?plist internal:keyListRoot true .
   ?plist rdf:first ?p .
   ?plist rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
   ?x ?p ?z .
   ?y ?p ?z .
-  (owlrl:sameValuesForProperties ?x ?y ?tail) log:skolem ?tailState .
-  ?tailState owlrl:sameValuesForProperties true .
-  (owlrl:sameValuesForProperties ?x ?y ?plist) log:skolem ?state . }
-=> { ?state owlrl:sameValuesForProperties true . } .
+  (internal:sameValuesForProperties ?x ?y ?tail) log:skolem ?tailState .
+  ?tailState internal:sameValuesForProperties true .
+  (internal:sameValuesForProperties ?x ?y ?plist) log:skolem ?state . }
+=> { ?state internal:sameValuesForProperties true . } .
 
 # property-chain helper. A path node states that the RDF list ?chain relates
 # ?x to ?y by following the properties in the list in order.
-{ ?chain owlrl:propertyChainRoot true .
+{ ?chain internal:propertyChainRoot true .
   ?chain rdf:first ?p .
   ?chain rdf:rest rdf:nil .
   ?x ?p ?y .
-  (owlrl:propertyChainHolds ?chain ?x ?y) log:skolem ?path . }
-=> { ?path owlrl:propertyChainHolds true ;
-           owlrl:pathChain ?chain ;
-           owlrl:pathSubject ?x ;
-           owlrl:pathObject ?y . } .
+  (internal:propertyChainHolds ?chain ?x ?y) log:skolem ?path . }
+=> { ?path internal:propertyChainHolds true ;
+           internal:pathChain ?chain ;
+           internal:pathSubject ?x ;
+           internal:pathObject ?y . } .
 
-{ ?chain owlrl:propertyChainRoot true .
+{ ?chain internal:propertyChainRoot true .
   ?chain rdf:first ?p .
   ?chain rdf:rest ?tail .
   ?tail rdf:first ?tailFirst .
   ?x ?p ?z .
-  ?tailPath owlrl:propertyChainHolds true ;
-            owlrl:pathChain ?tail ;
-            owlrl:pathSubject ?z ;
-            owlrl:pathObject ?y .
-  (owlrl:propertyChainHolds ?chain ?x ?y) log:skolem ?path . }
-=> { ?path owlrl:propertyChainHolds true ;
-           owlrl:pathChain ?chain ;
-           owlrl:pathSubject ?x ;
-           owlrl:pathObject ?y . } .
+  ?tailPath internal:propertyChainHolds true ;
+            internal:pathChain ?tail ;
+            internal:pathSubject ?z ;
+            internal:pathObject ?y .
+  (internal:propertyChainHolds ?chain ?x ?y) log:skolem ?path . }
+=> { ?path internal:propertyChainHolds true ;
+           internal:pathChain ?chain ;
+           internal:pathSubject ?x ;
+           internal:pathObject ?y . } .
 
 #################################################################
 # 4. Equality rules (eq-*)
@@ -318,39 +324,39 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 # eq-diff1
 { ?x owl:sameAs ?y .
   ?x owl:differentFrom ?y .
-  (owlrl:eq-diff1 ?x ?y) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:eq-diff1 ;
-          owlrl:term1 ?x ;
-          owlrl:term2 ?y . } .
+  (inconsistencies:eq-diff1 ?x ?y) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:eq-diff1 ;
+          inconsistencies:term1 ?x ;
+          inconsistencies:term2 ?y . } .
 
 # eq-diff2: AllDifferent/owl:members
 { ?ad a owl:AllDifferent .
   ?ad owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?zi ;
-        owlrl:right ?zj .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?zi ;
+        internal:right ?zj .
   ?zi owl:sameAs ?zj .
-  (owlrl:eq-diff2 ?ad ?zi ?zj) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:eq-diff2 ;
-          owlrl:term1 ?ad ;
-          owlrl:term2 ?zi ;
-          owlrl:term3 ?zj . } .
+  (inconsistencies:eq-diff2 ?ad ?zi ?zj) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:eq-diff2 ;
+          inconsistencies:term1 ?ad ;
+          inconsistencies:term2 ?zi ;
+          inconsistencies:term3 ?zj . } .
 
 # eq-diff3: AllDifferent/owl:distinctMembers
 { ?ad a owl:AllDifferent .
   ?ad owl:distinctMembers ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?zi ;
-        owlrl:right ?zj .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?zi ;
+        internal:right ?zj .
   ?zi owl:sameAs ?zj .
-  (owlrl:eq-diff3 ?ad ?zi ?zj) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:eq-diff3 ;
-          owlrl:term1 ?ad ;
-          owlrl:term2 ?zi ;
-          owlrl:term3 ?zj . } .
+  (inconsistencies:eq-diff3 ?ad ?zi ?zj) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:eq-diff3 ;
+          inconsistencies:term1 ?ad ;
+          inconsistencies:term2 ?zi ;
+          inconsistencies:term3 ?zj . } .
 
 #################################################################
 # 5. Property axiom rules (prp-*)
@@ -381,11 +387,11 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 # prp-irp
 { ?p rdf:type owl:IrreflexiveProperty .
   ?x ?p ?x .
-  (owlrl:prp-irp ?p ?x) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:prp-irp ;
-          owlrl:term1 ?p ;
-          owlrl:term2 ?x . } .
+  (inconsistencies:prp-irp ?p ?x) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:prp-irp ;
+          inconsistencies:term1 ?p ;
+          inconsistencies:term2 ?x . } .
 
 # prp-symp
 { ?p rdf:type owl:SymmetricProperty .
@@ -396,12 +402,12 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 { ?p rdf:type owl:AsymmetricProperty .
   ?x ?p ?y .
   ?y ?p ?x .
-  (owlrl:prp-asyp ?p ?x ?y) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:prp-asyp ;
-          owlrl:term1 ?p ;
-          owlrl:term2 ?x ;
-          owlrl:term3 ?y . } .
+  (inconsistencies:prp-asyp ?p ?x ?y) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:prp-asyp ;
+          inconsistencies:term1 ?p ;
+          inconsistencies:term2 ?x ;
+          inconsistencies:term3 ?y . } .
 
 # prp-trp
 { ?p rdf:type owl:TransitiveProperty .
@@ -448,12 +454,12 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?z2 ?p3 ?y . }
 => { ?x ?p ?y . } .
 
-# Longer property chains use the recursive owlrl:propertyChainHolds helper above.
+# Longer property chains use the recursive internal:propertyChainHolds helper above.
 { ?p owl:propertyChainAxiom ?chain .
-  ?path owlrl:propertyChainHolds true ;
-        owlrl:pathChain ?chain ;
-        owlrl:pathSubject ?x ;
-        owlrl:pathObject ?y . }
+  ?path internal:propertyChainHolds true ;
+        internal:pathChain ?chain ;
+        internal:pathSubject ?x ;
+        internal:pathObject ?y . }
 => { ?x ?p ?y . } .
 
 # A property-chain axiom P o P -> P is equivalent to transitivity for P.
@@ -477,13 +483,13 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 { ?p1 owl:propertyDisjointWith ?p2 .
   ?x ?p1 ?y .
   ?x ?p2 ?y .
-  (owlrl:prp-pdw ?p1 ?p2 ?x ?y) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:prp-pdw ;
-          owlrl:term1 ?p1 ;
-          owlrl:term2 ?p2 ;
-          owlrl:term3 ?x ;
-          owlrl:term4 ?y . } .
+  (inconsistencies:prp-pdw ?p1 ?p2 ?x ?y) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:prp-pdw ;
+          inconsistencies:term1 ?p1 ;
+          inconsistencies:term2 ?p2 ;
+          inconsistencies:term3 ?x ;
+          inconsistencies:term4 ?y . } .
 
 # If disjoint properties relate two subjects to the same value, the subjects are
 # different. This RDF-Based consequence is exercised by the official OWL tests.
@@ -510,52 +516,52 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 # prp-adp
 { ?adp a owl:AllDisjointProperties .
   ?adp owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?p1 ;
-        owlrl:right ?p2 .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?p1 ;
+        internal:right ?p2 .
   ?u ?p1 ?v .
   ?u ?p2 ?v .
-  (owlrl:prp-adp ?adp ?p1 ?p2 ?u ?v) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:prp-adp ;
-          owlrl:term1 ?adp ;
-          owlrl:term2 ?p1 ;
-          owlrl:term3 ?p2 ;
-          owlrl:term4 ?u ;
-          owlrl:term5 ?v . } .
+  (inconsistencies:prp-adp ?adp ?p1 ?p2 ?u ?v) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:prp-adp ;
+          inconsistencies:term1 ?adp ;
+          inconsistencies:term2 ?p1 ;
+          inconsistencies:term3 ?p2 ;
+          inconsistencies:term4 ?u ;
+          inconsistencies:term5 ?v . } .
 
 { ?adp a owl:AllDisjointProperties .
   ?adp owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?p1 ;
-        owlrl:right ?p2 .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?p1 ;
+        internal:right ?p2 .
   ?x1 ?p1 ?y .
   ?x2 ?p2 ?y . }
 => { ?x1 owl:differentFrom ?x2 . } .
 
 { ?adp a owl:AllDisjointProperties .
   ?adp owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?p1 ;
-        owlrl:right ?p2 .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?p1 ;
+        internal:right ?p2 .
   ?x1 ?p2 ?y .
   ?x2 ?p1 ?y . }
 => { ?x1 owl:differentFrom ?x2 . } .
 
 { ?adp a owl:AllDisjointProperties .
   ?adp owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?p1 ;
-        owlrl:right ?p2 .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?p1 ;
+        internal:right ?p2 .
   ?x ?p1 ?y1 .
   ?x ?p2 ?y2 . }
 => { ?y1 owl:differentFrom ?y2 . } .
 
 { ?adp a owl:AllDisjointProperties .
   ?adp owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?p1 ;
-        owlrl:right ?p2 .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?p1 ;
+        internal:right ?p2 .
   ?x ?p2 ?y1 .
   ?x ?p1 ?y2 . }
 => { ?y1 owl:differentFrom ?y2 . } .
@@ -574,8 +580,8 @@ owl:incompatibleWith        a owl:AnnotationProperty .
 { ?c owl:hasKey ?plist .
   ?x rdf:type ?c .
   ?y rdf:type ?c .
-  (owlrl:sameValuesForProperties ?x ?y ?plist) log:skolem ?state .
-  ?state owlrl:sameValuesForProperties true . }
+  (internal:sameValuesForProperties ?x ?y ?plist) log:skolem ?state .
+  ?state internal:sameValuesForProperties true . }
 => { ?x owl:sameAs ?y . } .
 
 # Contrapositive useful in RDF-Based conformance tests: if a functional property
@@ -597,26 +603,26 @@ owl:incompatibleWith        a owl:AnnotationProperty .
   ?npa owl:assertionProperty ?p .
   ?npa owl:targetIndividual ?i2 .
   ?i1 ?p ?i2 .
-  (owlrl:prp-npa1 ?npa ?i1 ?p ?i2) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:prp-npa1 ;
-          owlrl:term1 ?npa ;
-          owlrl:term2 ?i1 ;
-          owlrl:term3 ?p ;
-          owlrl:term4 ?i2 . } .
+  (inconsistencies:prp-npa1 ?npa ?i1 ?p ?i2) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:prp-npa1 ;
+          inconsistencies:term1 ?npa ;
+          inconsistencies:term2 ?i1 ;
+          inconsistencies:term3 ?p ;
+          inconsistencies:term4 ?i2 . } .
 
 # prp-npa2: negative data property assertion
 { ?npa owl:sourceIndividual ?i .
   ?npa owl:assertionProperty ?p .
   ?npa owl:targetValue ?lt .
   ?i ?p ?lt .
-  (owlrl:prp-npa2 ?npa ?i ?p ?lt) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:prp-npa2 ;
-          owlrl:term1 ?npa ;
-          owlrl:term2 ?i ;
-          owlrl:term3 ?p ;
-          owlrl:term4 ?lt . } .
+  (inconsistencies:prp-npa2 ?npa ?i ?p ?lt) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:prp-npa2 ;
+          inconsistencies:term1 ?npa ;
+          inconsistencies:term2 ?i ;
+          inconsistencies:term3 ?p ;
+          inconsistencies:term4 ?lt . } .
 
 #################################################################
 # 6. Class expression rules (cls-*)
@@ -628,10 +634,10 @@ owl:Nothing rdf:type owl:Class .
 
 # cls-nothing2
 { ?x rdf:type owl:Nothing .
-  (owlrl:cls-nothing2 ?x) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cls-nothing2 ;
-          owlrl:term1 ?x . } .
+  (inconsistencies:cls-nothing2 ?x) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cls-nothing2 ;
+          inconsistencies:term1 ?x . } .
 
 # cls-int1.  Common short intersections are materialized directly to avoid
 # recursive helper joins over every typed individual in list-heavy data.
@@ -679,9 +685,9 @@ owl:Nothing rdf:type owl:Class .
 
 # Longer intersections use the recursive allListClassTypes helper above.
 { ?c owl:intersectionOf ?list .
-  ?state owlrl:allListClassTypes true ;
-         owlrl:pathSubject ?y ;
-         owlrl:pathObject ?list . }
+  ?state internal:allListClassTypes true ;
+         internal:pathSubject ?y ;
+         internal:pathObject ?list . }
 => { ?y rdf:type ?c . } .
 
 # cls-int2
@@ -700,12 +706,12 @@ owl:Nothing rdf:type owl:Class .
 { ?c1 owl:complementOf ?c2 .
   ?x rdf:type ?c1 .
   ?x rdf:type ?c2 .
-  (owlrl:cls-com ?c1 ?c2 ?x) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cls-com ;
-          owlrl:term1 ?c1 ;
-          owlrl:term2 ?c2 ;
-          owlrl:term3 ?x . } .
+  (inconsistencies:cls-com ?c1 ?c2 ?x) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cls-com ;
+          inconsistencies:term1 ?c1 ;
+          inconsistencies:term2 ?c2 ;
+          inconsistencies:term3 ?x . } .
 
 # cls-svf1
 { ?r owl:someValuesFrom ?c .
@@ -743,13 +749,13 @@ owl:Nothing rdf:type owl:Class .
   ?r owl:onProperty ?p .
   ?u rdf:type ?r .
   ?u ?p ?y .
-  (owlrl:cls-maxc1 ?r ?u ?p ?y) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cls-maxc1 ;
-          owlrl:term1 ?r ;
-          owlrl:term2 ?u ;
-          owlrl:term3 ?p ;
-          owlrl:term4 ?y . } .
+  (inconsistencies:cls-maxc1 ?r ?u ?p ?y) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cls-maxc1 ;
+          inconsistencies:term1 ?r ;
+          inconsistencies:term2 ?u ;
+          inconsistencies:term3 ?p ;
+          inconsistencies:term4 ?y . } .
 
 # cls-maxc2
 { ?r owl:maxCardinality "1"^^xsd:nonNegativeInteger .
@@ -766,14 +772,14 @@ owl:Nothing rdf:type owl:Class .
   ?u rdf:type ?r .
   ?u ?p ?y .
   ?y rdf:type ?c .
-  (owlrl:cls-maxqc1 ?r ?u ?p ?y ?c) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cls-maxqc1 ;
-          owlrl:term1 ?r ;
-          owlrl:term2 ?u ;
-          owlrl:term3 ?p ;
-          owlrl:term4 ?y ;
-          owlrl:term5 ?c . } .
+  (inconsistencies:cls-maxqc1 ?r ?u ?p ?y ?c) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cls-maxqc1 ;
+          inconsistencies:term1 ?r ;
+          inconsistencies:term2 ?u ;
+          inconsistencies:term3 ?p ;
+          inconsistencies:term4 ?y ;
+          inconsistencies:term5 ?c . } .
 
 # cls-maxqc2
 { ?r owl:maxQualifiedCardinality "0"^^xsd:nonNegativeInteger .
@@ -781,13 +787,13 @@ owl:Nothing rdf:type owl:Class .
   ?r owl:onClass owl:Thing .
   ?u rdf:type ?r .
   ?u ?p ?y .
-  (owlrl:cls-maxqc2 ?r ?u ?p ?y) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cls-maxqc2 ;
-          owlrl:term1 ?r ;
-          owlrl:term2 ?u ;
-          owlrl:term3 ?p ;
-          owlrl:term4 ?y . } .
+  (inconsistencies:cls-maxqc2 ?r ?u ?p ?y) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cls-maxqc2 ;
+          inconsistencies:term1 ?r ;
+          inconsistencies:term2 ?u ;
+          inconsistencies:term3 ?p ;
+          inconsistencies:term4 ?y . } .
 
 # cls-maxqc3
 { ?r owl:maxQualifiedCardinality "1"^^xsd:nonNegativeInteger .
@@ -819,7 +825,7 @@ owl:Nothing rdf:type owl:Class .
   ?u ?p ?y2 .
   ?y1 rdf:type ?c .
   ?y1 owl:differentFrom ?y2 .
-  (owlrl:complement ?c) log:skolem ?notC . }
+  (internal:complement ?c) log:skolem ?notC . }
 => { ?notC rdf:type owl:Class ;
           owl:complementOf ?c .
      ?y2 rdf:type ?notC . } .
@@ -832,14 +838,14 @@ owl:Nothing rdf:type owl:Class .
   ?u rdf:type ?r .
   ?u ?p ?y .
   ?y rdf:type ?dt .
-  (owlrl:cls-maxqd1 ?r ?u ?p ?y ?dt) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cls-maxqd1 ;
-          owlrl:term1 ?r ;
-          owlrl:term2 ?u ;
-          owlrl:term3 ?p ;
-          owlrl:term4 ?y ;
-          owlrl:term5 ?dt . } .
+  (inconsistencies:cls-maxqd1 ?r ?u ?p ?y ?dt) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cls-maxqd1 ;
+          inconsistencies:term1 ?r ;
+          inconsistencies:term2 ?u ;
+          inconsistencies:term3 ?p ;
+          inconsistencies:term4 ?y ;
+          inconsistencies:term5 ?dt . } .
 
 { ?r owl:maxQualifiedCardinality "1"^^xsd:nonNegativeInteger .
   ?r owl:onProperty ?p .
@@ -878,21 +884,21 @@ owl:Nothing rdf:type owl:Class .
 { ?c1 owl:disjointWith ?c2 .
   ?x rdf:type ?c1 .
   ?x rdf:type ?c2 .
-  (owlrl:cax-dw ?c1 ?c2 ?x) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cax-dw ;
-          owlrl:term1 ?c1 ;
-          owlrl:term2 ?c2 ;
-          owlrl:term3 ?x . } .
+  (inconsistencies:cax-dw ?c1 ?c2 ?x) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cax-dw ;
+          inconsistencies:term1 ?c1 ;
+          inconsistencies:term2 ?c2 ;
+          inconsistencies:term3 ?x . } .
 
 { ?c1 owl:disjointWith ?c2 .
-  (owlrl:complement ?c2) log:skolem ?notC2 . }
+  (internal:complement ?c2) log:skolem ?notC2 . }
 => { ?notC2 rdf:type owl:Class ;
            owl:complementOf ?c2 .
      ?c1 rdfs:subClassOf ?notC2 . } .
 
 { ?c1 owl:disjointWith ?c2 .
-  (owlrl:complement ?c1) log:skolem ?notC1 . }
+  (internal:complement ?c1) log:skolem ?notC1 . }
 => { ?notC1 rdf:type owl:Class ;
            owl:complementOf ?c1 .
      ?c2 rdfs:subClassOf ?notC1 . } .
@@ -900,24 +906,24 @@ owl:Nothing rdf:type owl:Class .
 # cax-adc
 { ?adc a owl:AllDisjointClasses .
   ?adc owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?c1 ;
-        owlrl:right ?c2 .
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?c1 ;
+        internal:right ?c2 .
   ?z rdf:type ?c1 .
   ?z rdf:type ?c2 .
-  (owlrl:cax-adc ?adc ?c1 ?c2 ?z) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:cax-adc ;
-          owlrl:term1 ?adc ;
-          owlrl:term2 ?c1 ;
-          owlrl:term3 ?c2 ;
-          owlrl:term4 ?z . } .
+  (inconsistencies:cax-adc ?adc ?c1 ?c2 ?z) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:cax-adc ;
+          inconsistencies:term1 ?adc ;
+          inconsistencies:term2 ?c1 ;
+          inconsistencies:term3 ?c2 ;
+          inconsistencies:term4 ?z . } .
 
 { ?adc a owl:AllDisjointClasses .
   ?adc owl:members ?list .
-  ?list owlrl:listPair ?pair .
-  ?pair owlrl:left ?c1 ;
-        owlrl:right ?c2 . }
+  ?list internal:listPair ?pair .
+  ?pair internal:left ?c1 ;
+        internal:right ?c2 . }
 => { ?c1 owl:disjointWith ?c2 .
      ?c2 owl:disjointWith ?c1 . } .
 
@@ -946,8 +952,8 @@ owl:Nothing rdf:type owl:Class .
   ?lt dt:datatype ?datatype .
   ?datatype log:notEqualTo xsd:string .
   ?datatype log:notEqualTo rdf:langString .
-  (owlrl:literal ?lt) log:skolem ?litNode . }
-=> { ?litNode owlrl:term ?lt . } .
+  (internal:literal ?lt) log:skolem ?litNode . }
+=> { ?litNode internal:term ?lt . } .
 
 # Plain strings and language-tagged strings are very common in labels,
 # comments, and record values. Materialize their basic datatype membership
@@ -977,34 +983,34 @@ owl:Nothing rdf:type owl:Class .
          rdf:type rdfs:Literal . } .
 
 # dt-type2
-{ ?litNode owlrl:term ?lt .
+{ ?litNode internal:term ?lt .
   ?lt dt:datatype ?datatype .
   ?lt dt:validForDatatype ?datatype . }
 => { ?lt rdf:type ?datatype . } .
 
-{ ?litNode owlrl:term ?lt .
+{ ?litNode internal:term ?lt .
   ?datatype rdf:type rdfs:Datatype .
   ?lt dt:validForDatatype ?datatype . }
 => { ?lt rdf:type ?datatype . } .
 
-{ ?litNode owlrl:term ?lt . }
+{ ?litNode internal:term ?lt . }
 => { ?lt rdf:type rdfs:Literal . } .
 
 # dt-not-type
-{ ?litNode owlrl:term ?lt .
+{ ?litNode internal:term ?lt .
   ?lt rdf:type ?datatype .
   ?lt dt:invalidForDatatype ?datatype .
-  (owlrl:dt-not-type ?lt ?datatype) log:skolem ?err . }
-=> { ?err a owlrl:Inconsistency ;
-          owlrl:rule owlrl:dt-not-type ;
-          owlrl:term1 ?lt ;
-          owlrl:term2 ?datatype . } .
+  (inconsistencies:dt-not-type ?lt ?datatype) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:dt-not-type ;
+          inconsistencies:term1 ?lt ;
+          inconsistencies:term2 ?datatype . } .
 
 # dt-eq. The log:notEqualTo guard avoids deriving reflexive literal equality for
 # the exact same RDF term while still allowing value equality for different
 # lexical/datatype forms.
-{ ?n1 owlrl:term ?lt1 .
-  ?n2 owlrl:term ?lt2 .
+{ ?n1 internal:term ?lt1 .
+  ?n2 internal:term ?lt2 .
   ?lt1 log:notEqualTo ?lt2 .
   ?lt1 dt:datatype ?dt1 .
   ?dt1 log:notEqualTo xsd:string .
@@ -1013,8 +1019,8 @@ owl:Nothing rdf:type owl:Class .
 => { ?lt1 owl:sameAs ?lt2 . } .
 
 # dt-diff
-{ ?n1 owlrl:term ?lt1 .
-  ?n2 owlrl:term ?lt2 .
+{ ?n1 internal:term ?lt1 .
+  ?n2 internal:term ?lt2 .
   ?lt1 dt:datatype ?dt1 .
   ?dt1 log:notEqualTo xsd:string .
   ?dt1 log:notEqualTo rdf:langString .
@@ -1023,10 +1029,10 @@ owl:Nothing rdf:type owl:Class .
 
 # Optional canonical literal enrichment. This is not an OWL 2 RL entailment rule,
 # but it is useful in streaming pipelines for diagnostics and normalization.
-# Downstream projects may ignore or remove owlrl:canonicalLiteral triples.
-{ ?litNode owlrl:term ?lt .
+# Downstream projects may ignore or remove internal:canonicalLiteral triples.
+{ ?litNode internal:term ?lt .
   ?lt dt:canonicalLiteral ?canonical . }
-=> { ?litNode owlrl:canonicalLiteral ?canonical . } .
+=> { ?litNode internal:canonicalLiteral ?canonical . } .
 
 #################################################################
 # 9. Schema vocabulary rules (scm-*)

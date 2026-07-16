@@ -8,7 +8,7 @@ import { parseRdf, termKey } from './utils';
 const EX = 'https://example.org/manual-shacl#';
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
-const SHN = 'https://example.org/shacl-n3#';
+const SHN = 'https://www.pieter.pm/rdfjs-inference-engine/ns/internal#';
 
 const rules = `${readFileSync('rules/shacl-experimental/shacl-core-eyeling.n3', 'utf8')}
 

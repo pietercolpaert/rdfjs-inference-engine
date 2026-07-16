@@ -14,7 +14,7 @@
 @prefix math:   <http://www.w3.org/2000/10/swap/math#> .
 @prefix string: <http://www.w3.org/2000/10/swap/string#> .
 @prefix dt:     <https://eyereasoner.github.io/eyeling/datatype#> .
-@prefix shn:    <https://example.org/shacl-n3#> .
+@prefix shn:    <https://www.pieter.pm/rdfjs-inference-engine/ns/internal#> .
 
 # sh:ShapeClass is a SHACL 1.2 shortcut for nodes that are both classes and
 # node shapes.  The base profile already implements implicit class targets for

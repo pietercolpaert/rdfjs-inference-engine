@@ -912,6 +912,8 @@ function outputPrefixes() {
     catalog: 'https://example.org/catalog#',
     family: 'https://example.org/family#',
     test: 'https://example.org/test#',
+    inconsistencies: 'https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#',
+    qcr: 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#',
     shacl: 'https://example.org/shacl#',
     gen: 'https://eyereasoner.github.io/.well-known/genid/',
     skos: 'http://www.w3.org/2004/02/skos/core#',

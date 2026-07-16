@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" prefix="dct: http://purl.org/dc/terms/ owl: http://www.w3.org/2002/07/owl# rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns# rdfs: http://www.w3.org/2000/01/rdf-schema# skos: http://www.w3.org/2004/02/skos/core#">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies">
+  <title>RDF-JS inference inconsistency vocabulary</title>
+  <style>body{max-width:58rem;margin:3rem auto;padding:0 1rem;font:16px/1.55 system-ui,sans-serif;color:#18202a}code{background:#f1f3f5;padding:.1rem .25rem}dt{font-weight:700;margin-top:1rem}dd{margin:.2rem 0 0 1rem}.note{border-left:3px solid #476b8a;padding-left:1rem;color:#46515d}</style>
+</head>
+<body about="https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies" typeof="owl:Ontology">
+  <h1 property="dct:title">RDF-JS inference inconsistency vocabulary</h1>
+  <p property="dct:description">Machine-readable diagnostics emitted when an OWL 2 RL rule detects contradictory RDF.</p>
+  <p class="note">The HTML is also RDFa. Terms use the namespace <code>https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#</code>.</p>
+
+  <h2>Report terms</h2>
+  <dl>
+    <div resource="#Inconsistency" typeof="rdfs:Class"><dt property="rdfs:label">Inconsistency</dt><dd property="rdfs:comment">A structured report that identifies a violated OWL 2 RL consistency condition.</dd></div>
+    <div resource="#rule" typeof="rdf:Property"><dt property="rdfs:label">rule</dt><dd property="rdfs:comment">The OWL 2 RL diagnostic rule that produced the report.</dd></div>
+    <div resource="#term1" typeof="rdf:Property"><dt property="rdfs:label">term1</dt><dd property="rdfs:comment">First ordered evidence term for a diagnostic rule.</dd></div>
+    <div resource="#term2" typeof="rdf:Property"><dt property="rdfs:label">term2</dt><dd property="rdfs:comment">Second ordered evidence term for a diagnostic rule.</dd></div>
+    <div resource="#term3" typeof="rdf:Property"><dt property="rdfs:label">term3</dt><dd property="rdfs:comment">Third ordered evidence term for a diagnostic rule.</dd></div>
+    <div resource="#term4" typeof="rdf:Property"><dt property="rdfs:label">term4</dt><dd property="rdfs:comment">Fourth ordered evidence term for a diagnostic rule.</dd></div>
+    <div resource="#term5" typeof="rdf:Property"><dt property="rdfs:label">term5</dt><dd property="rdfs:comment">Fifth ordered evidence term for a diagnostic rule.</dd></div>
+  </dl>
+
+  <h2>Rules</h2>
+  <p>The following identifiers are values of <code>rule</code>. Their local names follow the OWL 2 RL/RDF rules.</p>
+  <ul>
+    <li resource="#eq-diff1" typeof="skos:Concept" property="rdfs:label">eq-diff1</li>
+    <li resource="#eq-diff2" typeof="skos:Concept" property="rdfs:label">eq-diff2</li>
+    <li resource="#eq-diff3" typeof="skos:Concept" property="rdfs:label">eq-diff3</li>
+    <li resource="#prp-irp" typeof="skos:Concept" property="rdfs:label">prp-irp</li>
+    <li resource="#prp-asyp" typeof="skos:Concept" property="rdfs:label">prp-asyp</li>
+    <li resource="#prp-pdw" typeof="skos:Concept" property="rdfs:label">prp-pdw</li>
+    <li resource="#prp-adp" typeof="skos:Concept" property="rdfs:label">prp-adp</li>
+    <li resource="#prp-npa1" typeof="skos:Concept" property="rdfs:label">prp-npa1</li>
+    <li resource="#prp-npa2" typeof="skos:Concept" property="rdfs:label">prp-npa2</li>
+    <li resource="#cls-nothing2" typeof="skos:Concept" property="rdfs:label">cls-nothing2</li>
+    <li resource="#cls-com" typeof="skos:Concept" property="rdfs:label">cls-com</li>
+    <li resource="#cls-maxc1" typeof="skos:Concept" property="rdfs:label">cls-maxc1</li>
+    <li resource="#cls-maxqc1" typeof="skos:Concept" property="rdfs:label">cls-maxqc1</li>
+    <li resource="#cls-maxqc2" typeof="skos:Concept" property="rdfs:label">cls-maxqc2</li>
+    <li resource="#cls-maxqd1" typeof="skos:Concept" property="rdfs:label">cls-maxqd1</li>
+    <li resource="#cax-dw" typeof="skos:Concept" property="rdfs:label">cax-dw</li>
+    <li resource="#cax-adc" typeof="skos:Concept" property="rdfs:label">cax-adc</li>
+    <li resource="#dt-not-type" typeof="skos:Concept" property="rdfs:label">dt-not-type</li>
+  </ul>
+</body>
+</html>

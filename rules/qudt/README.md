@@ -12,7 +12,7 @@ The profile derives normalized quantity values using canonical target units. It 
 - conversion multipliers and offsets;
 - selected logarithmic units with explicit profile metadata.
 
-The normalized result uses the `https://w3id.org/qudt-inference#` vocabulary and QUDT units.
+The normalized result uses the published [QUDT inference vocabulary](https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference) and QUDT units. Rule-maintenance predicates use the separate [internal namespace](https://www.pieter.pm/rdfjs-inference-engine/ns/internal) and are filtered from application output.
 
 For QUDT object inputs, applications may map a source property to a quantity profile:
 

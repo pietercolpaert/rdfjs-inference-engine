@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" prefix="dct: http://purl.org/dc/terms/ owl: http://www.w3.org/2002/07/owl# rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns# rdfs: http://www.w3.org/2000/01/rdf-schema#">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="https://www.pieter.pm/rdfjs-inference-engine/ns/internal">
+  <title>RDF-JS inference internal vocabulary</title>
+  <style>body{max-width:58rem;margin:3rem auto;padding:0 1rem;font:16px/1.55 system-ui,sans-serif;color:#18202a}code{background:#f1f3f5;padding:.1rem .25rem}li{margin:.25rem 0}.note{border-left:3px solid #8a6547;padding-left:1rem;color:#46515d}</style>
+</head>
+<body about="https://www.pieter.pm/rdfjs-inference-engine/ns/internal" typeof="owl:Ontology">
+  <h1 property="dct:title">RDF-JS inference internal vocabulary</h1>
+  <p property="dct:description">Implementation predicates used while evaluating bundled OWL, SHACL, and QUDT N3 profiles.</p>
+  <p class="note">These terms are unstable implementation details and are normally filtered from application output. The HTML is also RDFa.</p>
+  <h2>Terms</h2>
+  <ul>
+    <li resource="#listRoot" typeof="rdf:Property" property="rdfs:label">listRoot</li>
+    <li resource="#intersectionListRoot" typeof="rdf:Property" property="rdfs:label">intersectionListRoot</li>
+    <li resource="#longIntersectionListRoot" typeof="rdf:Property" property="rdfs:label">longIntersectionListRoot</li>
+    <li resource="#keyListRoot" typeof="rdf:Property" property="rdfs:label">keyListRoot</li>
+    <li resource="#propertyChainRoot" typeof="rdf:Property" property="rdfs:label">propertyChainRoot</li>
+    <li resource="#listPair" typeof="rdf:Property" property="rdfs:label">listPair</li>
+    <li resource="#left" typeof="rdf:Property" property="rdfs:label">left</li>
+    <li resource="#right" typeof="rdf:Property" property="rdfs:label">right</li>
+    <li resource="#allListClassTypes" typeof="rdf:Property" property="rdfs:label">allListClassTypes</li>
+    <li resource="#propertyChainHolds" typeof="rdf:Property" property="rdfs:label">propertyChainHolds</li>
+    <li resource="#pathChain" typeof="rdf:Property" property="rdfs:label">pathChain</li>
+    <li resource="#pathSubject" typeof="rdf:Property" property="rdfs:label">pathSubject</li>
+    <li resource="#pathObject" typeof="rdf:Property" property="rdfs:label">pathObject</li>
+    <li resource="#sameValuesForProperties" typeof="rdf:Property" property="rdfs:label">sameValuesForProperties</li>
+    <li resource="#term" typeof="rdf:Property" property="rdfs:label">term</li>
+    <li resource="#canonicalLiteral" typeof="rdf:Property" property="rdfs:label">canonicalLiteral</li>
+    <li resource="#complement" typeof="rdf:Property" property="rdfs:label">complement</li>
+    <li resource="#literal" typeof="rdf:Property" property="rdfs:label">literal</li>
+    <li resource="#active" typeof="rdf:Property" property="rdfs:label">active</li>
+    <li resource="#focusFor" typeof="rdf:Property" property="rdfs:label">focusFor</li>
+    <li resource="#focus" typeof="rdf:Property" property="rdfs:label">focus</li>
+    <li resource="#shape" typeof="rdf:Property" property="rdfs:label">shape</li>
+    <li resource="#path" typeof="rdf:Property" property="rdfs:label">path</li>
+    <li resource="#pathValue" typeof="rdf:Property" property="rdfs:label">pathValue</li>
+    <li resource="#value" typeof="rdf:Property" property="rdfs:label">value</li>
+    <li resource="#self" typeof="rdf:Property" property="rdfs:label">self</li>
+    <li resource="#reifies" typeof="rdf:Property" property="rdfs:label">reifies</li>
+    <li resource="#reifiesSubject" typeof="rdf:Property" property="rdfs:label">reifiesSubject</li>
+    <li resource="#reifiesPredicate" typeof="rdf:Property" property="rdfs:label">reifiesPredicate</li>
+    <li resource="#reifiesObject" typeof="rdf:Property" property="rdfs:label">reifiesObject</li>
+    <li resource="#unitToken" typeof="rdf:Property" property="rdfs:label">unitToken</li>
+    <li resource="#effectiveOffset" typeof="rdf:Property" property="rdfs:label">effectiveOffset</li>
+    <li resource="#parsedQuantityLiteral" typeof="rdf:Property" property="rdfs:label">parsedQuantityLiteral</li>
+    <li resource="#convertedValue" typeof="rdf:Property" property="rdfs:label">convertedValue</li>
+    <li resource="#linearRatioFromLogValue" typeof="rdf:Property" property="rdfs:label">linearRatioFromLogValue</li>
+    <li resource="#logValueFromLinearRatio" typeof="rdf:Property" property="rdfs:label">logValueFromLinearRatio</li>
+    <li resource="#normalizationUnit" typeof="rdf:Property" property="rdfs:label">normalizationUnit</li>
+    <li resource="#normalizationOutputProperty" typeof="rdf:Property" property="rdfs:label">normalizationOutputProperty</li>
+    <li resource="#normalizedLexicalForm" typeof="rdf:Property" property="rdfs:label">normalizedLexicalForm</li>
+    <li resource="#profileForDatatype" typeof="rdf:Property" property="rdfs:label">profileForDatatype</li>
+    <li resource="#profileForGenericUcum" typeof="rdf:Property" property="rdfs:label">profileForGenericUcum</li>
+    <li resource="#profileForObjectProperty" typeof="rdf:Property" property="rdfs:label">profileForObjectProperty</li>
+  </ul>
+</body>
+</html>

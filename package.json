@@ -19,6 +19,7 @@
     "browser/",
     "rules/*/*.n3",
     "rules/*/README.md",
+    "ns/*/index.html",
     "index.html",
     "README.md"
   ],
@@ -67,6 +68,8 @@
     "test:shacl-shape-planning:run": "node dist/tests/run-shacl-shape-planning.js",
     "test:stateful-skolemization": "npm run build:node --silent && npm run test:stateful-skolemization:run --silent",
     "test:stateful-skolemization:run": "node dist/tests/run-stateful-skolemization.js",
+    "test:vocabularies": "npm run build:node --silent && npm run test:vocabularies:run --silent",
+    "test:vocabularies:run": "node dist/tests/run-vocabularies.js",
     "test:marc-list-ontology": "npm run build:node --silent && npm run test:marc-list-ontology:run --silent",
     "test:marc-list-ontology:run": "node dist/tests/run-marc-list-ontology.js",
     "test:skos": "npm run build:node --silent && npm run test:skos:run --silent",
@@ -86,7 +89,7 @@
     "test:owl": "npm run build:node --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:qudt:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
+    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:vocabularies:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:qudt:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "perf": "npm run build:node --silent && node dist/perf/run.js",
     "perf:list": "npm run build:node --silent && node dist/perf/run.js --list"
   },
@@ -112,6 +115,7 @@
     "@types/node": "^25.9.2",
     "adm-zip": "^0.5.17",
     "esbuild": "^0.28.0",
+    "rdfa-streaming-parser": "^3.0.2",
     "rdfxml-streaming-parser": "^3.2.0",
     "typescript": "^6.0.3"
   }

@@ -60,7 +60,7 @@ The main class is `InferenceEngine`.
 - `load(..., { shaclIn, shaclOut })` uses trusted SHACL input/output shapes as optimization and projection hints. These hints are contracts, not validation.
 - `load(..., { skolemKey })` makes static closure `log:skolem` IRIs deterministic for a project/store key.
 - `saveRuntime(path)` writes the generated runtime.
-- `infer(quads)` returns newly inferred RDF-JS quads.
+- `infer(quads)` returns newly inferred RDF-JS quads, including structured OWL inconsistency reports.
 - `inferAsync(quads, { store })` runs with Eyeling's async runner and optional named persistent fact store.
 - `createInferenceStream()` / `stream()` creates an object-mode transform stream.
 
@@ -75,6 +75,16 @@ Default profiles are discovered from rule-set folders under `rules/`:
 The experimental SHACL validation profiles are documented separately in [rules/shacl-experimental/README.md](rules/shacl-experimental/README.md) and are not loaded by default.
 
 QUDT/CDT normalization also ships a precompiled same-folder runtime snapshot, `rules/qudt/qudt-cdt-normalization.runtime.n3`, so package installs and browser builds do not need to fetch or materialize `https://qudt.org/qudt-all`.
+
+## Vocabularies
+
+Project-defined RDF terms are published as HTML+RDFa through GitHub Pages:
+
+- [OWL inconsistency diagnostics](https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies)
+- [QUDT inference](https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference)
+- [Internal implementation terms](https://www.pieter.pm/rdfjs-inference-engine/ns/internal)
+
+The internal namespace is not an application contract and may change between releases. Example-specific `https://example.org/...` IRIs describe only fixture data and are not project vocabularies.
 
 ## Browser Bundle And Playground
 

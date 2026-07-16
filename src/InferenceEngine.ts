@@ -27,48 +27,17 @@ const OWL_INVERSE_OF = 'http://www.w3.org/2002/07/owl#inverseOf';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const LOG_SKOLEM = 'http://www.w3.org/2000/10/swap/log#skolem';
 const SKOLEM_BASE_IRI = 'https://eyereasoner.github.io/.well-known/genid/';
-const OWLRL = 'https://example.org/owlrl-n3#';
-const OWLRL_INCONSISTENCY = OWLRL + 'Inconsistency';
+const INCONSISTENCIES = 'https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#';
+const INCONSISTENCY = INCONSISTENCIES + 'Inconsistency';
 const SHACL = 'http://www.w3.org/ns/shacl#';
 const SHACL_VALIDATION_RESULT = SHACL + 'ValidationResult';
-const SHACLN3 = 'https://example.org/shacl-n3#';
-const QCR = 'https://w3id.org/qudt-inference#';
+const INTERNAL = 'https://www.pieter.pm/rdfjs-inference-engine/ns/internal#';
+const QCR = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#';
 const QUDT = 'http://qudt.org/schema/qudt/';
 const QUDT_UNIT = 'http://qudt.org/vocab/unit/';
 const QUDT_DIMENSION = QUDT + 'hasDimensionVector';
 const PRECOMPILED_BACKGROUND_MARKER = '# Precomputed background facts and closure';
 const NON_DEFAULT_RULE_DIRS = new Set(['precompiled', 'shacl-experimental']);
-const INTERNAL_HELPER_PREDICATES = new Set([
-  OWLRL + 'listRoot',
-  OWLRL + 'intersectionListRoot',
-  OWLRL + 'longIntersectionListRoot',
-  OWLRL + 'keyListRoot',
-  OWLRL + 'propertyChainRoot',
-  OWLRL + 'listMember',
-  OWLRL + 'listPair',
-  OWLRL + 'left',
-  OWLRL + 'right',
-  OWLRL + 'allListClassTypes',
-  OWLRL + 'sameValuesForProperties',
-  OWLRL + 'propertyChainHolds',
-  OWLRL + 'pathChain',
-  OWLRL + 'pathSubject',
-  OWLRL + 'pathObject',
-  OWLRL + 'term',
-  OWLRL + 'canonicalLiteral',
-  OWLRL + 'rule',
-  OWLRL + 'term1',
-  OWLRL + 'term2',
-  OWLRL + 'term3',
-  OWLRL + 'term4',
-  OWLRL + 'term5',
-  SHACLN3 + 'active',
-  SHACLN3 + 'focusFor',
-  SHACLN3 + 'shape',
-  SHACLN3 + 'focus',
-  SHACLN3 + 'path',
-  SHACLN3 + 'value',
-]);
 
 export type RuleProfile = string | {
   n3?: string;
@@ -182,7 +151,11 @@ export class InferenceEngine {
 
   public getStaticClosure(options: InferenceOptions = {}): Quad[] {
     const outputMode = options.outputMode ?? this.outputMode;
-    return this.staticClosure.filter((quad) => shouldEmitQuad(quad, outputMode));
+    return withInconsistencyQuads(
+      this.staticClosure.filter((quad) => shouldEmitQuad(quad, outputMode)),
+      this.staticClosure,
+      outputMode,
+    );
   }
 
   public getStaticInconsistencies(options: InferenceOptions = {}): InconsistencyReport[] {
@@ -254,6 +227,7 @@ export class InferenceEngine {
     this.assertLoaded();
     const inferenceData = this.optimizeInferenceInput(data, options);
     const derived: Quad[] = [];
+    const diagnostics: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
@@ -266,10 +240,12 @@ export class InferenceEngine {
         builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
+            diagnostics.push(item.quad);
             addDerived(derived, seen, item.quad, outputMode);
           }
           if (item.quads) {
             for (const quad of item.quads) {
+              diagnostics.push(quad);
               addDerived(derived, seen, quad, outputMode);
             }
           }
@@ -279,7 +255,11 @@ export class InferenceEngine {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
 
-    yield* this.projectInferenceOutput(derived, options);
+    yield* withInconsistencyQuads(
+      this.projectInferenceOutput(derived, options),
+      [...this.staticClosure, ...diagnostics],
+      outputMode,
+    );
   }
 
   public inferWithDiagnostics(data: Quad[], options: InferenceOptions = {}): InferenceResult {
@@ -315,9 +295,10 @@ export class InferenceEngine {
       unregisterDeterministicSkolemBuiltin(deterministicSkolem);
     }
 
+    const diagnosticSource = [...this.staticClosure, ...diagnostics];
     return {
-      quads: this.projectInferenceOutput(derived, options),
-      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics], outputMode),
+      quads: withInconsistencyQuads(this.projectInferenceOutput(derived, options), diagnosticSource, outputMode),
+      inconsistencies: collectInconsistencyReports(diagnosticSource, outputMode),
     };
   }
 
@@ -328,6 +309,7 @@ export class InferenceEngine {
     }
 
     const derived: Quad[] = [];
+    const diagnostics: Quad[] = [];
     const seen = new Set<string>();
     const outputMode = options.outputMode ?? this.outputMode;
     const deterministicSkolem = createDeterministicSkolemBuiltin(options);
@@ -344,10 +326,12 @@ export class InferenceEngine {
         storeClear: options.storeClear,
         onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
           if (item.quad) {
+            diagnostics.push(item.quad);
             addDerived(derived, seen, item.quad, outputMode);
           }
           if (item.quads) {
             for (const quad of item.quads) {
+              diagnostics.push(quad);
               addDerived(derived, seen, quad, outputMode);
             }
           }
@@ -360,7 +344,11 @@ export class InferenceEngine {
       await result.store.close();
     }
 
-    return this.projectInferenceOutput(derived, options);
+    return withInconsistencyQuads(
+      this.projectInferenceOutput(derived, options),
+      [...this.staticClosure, ...diagnostics],
+      outputMode,
+    );
   }
 
   public async inferAsyncWithDiagnostics(data: Quad[], options: InferenceOptions = {}): Promise<InferenceResult> {
@@ -407,9 +395,10 @@ export class InferenceEngine {
       await result.store.close();
     }
 
+    const diagnosticSource = [...this.staticClosure, ...diagnostics];
     return {
-      quads: this.projectInferenceOutput(derived, options),
-      inconsistencies: collectInconsistencyReports([...this.staticClosure, ...diagnostics], outputMode),
+      quads: withInconsistencyQuads(this.projectInferenceOutput(derived, options), diagnosticSource, outputMode),
+      inconsistencies: collectInconsistencyReports(diagnosticSource, outputMode),
     };
   }
 
@@ -725,8 +714,11 @@ const KNOWN_PREFIXES: Record<string, string> = {
   xsd: 'http://www.w3.org/2001/XMLSchema#',
   sh: 'http://www.w3.org/ns/shacl#',
   skos: 'http://www.w3.org/2004/02/skos/core#',
-  shn: SHACLN3,
-  owlrl: OWLRL,
+  shn: INTERNAL,
+  internal: INTERNAL,
+  owlrl: INCONSISTENCIES,
+  inconsistencies: INCONSISTENCIES,
+  qcr: QCR,
 };
 
 const STATIC_SCHEMA_PREDICATES = [
@@ -1224,7 +1216,9 @@ function ruleCanMatchKnownInput(metadata: RuntimeRuleMetadata, availablePredicat
   }
 
   for (const predicate of metadata.bodyPredicates) {
-    if (availablePredicates.has(predicate) || predicate.startsWith(OWLRL) || predicate.startsWith(SHACLN3)) {
+    if (availablePredicates.has(predicate)
+      || predicate.startsWith(INCONSISTENCIES)
+      || predicate.startsWith(INTERNAL)) {
       return true;
     }
   }
@@ -1665,7 +1659,7 @@ function collectQudtUnitMappings(quads: Iterable<Quad>): Map<string, Set<string>
     OWL_SAME_AS,
     'http://www.w3.org/2004/02/skos/core#exactMatch',
     QCR + 'alignedQudtUnit',
-    QCR + 'normalizationUnit',
+    INTERNAL + 'normalizationUnit',
   ]);
   const mappings = new Map<string, Set<string>>();
 
@@ -1820,7 +1814,7 @@ function isReflexiveSameAs(quad: Quad): boolean {
 
 function isInternalHelperQuad(quad: Quad): boolean {
   return quad.predicate.termType === 'NamedNode'
-    && INTERNAL_HELPER_PREDICATES.has(quad.predicate.value);
+    && quad.predicate.value.startsWith(INTERNAL);
 }
 
 function isShaclValidationResultQuad(quad: Quad): boolean {
@@ -1861,11 +1855,11 @@ function collectInconsistencyReports(quads: Iterable<Quad>, outputMode: Inferenc
     const report = byId.get(id) ?? { quads: [], terms: new Map<number, Term>() };
     report.quads.push(quad);
 
-    if (quad.predicate.value === OWLRL + 'rule') {
+    if (quad.predicate.value === INCONSISTENCIES + 'rule') {
       report.rule = quad.object.value;
-    } else if (quad.predicate.value.startsWith(OWLRL + 'term')) {
-      const index = Number.parseInt(quad.predicate.value.slice((OWLRL + 'term').length), 10);
-      if (Number.isInteger(index)) {
+    } else {
+      const index = inconsistencyTermIndex(quad.predicate.value);
+      if (index !== undefined) {
         report.terms.set(index, quad.object as Term);
       }
     }
@@ -1886,6 +1880,21 @@ function collectInconsistencyReports(quads: Iterable<Quad>, outputMode: Inferenc
       || !report.terms.some(isGeneratedSkolemTerm));
 }
 
+function withInconsistencyQuads(output: Quad[], source: Iterable<Quad>, outputMode: InferenceOutputMode): Quad[] {
+  const result = [...output];
+  const seen = new Set(result.map(quadKey));
+  for (const report of collectInconsistencyReports(source, outputMode)) {
+    for (const quad of report.quads) {
+      const key = quadKey(quad);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(quad);
+      }
+    }
+  }
+  return result;
+}
+
 function isInconsistencyDiagnosticQuad(quad: Quad): boolean {
   if (quad.predicate.termType !== 'NamedNode') {
     return false;
@@ -1893,9 +1902,14 @@ function isInconsistencyDiagnosticQuad(quad: Quad): boolean {
 
   return (quad.predicate.value === RDF_TYPE
     && quad.object.termType === 'NamedNode'
-    && quad.object.value === OWLRL_INCONSISTENCY)
-    || quad.predicate.value === OWLRL + 'rule'
-    || /^https:\/\/example\.org\/owlrl-n3#term[1-5]$/.test(quad.predicate.value);
+    && quad.object.value === INCONSISTENCY)
+    || quad.predicate.value === INCONSISTENCIES + 'rule'
+    || inconsistencyTermIndex(quad.predicate.value) !== undefined;
+}
+
+function inconsistencyTermIndex(predicate: string): number | undefined {
+  const localName = predicate.slice(INCONSISTENCIES.length);
+  return /^term[1-5]$/.test(localName) ? Number(localName.slice(4)) : undefined;
 }
 
 function hasLiteralSubject(quad: Quad): boolean {
