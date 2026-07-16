@@ -1,0 +1,32 @@
+@prefix ex: <https://example.org/logistics#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:ShipmentInputShape a sh:NodeShape ;
+  sh:targetNode ex:shipment-1 ;
+  sh:class ex:PriorityShipment ;
+  sh:class ex:FragileShipment ;
+  sh:property [ sh:path ex:contains ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path ex:destinationCountry ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path ex:handledBy ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path ex:trackingCode ; sh:minCount 2 ; sh:nodeKind sh:IRI ] .
+
+ex:ManifestInputShape a sh:NodeShape ;
+  sh:targetNode ex:shipment-2, ex:shipment-3 ;
+  sh:property [ sh:path ex:manifestId ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+ex:RegulatedInputShape a sh:NodeShape ;
+  sh:targetNode ex:shipment-4 ;
+  sh:class ex:RegulatedShipment ;
+  sh:property [ sh:path ex:contains ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+ex:CountryInputShape a sh:NodeShape ;
+  sh:targetNode ex:belgium ;
+  sh:class ex:Country .
+
+ex:PartnerInputShape a sh:NodeShape ;
+  sh:targetNode ex:alice ;
+  sh:property [ sh:path ex:partnerOf ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+ex:LocationInputShape a sh:NodeShape ;
+  sh:targetNode ex:box-1, ex:pallet-1 ;
+  sh:property [ sh:path ex:locatedIn ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .

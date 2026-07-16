@@ -1,0 +1,13 @@
+@prefix ex: <https://example.org/subjects#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:TaxonomyInputShape a sh:NodeShape ;
+  sh:targetNode ex:cat ;
+  sh:property [ sh:path skos:prefLabel ; sh:minCount 1 ; sh:datatype <http://www.w3.org/2001/XMLSchema#string> ] ;
+  sh:property [ sh:path skos:definition ; sh:minCount 1 ] ;
+  sh:property [ sh:path skos:broader ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+ex:TopConceptInputShape a sh:NodeShape ;
+  sh:targetNode ex:animal ;
+  sh:property [ sh:path skos:topConceptOf ; sh:minCount 1 ; sh:class skos:ConceptScheme ] .

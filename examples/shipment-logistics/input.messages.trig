@@ -1,5 +1,6 @@
-# RDF input for the shipment logistics OWL 2 RL example.
+# RDF Message log for the shipment logistics OWL 2 RL example.
 
+VERSION "1.2-messages"
 PREFIX : <https://example.org/logistics#>
 
 :shipment-1 a :PriorityShipment, :FragileShipment ;

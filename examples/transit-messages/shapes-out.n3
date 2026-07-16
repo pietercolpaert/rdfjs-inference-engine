@@ -1,0 +1,14 @@
+@prefix ex: <https://example.org/transit#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:VehicleMessageOutputShape a sh:NodeShape ;
+  sh:targetNode ex:bus-42, ex:bus-43 ;
+  sh:class ex:Vehicle .
+
+ex:BusMessageOutputShape a sh:NodeShape ;
+  sh:targetNode ex:bus-42 ;
+  sh:class ex:Bus .
+
+ex:OperatorMessageOutputShape a sh:NodeShape ;
+  sh:targetNode ex:operator-8 ;
+  sh:class ex:Operator .

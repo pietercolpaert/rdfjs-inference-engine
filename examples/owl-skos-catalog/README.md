@@ -7,7 +7,9 @@ OWL/RDFS rules infer that catalog topics are SKOS concepts and map a domain-spec
 ## Files
 
 - `ontology.n3` — background ontology and SKOS configuration.
-- `input.trig` — input catalog RDF data.
+- `input.messages.trig` — one-message RDF Message log.
+- `shapes-in.n3` — accepted local catalog input contract.
+- `shapes-out.n3` — required SKOS-aligned output contract.
 - `expected-selected-output.n3` — selected expected entailments.
 - `run.ts` — example runner.
 

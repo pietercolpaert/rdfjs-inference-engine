@@ -14,7 +14,7 @@ async function main(): Promise<void> {
   mkdirSync(dirname('generated/owl-skos-catalog-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/owl-skos-catalog-runtime.n3');
 
-  const data = parseToQuads(readFileSync('examples/owl-skos-catalog/input.trig', 'utf8'));
+  const data = parseToQuads(readFileSync('examples/owl-skos-catalog/input.messages.trig', 'utf8'));
   const closure = [...data, ...reasoner.infer(data)];
   const selected = parseToQuads(readFileSync('examples/owl-skos-catalog/expected-selected-output.n3', 'utf8'));
   assertContainsQuads(closure, selected, 'Combined OWL 2 RL + SKOS catalog example');

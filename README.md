@@ -32,7 +32,7 @@ import { DataFactory, isMessageQuad, Parser } from 'rdf-parser-ts';
 import { InferenceEngine } from 'rdfjs-inference-engine';
 
 const ontology = parseToQuads(readFileSync('examples/transit-fleet/ontology.n3', 'utf8'));
-const data = parseToQuads(readFileSync('examples/transit-fleet/input.trig', 'utf8'));
+const data = parseToQuads(readFileSync('examples/transit-fleet/input.messages.trig', 'utf8'));
 
 const reasoner = new InferenceEngine();
 reasoner.load(ontology);
@@ -94,7 +94,9 @@ The browser bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEn
 <script src="https://www.pieter.pm/rdfjs-inference-engine/browser/rdfjs-inference-engine.min.js"></script>
 ```
 
-The root [index.html](index.html) file is a browser playground. At browser-build time it bundles the default rule profiles from `rules/`, including QUDT's precompiled runtime snapshot. The advanced profile selector can enable or disable individual profiles.
+The root [index.html](index.html) file is a browser playground. Every scenario starts with an RDF Message Log and a pair of trusted SHACL contracts: SHACL IN describes the source representation and SHACL OUT describes the representation the application needs. The playground shows that alignment flow, background ontology, input messages, and output messages directly; rule-profile selection, stateful materialization, and the generated N3 runtime are available under advanced controls.
+
+At browser-build time the playground bundles the default rule profiles from `rules/`, including QUDT's precompiled runtime snapshot. SHACL contracts specialize applicable rules where supported, prune irrelevant input facts, and project inferred output while preserving message boundaries. They are optimization contracts rather than a replacement for validation.
 
 Build only the browser artifacts with:
 
@@ -104,7 +106,7 @@ npm run build:browser
 
 ## Examples
 
-Examples are self-contained folders under `examples/`, with their own README and input/background fixtures.
+Examples are self-contained folders under `examples/`, with their own README, `input.messages.trig`, `shapes-in.n3`, `shapes-out.n3`, and background ontology fixtures.
 
 - [Transit fleet](examples/transit-fleet/README.md)
 - [Shipment logistics](examples/shipment-logistics/README.md)
@@ -176,7 +178,7 @@ examples/
    my-example/
       README.md
       ontology.n3
-      input.trig
+      input.messages.trig
       expected-output.n3
       run.ts
 ```

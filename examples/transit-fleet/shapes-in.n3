@@ -1,0 +1,12 @@
+@prefix ex: <https://example.org/transit#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:FleetInputShape a sh:NodeShape ;
+  sh:targetNode ex:bus-42 ;
+  sh:class ex:ElectricBus ;
+  sh:property [
+    sh:path ex:operatedBy ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
+  ] .

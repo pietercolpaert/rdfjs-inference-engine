@@ -1,0 +1,14 @@
+@prefix ex: <https://example.org/catalog#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:CatalogOutputShape a sh:NodeShape ;
+  sh:targetNode ex:openData ;
+  sh:class skos:Concept ;
+  sh:property [ sh:path skos:related ; sh:hasValue ex:transportData ] ;
+  sh:property [ sh:path skos:semanticRelation ; sh:hasValue ex:transportData ] .
+
+ex:RelatedConceptOutputShape a sh:NodeShape ;
+  sh:targetNode ex:transportData ;
+  sh:class skos:Concept ;
+  sh:property [ sh:path skos:related ; sh:hasValue ex:openData ] .

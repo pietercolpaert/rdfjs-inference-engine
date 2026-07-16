@@ -17,6 +17,7 @@ const pathShape = parseQuads(`
 ex:Shape
   a sh:NodeShape ;
   sh:targetClass ex:Message ;
+  sh:class ex:AlignedMessage ;
   sh:property [
     sh:path ex:value ;
     sh:minCount 1 ;
@@ -46,6 +47,8 @@ ex:Shape
 
 const pathPlan = compileShaclShapeGraph(pathShape, 'in');
 assert.equal(pathPlan.shapes.length, 1, 'Expected one compiled SHACL node shape.');
+assert.deepEqual(pathPlan.shapes[0].classes, [EX + 'AlignedMessage'], 'Node-level sh:class constraints should be retained.');
+assert.ok(pathPlan.relevantClasses.includes(EX + 'AlignedMessage'), 'Node-level sh:class should guide class-aware planning.');
 assert.ok(pathPlan.relevantPredicates.includes(EX + 'value'), 'Direct predicate paths should be collected.');
 assert.ok(pathPlan.relevantPredicates.includes(EX + 'hasPart'), 'Inverse paths should expose their predicate.');
 assert.ok(pathPlan.relevantPredicates.includes(EX + 'parent'), 'Sequence paths should expose all predicates.');

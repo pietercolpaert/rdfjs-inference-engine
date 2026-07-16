@@ -22,3 +22,10 @@ The report is represented as:
   inconsistencies:term2 :B ;
   inconsistencies:term3 :x .
 ```
+
+## Playground files
+
+- `shapes-in.n3` describes the conflicting source assertions accepted by the scenario.
+- `shapes-out.n3` requests a machine-readable inconsistency report.
+- `ontology.n3` declares the disjoint classes.
+- `input.messages.trig` contains the independent RDF Message input.

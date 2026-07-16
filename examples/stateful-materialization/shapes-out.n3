@@ -1,0 +1,7 @@
+@prefix ex: <https://example.org/family#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:RememberedParentOutputShape a sh:NodeShape ;
+  sh:targetNode ex:alice ;
+  sh:class ex:Parent ;
+  sh:class ex:Mother .

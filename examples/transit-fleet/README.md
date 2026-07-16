@@ -5,7 +5,9 @@ This is the smallest OWL 2 RL/RDFS example. It demonstrates subclass, domain, an
 ## Files
 
 - `ontology.n3` — background vocabulary.
-- `input.trig` — input RDF data.
+- `input.messages.trig` — one-message RDF Message log.
+- `shapes-in.n3` — accepted electric-bus input contract.
+- `shapes-out.n3` — required vehicle and operator output contract.
 - `expected-output.n3` — expected inferred triples.
 - `run.ts` — example runner.
 
@@ -19,7 +21,7 @@ From the repository root:
 npm run example:transit-fleet
 ```
 
-The runner loads the background ontology with the default bundled rule profiles, generates `generated/transit-fleet-runtime.n3`, and then runs inference over `input.trig`.
+The runner loads the background ontology with the default bundled rule profiles, generates `generated/transit-fleet-runtime.n3`, and then runs inference over `input.messages.trig`.
 
 The input triples themselves are not returned; the output contains only newly derived triples.
 

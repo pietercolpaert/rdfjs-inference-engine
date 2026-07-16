@@ -68,6 +68,7 @@ type WorkerRequest = {
   backgroundSource: string;
   dataMode: InputMode;
   statefulMaterialization: boolean;
+  selectRuntimeRules?: boolean;
   statefulStoreName?: string;
   shaclInSource?: string;
   shaclOutSource?: string;
@@ -92,9 +93,9 @@ const defaultState = {
 const editors = {
   backgroundText: createEditor('backgroundText', defaultState.backgroundText),
   dataText: createEditor('dataText', defaultState.dataText),
-  shaclInText: createEditor('shaclInText', ''),
-  shaclOutText: createEditor('shaclOutText', ''),
-  outputText: createEditor('outputText', ''),
+  shaclInText: createEditor('shaclInText', defaultExample().shaclIn ?? ''),
+  shaclOutText: createEditor('shaclOutText', defaultExample().shaclOut ?? ''),
+  outputText: createEditor('outputText', '', { readOnly: true }),
 };
 
 const generatedRuntimeEditor = createEditor('generatedRuntimeText', '', { readOnly: true });
@@ -110,7 +111,6 @@ const controls = {
   backgroundTextPanel: getElement('backgroundTextPanel'),
   dataUrlPanel: getElement('dataUrlPanel'),
   dataTextPanel: getElement('dataTextPanel'),
-  shapeHintsPanel: getElement('shapeHintsPanel') as HTMLDetailsElement,
   generatedRuntimePanel: getElement('generatedRuntimePanel') as HTMLDetailsElement,
   runButton: getButton('runButton'),
   stopButton: getButton('stopButton'),
@@ -185,12 +185,6 @@ function wireControls(): void {
   for (const editor of Object.values(editors)) {
     editor.on('change', scheduleStateUpdate);
   }
-  controls.shapeHintsPanel.addEventListener('toggle', () => {
-    window.setTimeout(() => {
-      editors.shaclInText.refresh();
-      editors.shaclOutText.refresh();
-    }, 0);
-  });
   controls.generatedRuntimePanel.addEventListener('toggle', () => {
     window.setTimeout(() => generatedRuntimeEditor.refresh(), 0);
   });
@@ -243,6 +237,9 @@ async function runInference(): Promise<void> {
       backgroundSource,
       dataMode,
       statefulMaterialization: controls.statefulMaterialization.checked,
+      // This fixture exercises OWL list and restriction rules that the selector cannot yet
+      // reduce soundly. Its SHACL contracts still prune input and project output.
+      selectRuntimeRules: controls.exampleSelect.value === 'shipment-logistics' ? false : undefined,
       statefulStoreName: controls.statefulMaterialization.checked
         ? createStatefulStoreName(backgroundSource, dataMode === 'url' ? dataUrl ?? '' : dataSource ?? '')
         : undefined,
@@ -290,6 +287,8 @@ function runWorkerInference(run: ActiveRun, request: WorkerRequest): Promise<voi
         setRunStatus(run, message.message);
       } else if (message.type === 'runtime') {
         run.runtimeMessage = message.message;
+        controls.runtimeStats.textContent = message.message;
+        controls.runtimeStats.hidden = false;
         if (message.runtime !== undefined) {
           showGeneratedRuntime(message.runtime);
         }
@@ -356,6 +355,9 @@ self.onmessage = async (event) => {
     const reasoner = new api.InferenceEngine();
     const started = performance.now();
     const loadOptions = {};
+    if (request.selectRuntimeRules === false) {
+      loadOptions.selectRuntimeRules = false;
+    }
     if (request.statefulMaterialization) {
       loadOptions.skolemKey = request.statefulStoreName || 'rdfjs-inference-engine:playground:default';
     }
@@ -1103,7 +1105,6 @@ function resetDefaults(): void {
   editors.dataText.setValue(example.data);
   editors.shaclInText.setValue(example.shaclIn ?? '');
   editors.shaclOutText.setValue(example.shaclOut ?? '');
-  controls.shapeHintsPanel.open = Boolean(example.shaclIn || example.shaclOut);
   editors.outputText.setValue('');
   suppressStateUpdate = false;
   applyModeVisibility();
@@ -1116,7 +1117,7 @@ function populateExamples(): void {
   for (const example of bundledExamples as BundledExample[]) {
     const option = document.createElement('option');
     option.value = example.id;
-    option.textContent = `${example.label} — ${exampleFilesLabel(example)}`;
+    option.textContent = example.label;
     controls.exampleSelect.appendChild(option);
   }
   controls.exampleSelect.value = defaultExample().id;
@@ -1259,7 +1260,6 @@ function applyBundledExample(example: BundledExample): void {
   editors.dataText.setValue(example.data);
   editors.shaclInText.setValue(example.shaclIn ?? '');
   editors.shaclOutText.setValue(example.shaclOut ?? '');
-  controls.shapeHintsPanel.open = Boolean(example.shaclIn || example.shaclOut);
   editors.outputText.setValue('');
 }
 
@@ -1368,11 +1368,9 @@ function loadStateFromHash(): void {
   }
   if (state.shaclInText !== undefined) {
     editors.shaclInText.setValue(state.shaclInText);
-    controls.shapeHintsPanel.open = true;
   }
   if (state.shaclOutText !== undefined) {
     editors.shaclOutText.setValue(state.shaclOutText);
-    controls.shapeHintsPanel.open = true;
   }
   setDisabledRuleFiles(state.disabledRuleFiles ?? []);
   suppressStateUpdate = false;

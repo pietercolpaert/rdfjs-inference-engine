@@ -1,0 +1,25 @@
+@prefix ex: <https://example.org/subjects#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:ExpandedConceptOutputShape a sh:NodeShape ;
+  sh:targetNode ex:cat ;
+  sh:class skos:Concept ;
+  sh:property [ sh:path rdfs:label ; sh:minCount 1 ] ;
+  sh:property [ sh:path skos:note ; sh:minCount 1 ] ;
+  sh:property [ sh:path skos:broaderTransitive ; sh:minCount 2 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path skos:semanticRelation ; sh:hasValue ex:animal ] .
+
+ex:InverseHierarchyOutputShape a sh:NodeShape ;
+  sh:targetNode ex:mammal ;
+  sh:property [ sh:path skos:narrower ; sh:hasValue ex:cat ] .
+
+ex:TransitiveHierarchyOutputShape a sh:NodeShape ;
+  sh:targetNode ex:animal ;
+  sh:property [ sh:path skos:narrowerTransitive ; sh:hasValue ex:cat ] ;
+  sh:property [ sh:path skos:inScheme ; sh:hasValue ex:scheme ] .
+
+ex:SchemeOutputShape a sh:NodeShape ;
+  sh:targetNode ex:scheme ;
+  sh:property [ sh:path skos:hasTopConcept ; sh:hasValue ex:animal ] .

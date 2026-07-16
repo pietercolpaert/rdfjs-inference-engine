@@ -5,7 +5,9 @@ This OWL 2 RL example exercises a broader set of rule features than the transit 
 ## Files
 
 - `ontology.n3` — background ontology.
-- `input.trig` — input RDF data.
+- `input.messages.trig` — one-message RDF Message log.
+- `shapes-in.n3` — accepted shipment input contract.
+- `shapes-out.n3` — required enriched shipment output contract.
 - `expected-selected-output.n3` — selected expected entailments.
 - `run.ts` — example runner.
 

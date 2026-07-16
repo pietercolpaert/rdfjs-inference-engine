@@ -1,0 +1,12 @@
+@prefix ex: <https://example.org/catalog#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:CatalogInputShape a sh:NodeShape ;
+  sh:targetNode ex:openData ;
+  sh:class ex:DatasetConcept ;
+  sh:property [
+    sh:path ex:relatedTopic ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:nodeKind sh:IRI
+  ] .

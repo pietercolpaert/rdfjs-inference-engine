@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   mkdirSync(dirname('generated/skos-taxonomy-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/skos-taxonomy-runtime.n3');
 
-  const data = parseToQuads(readFileSync('examples/skos-taxonomy/input.trig', 'utf8'));
+  const data = parseToQuads(readFileSync('examples/skos-taxonomy/input.messages.trig', 'utf8'));
   const closure = [...data, ...reasoner.infer(data)];
   const selected = parseToQuads(readFileSync('examples/skos-taxonomy/expected-selected-output.n3', 'utf8'));
   assertContainsQuads(closure, selected, 'SKOS taxonomy example');

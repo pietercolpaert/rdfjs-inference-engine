@@ -1,5 +1,6 @@
-# RDF input for the combined OWL 2 RL + SKOS Core catalog example.
+# RDF Message log for the combined OWL 2 RL + SKOS Core catalog example.
 
+VERSION "1.2-messages"
 PREFIX : <https://example.org/catalog#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 

@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   mkdirSync(dirname('generated/shipment-logistics-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/shipment-logistics-runtime.n3');
 
-  const data = parseToQuads(readFileSync('examples/shipment-logistics/input.trig', 'utf8'));
+  const data = parseToQuads(readFileSync('examples/shipment-logistics/input.messages.trig', 'utf8'));
   const closure = [...data, ...reasoner.infer(data)];
   const selected = selectedExpectedQuads();
   assertContainsQuads(closure, selected, 'Shipment logistics OWL 2 RL example');

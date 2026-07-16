@@ -1,0 +1,8 @@
+@prefix ex: <https://example.org/test#> .
+@prefix inconsistencies: <https://www.pieter.pm/rdfjs-inference-engine/ns/inconsistencies#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:InconsistencyOutputShape a sh:NodeShape ;
+  sh:targetClass inconsistencies:Inconsistency ;
+  sh:property [ sh:path inconsistencies:rule ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path inconsistencies:term1 ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .

@@ -1,8 +1,9 @@
-# RDF input for the example.
+# RDF Message log for the example. This log contains one message.
 #
 # Run with:
 #   npm run example:transit-fleet
 
+VERSION "1.2-messages"
 PREFIX : <https://example.org/transit#>
 
 # Input facts. The generated runtime rules infer:

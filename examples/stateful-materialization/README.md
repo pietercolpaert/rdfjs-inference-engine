@@ -16,6 +16,8 @@ The default storage path is `.cache/eyeling-stores`. The default storage name is
 ## Files
 
 - `ontology.n3` — background family ontology.
+- `shapes-in.n3` — trusted contract for the facts accepted across messages.
+- `shapes-out.n3` — application contract for inferred parent and mother types.
 - `input.messages.trig` — RDF Messages input log.
 - `expected-stateless-output.messages.nq` — expected output without state.
 - `expected-stateful-output.messages.nq` — expected output with stateful materialization.

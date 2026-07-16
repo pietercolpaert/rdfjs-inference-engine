@@ -1,6 +1,6 @@
 import type { Quad, Term } from '@rdfjs/types';
 
-export const SHACL_SHAPE_PLANNING_VERSION = 3;
+export const SHACL_SHAPE_PLANNING_VERSION = 4;
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
@@ -70,6 +70,7 @@ export interface JoinOrderHint {
 
 export interface ShapePlan {
   shape: string;
+  classes: string[];
   targetClasses: string[];
   targetNodes: string[];
   targetSubjectsOf: string[];
@@ -155,6 +156,7 @@ interface RuntimeShapeGraph {
 
 interface RuntimeShape {
   s: string;
+  cl: string[];
   tc: string[];
   tn: string[];
   ts: string[];
@@ -325,6 +327,7 @@ function compactRuntimeShapeGraph(plan: ShapeGraphPlan): RuntimeShapeGraph {
     d: plan.direction,
     s: plan.shapes.map((shape) => ({
       s: shape.shape,
+      cl: shape.classes,
       tc: shape.targetClasses,
       tn: shape.targetNodes,
       ts: shape.targetSubjectsOf,
@@ -398,8 +401,8 @@ function expandRuntimeShape(compact: RuntimeShape): ShapePlan {
     };
   });
   const relevantPredicates = new Set<string>([...compact.ts, ...compact.to]);
-  const relevantClasses = new Set<string>(compact.tc);
-  if (compact.tc.length > 0) {
+  const relevantClasses = new Set<string>([...compact.cl, ...compact.tc]);
+  if (compact.cl.length > 0 || compact.tc.length > 0) {
     relevantPredicates.add(RDF_TYPE);
   }
   for (const property of propertyPlans) {
@@ -415,6 +418,7 @@ function expandRuntimeShape(compact: RuntimeShape): ShapePlan {
     : sortedUnion(relevantPredicates);
   return {
     shape: compact.s,
+    classes: compact.cl,
     targetClasses: compact.tc,
     targetNodes: compact.tn,
     targetSubjectsOf: compact.ts,
@@ -446,6 +450,12 @@ function outputProjectionPlan(plan: ShapeGraphPlan): OutputProjectionPlan {
   const allowedObjectsByPredicate = new Map<string, Set<string>>();
 
   for (const shape of plan.shapes) {
+    if (shape.classes.length > 0) {
+      allowedPredicates.add(RDF_TYPE);
+      const values = allowedObjectsByPredicate.get(RDF_TYPE) ?? new Set<string>();
+      addValues(values, shape.classes);
+      allowedObjectsByPredicate.set(RDF_TYPE, values);
+    }
     for (const property of shape.propertyPlans) {
       const objectConstraints = [...property.hasValues, ...property.inValues];
       for (const predicate of property.metadata.predicates) {
@@ -509,6 +519,7 @@ function compileShapePlan(shape: Term, index: ShapeGraphIndex): ShapePlan | unde
   const relevantPredicates = new Set<string>();
   const relevantClasses = new Set<string>();
 
+  const classes = namedNodeValues(objects(index, shape, SH + 'class'));
   const targetClasses = namedNodeValues(objects(index, shape, SH + 'targetClass'));
   const targetNodes = termIds(objects(index, shape, SH + 'targetNode'));
   const targetSubjectsOf = namedNodeValues(objects(index, shape, SH + 'targetSubjectsOf'));
@@ -516,6 +527,10 @@ function compileShapePlan(shape: Term, index: ShapeGraphIndex): ShapePlan | unde
   const ignoredPredicates = namedNodeValues(readListObjects(index, objects(index, shape, SH + 'ignoredProperties')));
   const closed = booleanObject(objects(index, shape, SH + 'closed'));
 
+  for (const classValue of classes) {
+    relevantPredicates.add(RDF_TYPE);
+    relevantClasses.add(classValue);
+  }
   for (const targetClass of targetClasses) {
     relevantPredicates.add(RDF_TYPE);
     relevantClasses.add(targetClass);
@@ -565,6 +580,7 @@ function compileShapePlan(shape: Term, index: ShapeGraphIndex): ShapePlan | unde
 
   return {
     shape: termId(shape),
+    classes,
     targetClasses,
     targetNodes,
     targetSubjectsOf,

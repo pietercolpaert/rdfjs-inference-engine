@@ -1,5 +1,6 @@
-# RDF input for the SKOS Core taxonomy example.
+# RDF Message log for the SKOS Core taxonomy example.
 
+VERSION "1.2-messages"
 PREFIX : <https://example.org/subjects#>
 PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
 

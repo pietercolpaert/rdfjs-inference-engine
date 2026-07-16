@@ -101,7 +101,7 @@ const bundledExamplesPlugin = {
           continue;
         }
 
-        const inputFile = ['input.trig', 'input.n3', 'input.ttl', 'input.messages.trig']
+        const inputFile = ['input.messages.trig', 'input.trig', 'input.n3', 'input.ttl']
           .find((candidate) => files.includes(candidate));
         if (!inputFile) {
           continue;
@@ -109,6 +109,9 @@ const bundledExamplesPlugin = {
 
         const shaclInFile = files.includes('shapes-in.n3') ? 'shapes-in.n3' : undefined;
         const shaclOutFile = files.includes('shapes-out.n3') ? 'shapes-out.n3' : undefined;
+        if (!shaclInFile || !shaclOutFile) {
+          throw new Error(`Playground example ${entry.name} must provide shapes-in.n3 and shapes-out.n3.`);
+        }
 
         examples.push({
           id: entry.name,

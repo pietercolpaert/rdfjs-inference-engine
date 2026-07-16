@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   mkdirSync(dirname('generated/transit-fleet-runtime.n3'), { recursive: true });
   reasoner.saveRuntime('generated/transit-fleet-runtime.n3');
 
-  const data = parseToQuads(readFileSync('examples/transit-fleet/input.trig', 'utf8'));
+  const data = parseToQuads(readFileSync('examples/transit-fleet/input.messages.trig', 'utf8'));
   const inferred = reasoner.infer(data);
 
   const output = await writeQuads(inferred, { '': 'https://example.org/transit#' });

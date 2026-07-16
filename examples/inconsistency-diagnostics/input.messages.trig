@@ -1,0 +1,7 @@
+# RDF Message log for the inconsistency diagnostics playground example.
+
+VERSION "1.2-messages"
+PREFIX : <https://example.org/test#>
+
+:x a :A .
+:x a :B .

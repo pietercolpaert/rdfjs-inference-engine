@@ -1,0 +1,10 @@
+@prefix ex: <https://example.org/family#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:FemaleMessageShape a sh:NodeShape ;
+  sh:targetNode ex:alice ;
+  sh:class ex:Female .
+
+ex:ParentLinkMessageShape a sh:NodeShape ;
+  sh:targetNode ex:bob ;
+  sh:property [ sh:path ex:hasParent ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .

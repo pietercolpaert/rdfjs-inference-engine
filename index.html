@@ -431,117 +431,467 @@
         border-top: 1px solid rgba(148, 163, 184, 0.35);
       }
     }
+
+    /* Workflow layout */
+    :root {
+      --bg: #f3f5f4;
+      --panel: #ffffff;
+      --panel-soft: #f7f8f8;
+      --border: #cbd2d0;
+      --border-soft: #e1e6e4;
+      --text: #18211f;
+      --muted: #596764;
+      --accent: #1769aa;
+      --accent-dark: #105486;
+      --source: #27705b;
+      --source-soft: #edf7f2;
+      --target: #9a5b17;
+      --target-soft: #fff7e8;
+    }
+
+    body {
+      background: var(--bg);
+    }
+
+    .page {
+      max-width: 1580px;
+      gap: 1.25rem;
+    }
+
+    header {
+      padding: 0.5rem 0 0.25rem;
+    }
+
+    header h1 {
+      letter-spacing: 0;
+    }
+
+    .workflow {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .stage {
+      width: 100%;
+      border: 1px solid var(--border-soft);
+      border-radius: 6px;
+      background: var(--panel);
+      box-shadow: 0 8px 24px rgba(25, 44, 39, 0.06);
+    }
+
+    .CodeMirror,
+    .rule-profile-option,
+    .option-row,
+    textarea {
+      border-radius: 4px;
+    }
+
+    .stage-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.15rem 0.8rem;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .stage-header .section-title,
+    .editor-heading .section-title {
+      margin: 0;
+      font-size: 0.98rem;
+      letter-spacing: 0;
+    }
+
+    .stage-header .meta,
+    .editor-heading .meta {
+      margin: 0.2rem 0 0;
+    }
+
+    .setup-body,
+    .ontology-body,
+    .runtime-body {
+      padding: 1rem 1.15rem 1.15rem;
+    }
+
+    .setup-body .example-row {
+      margin: 0;
+    }
+
+    .example-row label {
+      font-weight: 700;
+    }
+
+    .example-row select,
+    .mode-row select,
+    .uri-input-row input[type="url"] {
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .example-row select {
+      flex: 1 1 34rem;
+      min-width: min(100%, 24rem);
+    }
+
+    .rules-summary {
+      border-radius: 4px;
+      background: #eaf2f8;
+      color: #174f77;
+    }
+
+    .advanced-panel {
+      border-radius: 4px;
+      background: var(--panel-soft);
+    }
+
+    .advanced-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(17rem, 1fr);
+      gap: 1rem;
+    }
+
+    .advanced-column {
+      min-width: 0;
+    }
+
+    .advanced-column h3 {
+      margin: 0 0 0.55rem;
+      font-size: 0.86rem;
+    }
+
+    .advanced-column .option-row,
+    .advanced-column .mode-row,
+    .advanced-column .uri-input-row {
+      margin: 0 0 0.65rem;
+    }
+
+    .contract-flow,
+    .message-flow {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 8rem minmax(0, 1fr);
+      align-items: stretch;
+      padding: 1rem 1.15rem 1.15rem;
+    }
+
+    .editor-pane {
+      min-width: 0;
+    }
+
+    .editor-heading {
+      min-height: 3.7rem;
+      padding: 0 0 0.65rem;
+    }
+
+    .source-pane .section-title {
+      color: var(--source);
+    }
+
+    .target-pane .section-title {
+      color: var(--target);
+    }
+
+    .flow-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 750;
+      line-height: 1.2;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .flow-arrow span {
+      color: var(--accent);
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .contract-flow .CodeMirror {
+      height: 17rem;
+      font-size: 0.8rem;
+    }
+
+    .message-flow .CodeMirror {
+      height: 30rem;
+      font-size: 0.82rem;
+    }
+
+    .ontology-body .CodeMirror {
+      height: 19rem;
+      font-size: 0.82rem;
+    }
+
+    .source-pane .CodeMirror {
+      border-top: 3px solid var(--source);
+      background: var(--source-soft);
+    }
+
+    .target-pane .CodeMirror {
+      border-top: 3px solid var(--target);
+      background: var(--target-soft);
+    }
+
+    .run-strip {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1.15rem;
+      border-top: 1px solid var(--border-soft);
+      background: #f7f9f8;
+    }
+
+    .run-strip .status {
+      flex: 1 1 24rem;
+      min-width: 0;
+      color: #20433a;
+      font-weight: 650;
+    }
+
+    .runtime-stats {
+      display: block;
+      padding: 0.7rem 1.15rem;
+      border-top: 1px solid var(--border-soft);
+      background: #eef3f1;
+      color: #3f5650;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.76rem;
+      line-height: 1.45;
+    }
+
+    .runtime-stats:empty {
+      display: none;
+    }
+
+    button {
+      border-radius: 4px;
+      box-shadow: none;
+    }
+
+    button:hover:not(:disabled) {
+      box-shadow: 0 5px 12px rgba(23, 105, 170, 0.18);
+    }
+
+    .generated-runtime {
+      margin: 0;
+      border: 0;
+      border-top: 1px solid var(--border-soft);
+      border-radius: 0;
+    }
+
+    .generated-runtime .CodeMirror {
+      height: 30rem;
+    }
+
+    @media (max-width: 900px) {
+      .contract-flow,
+      .message-flow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.8rem;
+      }
+
+      .flow-arrow {
+        min-height: 3rem;
+        flex-direction: row;
+      }
+
+      .flow-arrow span {
+        transform: rotate(90deg);
+      }
+
+      .advanced-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .contract-flow .CodeMirror,
+      .message-flow .CodeMirror {
+        height: 20rem;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .stage-header,
+      .setup-body,
+      .ontology-body,
+      .contract-flow,
+      .message-flow {
+        padding-right: 0.85rem;
+        padding-left: 0.85rem;
+      }
+
+      .run-strip {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        flex-wrap: wrap;
+        padding: 0.7rem 0.85rem;
+      }
+
+      .run-strip button {
+        flex: 1 1 auto;
+      }
+
+      .run-strip .status {
+        flex-basis: 100%;
+      }
+
+      .example-row select {
+        flex: 0 0 auto;
+        min-height: 44px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="page">
     <header>
-      <h1>RDF-JS inference engine playground</h1>
-      <p class="meta">Run generated-runtime inference in the browser with the bundled OWL 2 RL and SKOS Core rule profiles.</p>
-      <p class="meta">Use this in your own projects with the <a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM library</a> or find the code on <a href="https://github.com/pietercolpaert/rdfjs-inference-engine">Github</a>.</p>
+      <h1>RDF-JS inference playground</h1>
+      <p class="meta">Align RDF Message logs from a documented source contract towards the RDF contract your application accepts.</p>
+      <p class="meta"><a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM package</a> · <a href="https://github.com/pietercolpaert/rdfjs-inference-engine">GitHub repository</a></p>
     </header>
-    <main class="grid">
-      <section class="card">
-        <h2 class="section-title">Bundled example</h2>
-        <p class="meta">Load one of the self-contained examples from the repository examples folder, then run it with OWL 2 RL and SKOS Core support enabled by default.</p>
-        <div class="example-row">
-          <label for="exampleSelect">Example</label>
-          <select id="exampleSelect"></select>
-          <span id="rulesSummary" class="rules-summary"></span>
-        </div>
-        <details class="advanced-panel">
-          <summary>Advanced rule profile selection</summary>
-          <div class="advanced-panel-body">
-            <p class="meta">All bundled N3 rule files are enabled by default. Turn individual profiles off when you want to isolate one ruleset, compare behavior, or debug which profile derives a result.</p>
-            <div id="ruleProfileList" class="rule-profile-list" aria-label="Bundled N3 rule files"></div>
-          </div>
-        </details>
-      </section>
-
-      <section class="card half">
-        <h2 class="section-title">Background knowledge</h2>
-        <p class="meta">Provide the ontology, alignments, context information... in TriG, Turtle, N-triples or N-quads.</p>
-        <div class="mode-row">
-          <label for="backgroundMode">Input source</label>
-          <select id="backgroundMode">
-            <option value="text">Text input</option>
-            <option value="url">URL</option>
-          </select>
-        </div>
-        <div id="backgroundUrlPanel" class="uri-input-row">
-          <label for="backgroundUrl">Background RDF URL</label>
-          <input id="backgroundUrl" type="url" placeholder="https://.../ontology.ttl">
-          <span class="hint">Fetched when you run inference. The server must allow browser CORS requests.</span>
-        </div>
-        <div id="backgroundTextPanel">
-          <textarea id="backgroundText" spellcheck="false"></textarea>
-        </div>
-      </section>
-
-      <section class="card half">
-        <h2 class="section-title">Input data</h2>
-        <p class="meta">Can be an RDF response (TriG, Turtle, N-triples or N-quads) or an RDF Messages log.</p>
-        <div class="mode-row">
-          <label for="dataMode">Input source</label>
-          <select id="dataMode">
-            <option value="text">Text input</option>
-            <option value="url">URL</option>
-          </select>
-        </div>
-        <div class="option-row">
-          <input id="statefulMaterialization" type="checkbox">
-          <div class="option-copy">
-            <label for="statefulMaterialization">Stateful materialization for RDF Messages</label>
-            <span class="hint">Use a named Eyeling persistent fact store per playground dataset, then reason over that store plus each next message. Checking this box means you tell the engine that each message is universally true, which is not the default behaviour. Check this box with care.</span>
+    <main class="workflow">
+      <section class="stage setup-stage">
+        <div class="stage-header">
+          <div>
+            <h2 class="section-title">Example</h2>
+            <p class="meta">Each example combines source and target contracts, background knowledge, and an RDF Message log.</p>
           </div>
         </div>
-        <div id="dataUrlPanel" class="uri-input-row">
-          <label for="dataUrl">Data or RDF Messages URL</label>
-          <input id="dataUrl" type="url" placeholder="https://.../data.trig">
-          <span class="hint">URL input is fetched when you run inference. RDF Messages URLs are streamed and emitted incrementally.</span>
-        </div>
-        <div id="dataTextPanel">
-          <textarea id="dataText" spellcheck="false"></textarea>
-        </div>
-        <details id="shapeHintsPanel" class="advanced-panel">
-          <summary>Advanced SHACL in/out shape hints</summary>
-          <div class="advanced-panel-body">
-            <p class="meta">Optional trusted optimization contracts. These SHACL shapes are not used for validation; they help the generated runtime and per-input planner keep only rules, predicates, indexes, and joins relevant to the expected input and desired output.</p>
-            <div class="shape-hints-grid">
-              <div class="shape-hint-editor">
-                <label for="shaclInText">Input SHACL shape hint</label>
-                <span class="hint">Describes RDF Messages or input batches passed to inference.</span>
-                <textarea id="shaclInText" spellcheck="false"></textarea>
+        <div class="setup-body">
+          <div class="example-row">
+            <label for="exampleSelect">Scenario</label>
+            <select id="exampleSelect"></select>
+            <span id="rulesSummary" class="rules-summary"></span>
+          </div>
+          <details class="advanced-panel">
+            <summary>Advanced settings</summary>
+            <div class="advanced-panel-body advanced-grid">
+              <div class="advanced-column">
+                <h3>N3 rule profiles</h3>
+                <p class="meta">Disable a profile to inspect its contribution to the alignment.</p>
+                <div id="ruleProfileList" class="rule-profile-list" aria-label="Bundled N3 rule files"></div>
               </div>
-              <div class="shape-hint-editor">
-                <label for="shaclOutText">Output SHACL shape hint</label>
-                <span class="hint">Describes the inferred RDF you care about retaining.</span>
-                <textarea id="shaclOutText" spellcheck="false"></textarea>
+              <div class="advanced-column">
+                <h3>Execution and sources</h3>
+                <div class="option-row">
+                  <input id="statefulMaterialization" type="checkbox">
+                  <div class="option-copy">
+                    <label for="statefulMaterialization">Stateful materialization</label>
+                    <span class="hint">Retain facts across message boundaries. Enable only when earlier messages remain universally true.</span>
+                  </div>
+                </div>
+                <div class="mode-row">
+                  <label for="backgroundMode">Ontology source</label>
+                  <select id="backgroundMode">
+                    <option value="text">Editor</option>
+                    <option value="url">URL</option>
+                  </select>
+                </div>
+                <div id="backgroundUrlPanel" class="uri-input-row">
+                  <label for="backgroundUrl">Ontology URL</label>
+                  <input id="backgroundUrl" type="url" placeholder="https://.../ontology.ttl">
+                  <span class="hint">The server must allow browser CORS requests.</span>
+                </div>
+                <div class="mode-row">
+                  <label for="dataMode">Message-log source</label>
+                  <select id="dataMode">
+                    <option value="text">Editor</option>
+                    <option value="url">URL</option>
+                  </select>
+                </div>
+                <div id="dataUrlPanel" class="uri-input-row">
+                  <label for="dataUrl">RDF Message log URL</label>
+                  <input id="dataUrl" type="url" placeholder="https://.../messages.trig">
+                  <span class="hint">Remote message logs are streamed when possible.</span>
+                </div>
               </div>
             </div>
-          </div>
-        </details>
-      </section>
-
-      <section class="card">
-        <div class="actions">
-          <button id="runButton" type="button">Run inference</button>
-          <button id="stopButton" class="secondary" type="button" hidden>Stop</button>
-          <button id="resetButton" class="secondary" type="button">Reset demo</button>
-          <button id="shareButton" class="secondary" type="button">Copy share URL</button>
-          <span id="status" class="status"></span>
-          <span id="runtimeStats" class="stats"></span>
+          </details>
         </div>
       </section>
 
-      <section class="card output">
-        <h2 class="section-title">Output</h2>
-        <p class="meta">Newly inferred triples.</p>
-        <textarea id="outputText" spellcheck="false"></textarea>
+      <section class="stage contract-stage">
+        <div class="stage-header">
+          <div>
+            <h2 class="section-title">Alignment contract</h2>
+            <p class="meta">Trusted SHACL contracts guide rule pruning and select the inferred representation retained for the application.</p>
+          </div>
+        </div>
+        <div id="shapeHintsPanel" class="contract-flow">
+          <div class="editor-pane source-pane">
+            <div class="editor-heading">
+              <h3 class="section-title">SHACL IN</h3>
+              <p class="meta">What each incoming message may contain.</p>
+            </div>
+            <textarea id="shaclInText" spellcheck="false"></textarea>
+          </div>
+          <div class="flow-arrow" aria-hidden="true"><span>→</span>Align towards</div>
+          <div class="editor-pane target-pane">
+            <div class="editor-heading">
+              <h3 class="section-title">SHACL OUT</h3>
+              <p class="meta">What the receiving application can handle.</p>
+            </div>
+            <textarea id="shaclOutText" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage ontology-stage">
+        <div class="stage-header">
+          <div>
+            <h2 class="section-title">Ontology and background knowledge</h2>
+            <p class="meta">Stable vocabulary, mappings, and context loaded before the messages are processed.</p>
+          </div>
+        </div>
+        <div class="ontology-body">
+          <div id="backgroundTextPanel">
+            <textarea id="backgroundText" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <section class="stage messages-stage">
+        <div class="stage-header">
+          <div>
+            <h2 class="section-title">RDF Messages</h2>
+            <p class="meta">Messages are processed independently unless stateful materialization is enabled.</p>
+          </div>
+        </div>
+        <div class="message-flow">
+          <div class="editor-pane source-pane">
+            <div class="editor-heading">
+              <h3 class="section-title">MESSAGES IN</h3>
+              <p class="meta">Editable RDF 1.2 Message log supplied by the source.</p>
+            </div>
+            <div id="dataTextPanel">
+              <textarea id="dataText" spellcheck="false"></textarea>
+            </div>
+          </div>
+          <div class="flow-arrow" aria-hidden="true"><span>→</span>Infer</div>
+          <div class="editor-pane target-pane output">
+            <div class="editor-heading">
+              <h3 class="section-title">MESSAGES OUT</h3>
+              <p class="meta">Newly inferred RDF, preserving the input message boundaries.</p>
+            </div>
+            <textarea id="outputText" spellcheck="false" readonly></textarea>
+          </div>
+        </div>
+        <div class="run-strip">
+          <button id="runButton" type="button">Run inference</button>
+          <button id="stopButton" class="secondary" type="button" hidden>Stop</button>
+          <button id="resetButton" class="secondary" type="button">Reset</button>
+          <button id="shareButton" class="secondary" type="button">Copy share URL</button>
+          <span id="status" class="status"></span>
+        </div>
+        <span id="runtimeStats" class="runtime-stats" aria-live="polite"></span>
         <details id="generatedRuntimePanel" class="advanced-panel generated-runtime" hidden>
-          <summary>Advanced: View generated N3 runtime</summary>
-          <div class="advanced-panel-body">
-            <p class="meta">The generated N3 runtime is shown after inference compiles the selected rule profiles, background knowledge, and optional SHACL in/out hints. This is the exact runtime text passed to Eyeling in the browser.</p>
+          <summary>Generated N3 runtime</summary>
+          <div class="advanced-panel-body runtime-body">
+            <p class="meta">Exact N3 runtime compiled from the selected profiles, ontology, and SHACL contracts.</p>
             <textarea id="generatedRuntimeText" spellcheck="false" readonly></textarea>
           </div>
         </details>

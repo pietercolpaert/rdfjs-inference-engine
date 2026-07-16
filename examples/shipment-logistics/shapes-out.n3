@@ -1,0 +1,28 @@
+@prefix ex: <https://example.org/logistics#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:EnrichedShipmentShape a sh:NodeShape ;
+  sh:targetNode ex:shipment-1 ;
+  sh:class ex:ExpressShipment ;
+  sh:class ex:Shipment ;
+  sh:class ex:CountryDestinationShipment ;
+  sh:property [ sh:path ex:requiresHandling ; sh:hasValue ex:carefulHandling ; sh:minCount 1 ] ;
+  sh:property [ sh:path ex:hasPart ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+ex:InverseAndTransitiveOutputShape a sh:NodeShape ;
+  sh:targetNode ex:alice, ex:box-1 ;
+  sh:property [ sh:path ex:handles ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path ex:locatedIn ; sh:nodeKind sh:IRI ] .
+
+ex:SymmetricPartnerOutputShape a sh:NodeShape ;
+  sh:targetNode ex:bob ;
+  sh:property [ sh:path ex:partnerOf ; sh:hasValue ex:alice ] .
+
+ex:IdentityOutputShape a sh:NodeShape ;
+  sh:targetNode ex:tracking-a, ex:shipment-2 ;
+  sh:property [ sh:path owl:sameAs ; sh:minCount 1 ; sh:nodeKind sh:IRI ] .
+
+ex:RegulatedItemOutputShape a sh:NodeShape ;
+  sh:targetNode ex:item-9 ;
+  sh:class ex:RegulatedItem .

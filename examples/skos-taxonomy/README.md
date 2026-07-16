@@ -5,7 +5,9 @@ This example materializes SKOS Core consequences for a small taxonomy.
 ## Files
 
 - `ontology.n3` — background concept scheme.
-- `input.trig` — input SKOS data.
+- `input.messages.trig` — one-message RDF Message log.
+- `shapes-in.n3` — accepted taxonomy input contract.
+- `shapes-out.n3` — required expanded SKOS output contract.
 - `expected-selected-output.n3` — selected expected entailments.
 - `run.ts` — example runner.
 

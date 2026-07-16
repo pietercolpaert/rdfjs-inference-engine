@@ -1,0 +1,7 @@
+@prefix ex: <https://example.org/test#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+
+ex:ContradictoryInputShape a sh:NodeShape ;
+  sh:targetNode ex:x ;
+  sh:class ex:A ;
+  sh:class ex:B .
