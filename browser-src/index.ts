@@ -12,7 +12,6 @@ import {
   compileShaclShapeGraph,
   createShapePlanning,
   optimizeInputWithShapePlanning,
-  parseShapePlanningFromRuntime,
   projectOutputWithShapePlanning,
   shapePlanningSummary,
   type ShapeInputOptimization,
@@ -65,6 +64,7 @@ export interface LoadedRuleProfile {
 
 export interface InferenceEngineOptions {
   runtime?: string;
+  shapePlanning?: ShapePlanning;
   dataFactory?: DataFactory;
   runtimeCompiler?: RuntimeCompiler;
   outputMode?: InferenceOutputMode;
@@ -150,7 +150,7 @@ export class InferenceEngine {
     if (options.runtime) {
       this.runtime = options.runtime;
     }
-    this.shapePlanning = parseShapePlanningFromRuntime(this.runtime);
+    this.shapePlanning = options.shapePlanning;
   }
 
   public getRuntime(): string {

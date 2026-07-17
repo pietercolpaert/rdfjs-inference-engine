@@ -135,12 +135,17 @@ The default runtime compiler first applies the normal load-time static selection
 2. **Output relevance.** Starting from `shaclOut` predicates/classes, walk backwards through rule metadata and keep rules that can produce desired output or necessary intermediate predicates/classes.
 3. **Join-order scheduling.** Rules with body predicates that match high-priority SHACL join hints are emitted earlier in the generated runtime.
 
-The generated runtime includes human-readable comments plus serialized shape-planning metadata. Saved runtimes restore the shape plan automatically:
+The generated runtime includes human-readable comments describing the shape plan, but not the shape-planning JSON itself; the runtime N3 text stays free of embedded metadata blobs. To restore `getShapePlanning()` on a reloaded engine, persist the shape plan separately with `serializeShapePlanning()`/`saveRuntime({ path, shapePlanningPath })` and pass it back in via the constructor:
 
 ```ts
 const runtime = reasoner.load(backgroundQuads, { shaclIn, shaclOut });
-const restored = new InferenceEngine({ runtime });
-restored.getShapePlanning(); // restored from runtime comments
+reasoner.saveRuntime({ path: 'runtime.n3', shapePlanningPath: 'runtime.shapeplan.json' });
+
+const restored = new InferenceEngine({
+  runtimePath: 'runtime.n3',
+  shapePlanningPath: 'runtime.shapeplan.json',
+});
+restored.getShapePlanning(); // restored from the sidecar JSON file
 ```
 
 ## Inference-time optimization
@@ -328,7 +333,7 @@ Compared with the static selected runtime, the SHACL in/out hints removed 10 of 
 
 Compared with the full generic runtime, the SHACL-guided rule section was **44.5% smaller by bytes**.
 
-The full runtime file for the SHACL-guided case is larger than the static selected runtime because it embeds URL-encoded shape-planning JSON metadata so saved runtimes can restore `getShapePlanning()` without reparsing the original shapes. If comparing executable rules only, use the rule-section bytes rather than full runtime bytes.
+The full runtime file for the SHACL-guided case in this historical measurement was larger than the static selected runtime because, at the time, it embedded URL-encoded shape-planning JSON metadata in a comment so saved runtimes could restore `getShapePlanning()` without reparsing the original shapes. That metadata is no longer embedded in the generated runtime text (see [Select and order runtime rules](#4-select-and-order-runtime-rules) above); use `serializeShapePlanning()`/`shapePlanningPath` to persist it separately instead. If comparing executable rules only, use the rule-section bytes rather than full runtime bytes.
 
 ### Reasoning throughput: actual twenty-message stream
 

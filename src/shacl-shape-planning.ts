@@ -220,10 +220,7 @@ export function createShapePlanning(input?: ShapeGraphPlan, output?: ShapeGraphP
 }
 
 export function shapePlanningSummary(planning: ShapePlanning): string[] {
-  const lines = [
-    `# Shape-guided rule selection: version ${planning.version}`,
-    `# rdfjs-inference-engine shapePlanning=${JSON.stringify(compactRuntimeShapePlanning(planning))}`,
-  ];
+  const lines = [`# Shape-guided rule selection: version ${planning.version}`];
 
   appendGraphPlanSummary(lines, 'Input SHACL shape plan', planning.input);
   appendGraphPlanSummary(lines, 'Output SHACL shape plan', planning.output);
@@ -296,14 +293,12 @@ export function projectOutputWithShapePlanning(quads: Iterable<Quad>, planning: 
   return outputQuads.filter((quad) => outputQuadMatchesProjection(quad, projection));
 }
 
-export function parseShapePlanningFromRuntime(runtime: string): ShapePlanning | undefined {
-  const match = /^# rdfjs-inference-engine shapePlanning=(.+)$/m.exec(runtime);
-  if (!match) {
-    return undefined;
-  }
+export function serializeShapePlanning(planning: ShapePlanning): string {
+  return JSON.stringify(compactRuntimeShapePlanning(planning));
+}
 
+export function deserializeShapePlanning(source: string): ShapePlanning | undefined {
   try {
-    const source = match[1].startsWith('%') ? decodeURIComponent(match[1]) : match[1];
     const parsed = JSON.parse(source) as ShapePlanning | RuntimeShapePlanning;
     if ('v' in parsed) {
       return expandRuntimeShapePlanning(parsed);

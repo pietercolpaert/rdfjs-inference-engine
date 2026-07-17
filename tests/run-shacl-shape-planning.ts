@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import type { Quad } from '@rdfjs/types';
 import { Parser } from 'rdf-parser-ts';
-import { InferenceEngine, compileShaclShapeGraph } from '../src';
+import { InferenceEngine, compileShaclShapeGraph, deserializeShapePlanning, serializeShapePlanning } from '../src';
 
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const EX = 'https://example.org/shape-planning#';
@@ -201,11 +201,16 @@ const closureRuntimeReasoner = new InferenceEngine();
 closureRuntimeReasoner.load(ontology, { shaclIn, shaclOut, includeStaticClosure: true });
 assert.ok(closureRuntimeReasoner.getRuntime().includes('# Precomputed background facts and closure'), 'includeStaticClosure: true should still explicitly embed the static background closure.');
 
-const restoredReasoner = new InferenceEngine({ runtime: reasoner.getRuntime() });
+const restoredReasoner = new InferenceEngine({ runtime: reasoner.getRuntime(), shapePlanning: deserializeShapePlanning(serializeShapePlanning(planning)) });
 assert.deepEqual(
   restoredReasoner.getShapePlanning()?.relevantOutputPredicates,
   planning.relevantOutputPredicates,
-  'Saved runtime text should embed enough shape planning metadata to restore it without reparsing shapes.',
+  'A serialized shape plan should restore relevantOutputPredicates when passed back into the constructor.',
+);
+assert.equal(
+  reasoner.getRuntime().includes('rdfjs-inference-engine shapePlanning='),
+  false,
+  'The generated runtime should not embed shape-planning JSON in a comment.',
 );
 
 const observationInput = parseQuads(`

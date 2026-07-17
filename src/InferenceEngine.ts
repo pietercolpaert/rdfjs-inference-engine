@@ -7,9 +7,10 @@ import { Parser } from 'rdf-parser-ts';
 import {
   compileShaclShapeGraph,
   createShapePlanning,
+  deserializeShapePlanning,
   optimizeInputWithShapePlanning,
-  parseShapePlanningFromRuntime,
   projectOutputWithShapePlanning,
+  serializeShapePlanning,
   shapePlanningSummary,
   type ShapeInputOptimization,
   type ShapePlanning,
@@ -63,6 +64,8 @@ export interface LoadedRuleProfile {
 export interface InferenceEngineOptions {
   runtime?: string;
   runtimePath?: string;
+  shapePlanning?: ShapePlanning;
+  shapePlanningPath?: string;
   dataFactory?: DataFactory;
   runtimeCompiler?: RuntimeCompiler;
   outputMode?: InferenceOutputMode;
@@ -125,6 +128,7 @@ export interface InferenceResult {
 
 export interface SaveOptions {
   path: string;
+  shapePlanningPath?: string;
 }
 
 export class InferenceEngine {
@@ -146,7 +150,12 @@ export class InferenceEngine {
     } else if (options.runtime) {
       this.runtime = options.runtime;
     }
-    this.shapePlanning = parseShapePlanningFromRuntime(this.runtime);
+
+    if (options.shapePlanning) {
+      this.shapePlanning = options.shapePlanning;
+    } else if (options.shapePlanningPath) {
+      this.shapePlanning = deserializeShapePlanning(readFileSync(options.shapePlanningPath, 'utf8'));
+    }
   }
 
   public getRuntime(): string {
@@ -225,6 +234,11 @@ export class InferenceEngine {
   public saveRuntime(pathOrOptions: string | SaveOptions): void {
     const path = typeof pathOrOptions === 'string' ? pathOrOptions : pathOrOptions.path;
     writeFileSync(path, this.runtime, 'utf8');
+
+    const shapePlanningPath = typeof pathOrOptions === 'string' ? undefined : pathOrOptions.shapePlanningPath;
+    if (shapePlanningPath && this.shapePlanning) {
+      writeFileSync(shapePlanningPath, serializeShapePlanning(this.shapePlanning), 'utf8');
+    }
   }
 
   public *infer(data: Quad[], options: InferenceOptions = {}): Generator<Quad> {
