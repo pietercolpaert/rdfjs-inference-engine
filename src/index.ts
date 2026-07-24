@@ -1,4 +1,10 @@
-export { InferenceEngine, defaultRuntimeCompiler, loadDefaultRuleProfiles, serializeQuadsAsN3 } from './InferenceEngine';
+export {
+  InferenceEngine,
+  defaultRuntimeCompiler,
+  loadDefaultRuleProfiles,
+  serializeQuadsAsN3,
+  type N3ReasonerBackend,
+} from './InferenceEngine';
 export { compileShaclShapeGraph, createShapePlanning, deserializeShapePlanning, projectOutputWithShapePlanning, serializeShapePlanning, shapePlanningSummary } from './shacl-shape-planning';
 export type {
   InferenceEngineOptions,

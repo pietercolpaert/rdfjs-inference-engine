@@ -68,12 +68,17 @@ export interface InferenceEngineOptions {
   dataFactory?: DataFactory;
   runtimeCompiler?: RuntimeCompiler;
   outputMode?: InferenceOutputMode;
+  n3Reasoner?: N3ReasonerBackend;
+  reasoner?: N3ReasonerBackend;
 }
 
 export type InferenceOutputMode = 'application' | 'conformance';
+export type N3ReasonerBackend = 'eyeling' | 'eyeron';
 
 export interface InferenceOptions {
   outputMode?: InferenceOutputMode;
+  n3Reasoner?: N3ReasonerBackend;
+  reasoner?: N3ReasonerBackend;
   store?: string | InferenceStoreOptions;
   storePath?: string;
   storeClear?: boolean;
@@ -93,6 +98,8 @@ export interface InferenceStoreOptions {
 
 export interface LoadOptions {
   runtimeCompiler?: RuntimeCompiler;
+  n3Reasoner?: N3ReasonerBackend;
+  reasoner?: N3ReasonerBackend;
   includeStaticClosure?: boolean;
   selectRuntimeRules?: boolean;
   shaclIn?: ShaclShapeInput;
@@ -133,12 +140,18 @@ export interface InferenceResult {
 }
 type Listener = (...args: any[]) => void;
 
+interface EyeronModule {
+  default(moduleOrPath?: unknown): Promise<unknown>;
+  reasonWithOptions(input: string, proof: boolean, rdf: boolean, rdfFormat: string): string;
+}
+
 export class InferenceEngine {
   private runtime = '';
   private staticClosure: Quad[] = [];
   private readonly dataFactory: DataFactory;
   private readonly runtimeCompiler: RuntimeCompiler;
   private readonly outputMode: InferenceOutputMode;
+  private readonly n3Reasoner: N3ReasonerBackend;
   private shapePlanning?: ShapePlanning;
   private lastInputOptimization?: ShapeInputOptimization;
 
@@ -146,6 +159,7 @@ export class InferenceEngine {
     this.dataFactory = options.dataFactory ?? rdfjs;
     this.runtimeCompiler = options.runtimeCompiler ?? defaultRuntimeCompiler;
     this.outputMode = options.outputMode ?? 'application';
+    this.n3Reasoner = options.n3Reasoner ?? options.reasoner ?? 'eyeling';
 
     if (options.runtime) {
       this.runtime = options.runtime;
@@ -180,6 +194,49 @@ export class InferenceEngine {
   }
 
   public load(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): string {
+    if (selectedN3Reasoner(this.n3Reasoner, options) === 'eyeron') {
+      throw new Error('Eyeron runs through the asynchronous WebAssembly path. Use loadAsync(...) when n3Reasoner is "eyeron".');
+    }
+    return this.loadWithEyeling(profiles, vocabulary, options);
+  }
+
+  public async loadAsync(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): Promise<string> {
+    if (selectedN3Reasoner(this.n3Reasoner, options) !== 'eyeron') {
+      return this.loadWithEyeling(profiles, vocabulary, options);
+    }
+
+    const eyeron = await getBrowserEyeron();
+    const normalizedProfiles = normalizeProfiles(profiles);
+    const profileN3 = normalizedProfiles
+      .filter((profile) => !profile.precompiledRuntime)
+      .map((profile) => profile.n3)
+      .join('\n\n');
+    const vocabularyQuads = quadsFromVocabulary(vocabulary);
+    this.staticClosure = reasonWithEyeron(eyeron, profileN3, vocabularyQuads);
+    this.shapePlanning = compileLoadShapePlanning(options);
+
+    const runtimeCompiler = options.runtimeCompiler ?? this.runtimeCompiler;
+    const compiledRuntime = runtimeCompiler({
+      profiles: normalizedProfiles,
+      profileN3,
+      vocabulary: vocabularyQuads,
+      closure: this.staticClosure,
+      dataFactory: this.dataFactory,
+      options,
+      shapePlanning: this.shapePlanning,
+    });
+    this.runtime = appendPrecompiledProfileRuntimes(
+      compiledRuntime,
+      normalizedProfiles,
+      vocabularyQuads,
+      this.staticClosure,
+      this.shapePlanning,
+    );
+
+    return this.runtime;
+  }
+
+  private loadWithEyeling(profiles: RuleProfile | RuleProfile[], vocabulary: VocabularyDataset, options: LoadOptions = {}): string {
     const normalizedProfiles = normalizeProfiles(profiles);
     const profileN3 = normalizedProfiles
       .filter((profile) => !profile.precompiledRuntime)
@@ -225,6 +282,9 @@ export class InferenceEngine {
 
   public *infer(data: Quad[], options: InferenceOptions = {}): Generator<Quad> {
     this.assertLoaded();
+    if (selectedN3Reasoner(this.n3Reasoner, options) === 'eyeron') {
+      throw new Error('Eyeron runs through the asynchronous WebAssembly path. Use inferAsync(...) when n3Reasoner is "eyeron".');
+    }
     const inferenceData = this.optimizeInferenceInput(data, options);
     const derived: Quad[] = [];
     const diagnostics: Quad[] = [];
@@ -264,6 +324,9 @@ export class InferenceEngine {
 
   public inferWithDiagnostics(data: Quad[], options: InferenceOptions = {}): InferenceResult {
     this.assertLoaded();
+    if (selectedN3Reasoner(this.n3Reasoner, options) === 'eyeron') {
+      throw new Error('Eyeron runs through the asynchronous WebAssembly path. Use inferAsyncWithDiagnostics(...) when n3Reasoner is "eyeron".');
+    }
     const inferenceData = this.optimizeInferenceInput(data, options);
     const derived: Quad[] = [];
     const diagnostics: Quad[] = [];
@@ -303,6 +366,9 @@ export class InferenceEngine {
 
   public async inferAsync(data: Quad[], options: InferenceOptions = {}): Promise<Quad[]> {
     this.assertLoaded();
+    if (selectedN3Reasoner(this.n3Reasoner, options) === 'eyeron') {
+      return (await this.inferAsyncWithDiagnostics(data, options)).quads;
+    }
     if (!options.store && !options.storePath && !options.storeClear) {
       return Array.from(this.infer(data, options));
     }
@@ -353,6 +419,19 @@ export class InferenceEngine {
 
   public async inferAsyncWithDiagnostics(data: Quad[], options: InferenceOptions = {}): Promise<InferenceResult> {
     this.assertLoaded();
+    if (selectedN3Reasoner(this.n3Reasoner, options) === 'eyeron') {
+      if (options.store || options.storePath || options.storeClear) {
+        throw new Error('Stateful materialization stores are only supported by the Eyeling backend.');
+      }
+      const inferenceData = this.optimizeInferenceInput(data, options);
+      const derived = reasonWithEyeron(await getBrowserEyeron(), this.runtime, inferenceData);
+      const outputMode = options.outputMode ?? this.outputMode;
+      const diagnosticSource = [...this.staticClosure, ...derived];
+      return {
+        quads: withInconsistencyQuads(this.projectInferenceOutput(derived.filter((quad) => shouldEmitQuad(quad, outputMode)), options), diagnosticSource, outputMode),
+        inconsistencies: collectInconsistencyReports(diagnosticSource, outputMode),
+      };
+    }
     if (!options.store && !options.storePath && !options.storeClear) {
       return this.inferWithDiagnostics(data, options);
     }
@@ -514,6 +593,45 @@ export async function writeMessages(messages: Iterable<Iterable<Quad>>, prefixes
   return new Promise<string>((resolve, reject) => {
     writer.end((error?: Error | null, result?: string) => error ? reject(error) : resolve(result ?? ''));
   });
+}
+
+let browserEyeronPromise: Promise<EyeronModule> | undefined;
+
+export async function initializeEyeronReasoner(moduleUrl = './eyeron/eyeron.js', wasmUrl?: string): Promise<void> {
+  browserEyeronPromise = (async () => {
+    const module = await import(/* @vite-ignore */ moduleUrl) as EyeronModule;
+    await module.default(wasmUrl ? { module_or_path: wasmUrl } : undefined);
+    return module;
+  })();
+  await browserEyeronPromise;
+}
+
+function selectedN3Reasoner(defaultReasoner: N3ReasonerBackend, options: { n3Reasoner?: N3ReasonerBackend; reasoner?: N3ReasonerBackend }): N3ReasonerBackend {
+  return options.n3Reasoner ?? options.reasoner ?? defaultReasoner;
+}
+
+async function getBrowserEyeron(): Promise<EyeronModule> {
+  if (!browserEyeronPromise) {
+    await initializeEyeronReasoner();
+  }
+  return browserEyeronPromise as Promise<EyeronModule>;
+}
+
+function reasonWithEyeron(eyeron: EyeronModule, n3: string, quads: Quad[]): Quad[] {
+  if (!n3.trim() && quads.length === 0) {
+    return [];
+  }
+
+  const output = eyeron.reasonWithOptions(`${n3.trimEnd()}\n${serializeQuadsAsN3(quads)}`, false, false, 'auto');
+  return parseReasonerOutputQuads(output);
+}
+
+function parseReasonerOutputQuads(source: string): Quad[] {
+  if (!source.trim()) {
+    return [];
+  }
+  const parsed = new Parser({ factory: RdfParserDataFactory }).parse(source) ?? [];
+  return Array.from(parsed as Iterable<unknown>) as Quad[];
 }
 
 export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {

@@ -1,6 +1,6 @@
 # RDF-JS inference engine
 
-Small TypeScript library for doing generated-runtime materialization at ingest time with [Eyeling](https://github.com/eyereasoner/eyeling), N3 rules, [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts), and RDF-JS quads.
+Small TypeScript library for doing generated-runtime materialization at ingest time with N3 rules, RDF-JS quads, [Eyeling](https://github.com/eyereasoner/eyeling), [Eyeron](https://github.com/eyereasoner/eyeron/), and [rdf-parser-ts](https://www.npmjs.com/package/rdf-parser-ts).
 
 The engine is intentionally rule-profile agnostic. The bundled profiles live under `rules/`, and each rule-set folder documents what it does, what it does not do, and how it is tested.
 
@@ -59,6 +59,7 @@ The main class is `InferenceEngine`.
 - `load(..., { selectRuntimeRules: false })` keeps the full generic profile when later `infer()` calls may contain schema or shape triples.
 - `load(..., { shaclIn, shaclOut })` uses trusted SHACL input/output shapes as optimization and projection hints. These hints are contracts, not validation.
 - `load(..., { skolemKey })` makes static closure `log:skolem` IRIs deterministic for a project/store key.
+- `constructor({ n3Reasoner: 'eyeron' })` selects Eyeron's WebAssembly backend. Use `loadAsync()` and `inferAsync()` with Eyeron; synchronous `load()` and `infer()` use Eyeling.
 - `saveRuntime(path)` writes the generated runtime.
 - `infer(quads)` returns newly inferred RDF-JS quads, including structured OWL inconsistency reports.
 - `inferAsync(quads, { store })` runs with Eyeling's async runner and optional named persistent fact store.
@@ -88,13 +89,13 @@ The internal namespace is not an application contract and may change between rel
 
 ## Browser Bundle And Playground
 
-The browser bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `Parser`, `Writer`, `DataFactory`, `parseRdfOrMessages()`, `writeQuads()`, and `writeMessages()`.
+The browser bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEngine`, `initializeEyeronReasoner()`, `Parser`, `Writer`, `DataFactory`, `parseRdfOrMessages()`, `writeQuads()`, and `writeMessages()`.
 
 ```html
 <script src="https://www.pieter.pm/rdfjs-inference-engine/browser/rdfjs-inference-engine.min.js"></script>
 ```
 
-The root [index.html](index.html) file is a browser playground. Every scenario starts with an RDF Message Log and a pair of trusted SHACL contracts: SHACL IN describes the source representation and SHACL OUT describes the representation the application needs. The playground shows that alignment flow, background ontology, input messages, and output messages directly; rule-profile selection, stateful materialization, and the generated N3 runtime are available under advanced controls.
+The root [index.html](index.html) file is a browser playground. Every scenario starts with an RDF Message Log and a pair of trusted SHACL contracts: SHACL IN describes the source representation and SHACL OUT describes the representation the application needs. The playground shows that alignment flow, background ontology, input messages, and output messages directly; N3 reasoner selection, rule-profile selection, stateful materialization, and the generated N3 runtime are available under advanced controls.
 
 At browser-build time the playground bundles the default rule profiles from `rules/`, including QUDT's precompiled runtime snapshot. SHACL contracts specialize applicable rules where supported, prune irrelevant input facts, and project inferred output while preserving message boundaries. They are optimization contracts rather than a replacement for validation.
 

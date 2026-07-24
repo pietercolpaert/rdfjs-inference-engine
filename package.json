@@ -17,6 +17,7 @@
   "files": [
     "dist/src/",
     "browser/",
+    "vendor/eyeron/*",
     "rules/*/*.n3",
     "rules/*/README.md",
     "ns/*/index.html",
@@ -64,6 +65,8 @@
     "test:examples": "npm run build:node --silent && npm run test:transit-fleet:run --silent && npm run test:shipment-logistics:run --silent && npm run test:skos-taxonomy:run --silent && npm run test:owl-skos-catalog:run --silent && npm run test:transit-messages:run --silent && npm run test:stateful-materialization:run --silent",
     "test:default-rules": "npm run build:node --silent && npm run test:default-rules:run --silent",
     "test:default-rules:run": "node dist/tests/run-default-rule-loading.js",
+    "test:eyeron": "npm run build:node --silent && npm run test:eyeron:run --silent",
+    "test:eyeron:run": "node dist/tests/run-eyeron-backend.js",
     "test:shacl-shape-planning": "npm run build:node --silent && npm run test:shacl-shape-planning:run --silent",
     "test:shacl-shape-planning:run": "node dist/tests/run-shacl-shape-planning.js",
     "test:stateful-skolemization": "npm run build:node --silent && npm run test:stateful-skolemization:run --silent",
@@ -91,7 +94,7 @@
     "test:owl": "npm run build:node --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:vocabularies:run --silent && npm run test:playground:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:qudt:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
+    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:eyeron:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:vocabularies:run --silent && npm run test:playground:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:qudt:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "perf": "npm run build:node --silent && node dist/perf/run.js",
     "perf:list": "npm run build:node --silent && node dist/perf/run.js --list"
   },

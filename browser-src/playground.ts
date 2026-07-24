@@ -4,6 +4,7 @@ import { bundledExamples } from 'bundled-examples';
 declare const CodeMirror: any;
 
 type InputMode = 'text' | 'url';
+type N3ReasonerBackend = 'eyeron' | 'eyeling';
 
 type Editor = {
   getValue(): string;
@@ -21,6 +22,7 @@ type PlaygroundState = {
   backgroundMode?: InputMode;
   dataMode?: InputMode;
   statefulMaterialization?: boolean;
+  n3Reasoner?: N3ReasonerBackend;
   disabledRuleFiles?: string[];
   backgroundUrl?: string;
   dataUrl?: string;
@@ -72,6 +74,9 @@ type WorkerRequest = {
   bundledRuleProfiles: BundledRuleProfile[];
   bundledRuleCount: number;
   bundledRuleLabels: string[];
+  n3Reasoner: N3ReasonerBackend;
+  eyeronScriptUrl: string;
+  eyeronWasmUrl: string;
   backgroundSource: string;
   dataMode: InputMode;
   statefulMaterialization: boolean;
@@ -93,6 +98,7 @@ type WorkerMessage =
 const defaultState = {
   backgroundMode: 'text' as InputMode,
   dataMode: 'text' as InputMode,
+  n3Reasoner: 'eyeron' as N3ReasonerBackend,
   backgroundText: defaultExample().background,
   dataText: defaultExample().data,
 };
@@ -111,6 +117,7 @@ const controls = {
   exampleSelect: getSelect('exampleSelect'),
   backgroundMode: getSelect('backgroundMode'),
   dataMode: getSelect('dataMode'),
+  n3Reasoner: getSelect('n3Reasoner'),
   statefulMaterialization: getInput('statefulMaterialization'),
   backgroundUrl: getInput('backgroundUrl'),
   dataUrl: getInput('dataUrl'),
@@ -199,6 +206,7 @@ function wireControls(): void {
     input.addEventListener('input', scheduleStateUpdate);
   }
   controls.statefulMaterialization.addEventListener('change', scheduleStateUpdate);
+  controls.n3Reasoner.addEventListener('change', scheduleStateUpdate);
 }
 
 async function runInference(): Promise<void> {
@@ -237,10 +245,13 @@ async function runInference(): Promise<void> {
 
     await runWorkerInference(run, {
       apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', window.location.href).href,
+      eyeronScriptUrl: new URL('browser/eyeron/eyeron.js', window.location.href).href,
+      eyeronWasmUrl: new URL('browser/eyeron/eyeron_bg.wasm', window.location.href).href,
       bundledRules: selectedProfiles.map((profile) => profile.n3).join('\n\n'),
       bundledRuleProfiles: selectedProfiles,
       bundledRuleCount: selectedProfiles.length,
       bundledRuleLabels: selectedProfiles.map((profile) => profile.file),
+      n3Reasoner: selectedN3Reasoner(),
       backgroundSource,
       dataMode,
       statefulMaterialization: controls.statefulMaterialization.checked,
@@ -357,10 +368,17 @@ self.onmessage = async (event) => {
     }
 
     self.postMessage({ type: 'status', message: 'Parsing background knowledge…' });
+    if (request.n3Reasoner === 'eyeron') {
+      if (request.statefulMaterialization) {
+        throw new Error('Stateful materialization is only available with the Eyeling backend.');
+      }
+      self.postMessage({ type: 'status', message: 'Loading Eyeron WebAssembly module…' });
+      await api.initializeEyeronReasoner(request.eyeronScriptUrl, request.eyeronWasmUrl);
+    }
     const background = api.parseRdfOrMessages(request.backgroundSource);
     self.postMessage({ type: 'status', message: 'Parsed ' + background.quads.length + ' background quad(s). Compiling runtime…' });
 
-    const reasoner = new api.InferenceEngine();
+    const reasoner = new api.InferenceEngine({ n3Reasoner: request.n3Reasoner });
     const started = performance.now();
     const loadOptions = {};
     if (request.selectRuntimeRules === false) {
@@ -381,10 +399,10 @@ self.onmessage = async (event) => {
     const ruleProfiles = request.bundledRuleProfiles && request.bundledRuleProfiles.length
       ? request.bundledRuleProfiles.map((profile) => ({ n3: profile.n3, label: profile.file, precompiledRuntime: profile.precompiledRuntime }))
       : [{ n3: request.bundledRules, label: ruleLabel }];
-    const runtime = reasoner.load(ruleProfiles, background.quads, Object.keys(loadOptions).length ? loadOptions : undefined);
+    const runtime = await reasoner.loadAsync(ruleProfiles, background.quads, Object.keys(loadOptions).length ? loadOptions : undefined);
     const compiledAt = performance.now();
     const shapeHintSummary = (request.shaclInSource || request.shaclOutSource) ? ' · SHACL hints ' + [request.shaclInSource ? 'in' : '', request.shaclOutSource ? 'out' : ''].filter(Boolean).join('/') : '';
-    self.postMessage({ type: 'runtime', message: 'Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + shapeHintSummary + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB', runtime });
+    self.postMessage({ type: 'runtime', message: 'Reasoner ' + request.n3Reasoner + ' · Background ' + countLabel(background.quads.length, 'quad') + ' · Rule profiles ' + request.bundledRuleCount + shapeHintSummary + ' · Runtime ' + (runtime.length / 1024).toFixed(1) + ' KiB', runtime });
 
     await processInputData(api, reasoner, request, compiledAt, started);
   } catch (error) {
@@ -561,7 +579,7 @@ async function finishStreamingState(state) {
 
   const total = state.ordinaryQuads.length;
   self.postMessage({ type: 'status', message: 'Parsed ' + total + ' input quad(s). Running inference…' });
-  const inference = state.reasoner.inferWithDiagnostics(state.ordinaryQuads);
+  const inference = await state.reasoner.inferAsyncWithDiagnostics(state.ordinaryQuads);
   const comments = formatInconsistencyComments(inference.inconsistencies);
   self.postMessage({ type: 'status', message: 'Processed ' + total + ' input quad(s). Serializing ' + inference.quads.length + ' inferred quad(s)…' });
   const output = await state.api.writeQuads(inference.quads, state.outputPrefixes);
@@ -582,7 +600,7 @@ async function processCurrentMessage(state) {
           clear: state.processedMessageCount === 0,
         },
       })
-    : state.reasoner.inferWithDiagnostics(state.currentMessage);
+    : await state.reasoner.inferAsyncWithDiagnostics(state.currentMessage);
   state.messageProcessingMs += performance.now() - messageStartedAt;
   state.inconsistencyComments.push(formatInconsistencyComments(inference.inconsistencies, 'message ' + messageNumber));
   state.writer.addMessage(inference.quads);
@@ -1154,12 +1172,17 @@ function getMode(kind: 'background' | 'data'): InputMode {
   return value === 'url' ? 'url' : 'text';
 }
 
+function selectedN3Reasoner(): N3ReasonerBackend {
+  return controls.n3Reasoner.value === 'eyeling' ? 'eyeling' : 'eyeron';
+}
+
 function resetDefaults(): void {
   const example = defaultExample();
   suppressStateUpdate = true;
   controls.exampleSelect.value = example.id;
   controls.backgroundMode.value = defaultState.backgroundMode;
   controls.dataMode.value = defaultState.dataMode;
+  controls.n3Reasoner.value = defaultState.n3Reasoner;
   controls.statefulMaterialization.checked = false;
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
@@ -1316,6 +1339,7 @@ function applyBundledExample(example: BundledExample): void {
   controls.exampleSelect.value = example.id;
   controls.backgroundMode.value = 'text';
   controls.dataMode.value = 'text';
+  controls.n3Reasoner.value = defaultReasonerForExample(example.id);
   controls.statefulMaterialization.checked = shouldEnableStatefulMaterialization(example.id);
   controls.backgroundUrl.value = '';
   controls.dataUrl.value = '';
@@ -1328,6 +1352,10 @@ function applyBundledExample(example: BundledExample): void {
 
 function shouldEnableStatefulMaterialization(exampleId: string): boolean {
   return exampleId === 'stateful-materialization';
+}
+
+function defaultReasonerForExample(exampleId: string): N3ReasonerBackend {
+  return shouldEnableStatefulMaterialization(exampleId) ? 'eyeling' : defaultState.n3Reasoner;
 }
 
 function defaultExample(): BundledExample {
@@ -1349,6 +1377,7 @@ function collectState(): PlaygroundState {
     disabledRuleFiles: disabledRules.length > 0 ? disabledRules : undefined,
     backgroundMode: getMode('background') === defaultState.backgroundMode ? undefined : getMode('background'),
     dataMode: getMode('data') === defaultState.dataMode ? undefined : getMode('data'),
+    n3Reasoner: selectedN3Reasoner() === defaultState.n3Reasoner ? undefined : selectedN3Reasoner(),
     statefulMaterialization: controls.statefulMaterialization.checked || undefined,
     backgroundUrl: controls.backgroundUrl.value.trim() || undefined,
     dataUrl: controls.dataUrl.value.trim() || undefined,
@@ -1382,6 +1411,7 @@ function collectState(): PlaygroundState {
 function isUntouchedExample(example: BundledExample): boolean {
   return getMode('background') === 'text'
     && getMode('data') === 'text'
+    && selectedN3Reasoner() === defaultReasonerForExample(example.id)
     && controls.statefulMaterialization.checked === shouldEnableStatefulMaterialization(example.id)
     && controls.backgroundUrl.value.trim() === ''
     && controls.dataUrl.value.trim() === ''
@@ -1418,6 +1448,7 @@ function loadStateFromHash(): void {
   }
   controls.backgroundMode.value = state.backgroundMode ?? defaultState.backgroundMode;
   controls.dataMode.value = state.dataMode ?? defaultState.dataMode;
+  controls.n3Reasoner.value = state.n3Reasoner ?? defaultState.n3Reasoner;
   if (state.statefulMaterialization !== undefined) {
     controls.statefulMaterialization.checked = state.statefulMaterialization;
   }

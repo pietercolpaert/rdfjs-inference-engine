@@ -1,8 +1,11 @@
-import { access, mkdir, readdir, readFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 
 await mkdir('browser', { recursive: true });
+await mkdir('browser/eyeron', { recursive: true });
+await copyFile('vendor/eyeron/eyeron.js', 'browser/eyeron/eyeron.js');
+await copyFile('vendor/eyeron/eyeron_bg.wasm', 'browser/eyeron/eyeron_bg.wasm');
 
 const nonDefaultRuleDirs = new Set(['precompiled', 'shacl-experimental']);
 
