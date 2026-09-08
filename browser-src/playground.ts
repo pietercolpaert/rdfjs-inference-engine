@@ -72,11 +72,13 @@ type WorkerRequest = {
   bundledRuleProfiles: BundledRuleProfile[];
   bundledRuleCount: number;
   bundledRuleLabels: string[];
-  backgroundSource: string;
+  backgroundMode: InputMode;
   dataMode: InputMode;
   statefulMaterialization: boolean;
   selectRuntimeRules?: boolean;
   statefulStoreName?: string;
+  backgroundSource?: string;
+  backgroundUrl?: string;
   shaclInSource?: string;
   shaclOutSource?: string;
   dataSource?: string;
@@ -219,13 +221,17 @@ async function runInference(): Promise<void> {
     editors.outputText.setValue('');
     setRunStatus(run, 'Preparing inference…');
 
-    const backgroundSource = await getSource('background', run.controller.signal);
-    throwIfAborted(run.controller.signal);
+    const backgroundMode = getMode('background');
+    const backgroundSource = backgroundMode === 'text' ? editors.backgroundText.getValue() : undefined;
+    const backgroundUrl = backgroundMode === 'url' ? controls.backgroundUrl.value.trim() : undefined;
     const dataMode = getMode('data');
     const dataSource = dataMode === 'text' ? editors.dataText.getValue() : undefined;
     const dataUrl = dataMode === 'url' ? controls.dataUrl.value.trim() : undefined;
     const shaclInSource = editors.shaclInText.getValue().trim() || undefined;
     const shaclOutSource = editors.shaclOutText.getValue().trim() || undefined;
+    if (backgroundMode === 'url' && !backgroundUrl) {
+      throw new Error('Enter an ontology URL or switch to text input.');
+    }
     if (dataMode === 'url' && !dataUrl) {
       throw new Error('Enter a data URL or switch to text input.');
     }
@@ -241,14 +247,16 @@ async function runInference(): Promise<void> {
       bundledRuleProfiles: selectedProfiles,
       bundledRuleCount: selectedProfiles.length,
       bundledRuleLabels: selectedProfiles.map((profile) => profile.file),
+      backgroundMode,
       backgroundSource,
+      backgroundUrl,
       dataMode,
       statefulMaterialization: controls.statefulMaterialization.checked,
       // This fixture exercises OWL list and restriction rules that the selector cannot yet
       // reduce soundly. Its SHACL contracts still prune input and project output.
       selectRuntimeRules: controls.exampleSelect.value === 'shipment-logistics' ? false : undefined,
       statefulStoreName: controls.statefulMaterialization.checked
-        ? createStatefulStoreName(backgroundSource, dataMode === 'url' ? dataUrl ?? '' : dataSource ?? '')
+        ? createStatefulStoreName(backgroundSource ?? backgroundUrl ?? '', dataMode === 'url' ? dataUrl ?? '' : dataSource ?? '')
         : undefined,
       shaclInSource,
       shaclOutSource,
@@ -356,8 +364,10 @@ self.onmessage = async (event) => {
       throw new Error('Could not load the browser inference engine bundle.');
     }
 
-    self.postMessage({ type: 'status', message: 'Parsing background knowledge…' });
-    const background = api.parseRdfOrMessages(request.backgroundSource);
+    self.postMessage({ type: 'status', message: request.backgroundMode === 'url' ? 'Dereferencing background knowledge with ldfetch…' : 'Parsing background knowledge…' });
+    const background = request.backgroundMode === 'url'
+      ? await dereferenceUrlInput(api, request.backgroundUrl, 'background knowledge')
+      : api.parseRdfOrMessages(request.backgroundSource || '');
     self.postMessage({ type: 'status', message: 'Parsed ' + background.quads.length + ' background quad(s). Compiling runtime…' });
 
     const reasoner = new api.InferenceEngine();
@@ -416,39 +426,19 @@ async function processUrlInput(api, reasoner, url, compiledAt, started) {
     throw new Error('Missing data URL.');
   }
 
-  self.postMessage({ type: 'status', message: 'Fetching input data stream…' });
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Could not fetch ' + url + ': ' + response.status + ' ' + response.statusText);
-  }
-  if (!response.body) {
-    const source = await response.text();
-    await processTextInput(api, reasoner, source, compiledAt, started);
-    return;
-  }
+  const parsed = await dereferenceUrlInput(api, url, 'input data');
+  await processDereferencedInput(api, reasoner, parsed, compiledAt, started);
+}
 
-  const state = createStreamingState(api, reasoner, compiledAt, started, url, requestStatefulMaterialization(), requestStatefulStoreName());
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let bytes = 0;
-
-  for (;;) {
-    const read = await reader.read();
-    if (read.done) {
-      break;
-    }
-    bytes += read.value.byteLength;
-    const text = decoder.decode(read.value, { stream: true });
-    await handleParsedItems(state, state.parser.write(text));
-    postProgressStatus(state, progressMessage(state, 'Streaming input: read ' + Math.round(bytes / 1024) + ' KiB'));
+async function dereferenceUrlInput(api, url, label) {
+  if (!url) {
+    throw new Error('Missing ' + label + ' URL.');
   }
-
-  const tail = decoder.decode();
-  if (tail) {
-    await handleParsedItems(state, state.parser.write(tail));
-  }
-  await handleParsedItems(state, state.parser.end());
-  await finishStreamingState(state);
+  self.postMessage({ type: 'status', message: 'Dereferencing ' + label + ' with ldfetch…' });
+  const parsed = await api.dereferenceRdfUrl(url);
+  const resolved = parsed.url && parsed.url !== url ? ' from ' + parsed.url : '';
+  self.postMessage({ type: 'status', message: 'Dereferenced ' + countLabel(parsed.quads.length, 'quad') + resolved + '.' });
+  return parsed;
 }
 
 function requestStatefulMaterialization() {
@@ -462,7 +452,15 @@ function requestStatefulStoreName() {
 }
 
 function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization, statefulStoreName) {
-  const state = {
+  const state = createProcessingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization, statefulStoreName);
+  state.parser = new api.IncrementalParser({ factory: api.DataFactory }, {
+    prefix: (prefix, iri) => addInputPrefix(state, prefix, iri),
+  });
+  return state;
+}
+
+function createProcessingState(api, reasoner, compiledAt, started, sourceLabel, statefulMaterialization, statefulStoreName) {
+  return {
     api,
     reasoner,
     parser: null,
@@ -484,10 +482,6 @@ function createStreamingState(api, reasoner, compiledAt, started, sourceLabel, s
     lastStatusAt: 0,
     writer: null,
   };
-  state.parser = new api.IncrementalParser({ factory: api.DataFactory }, {
-    prefix: (prefix, iri) => addInputPrefix(state, prefix, iri),
-  });
-  return state;
 }
 
 function addInputPrefix(state, prefix, iri) {
@@ -524,6 +518,34 @@ function outputPrefixes() {
   };
 }
 
+async function processDereferencedInput(api, reasoner, parsed, compiledAt, started) {
+  const state = createProcessingState(api, reasoner, compiledAt, started, parsed.url || 'URL input', requestStatefulMaterialization(), requestStatefulStoreName());
+  addInputPrefixes(state, parsed.prefixes || {});
+
+  if (parsed.isMessages) {
+    state.messagesMode = true;
+    for (const message of parsed.messages) {
+      state.currentMessage = Array.from(message);
+      state.parsedQuadCount += state.currentMessage.length;
+      await processCurrentMessage(state);
+      state.currentMessageCounter += 1;
+      state.currentMessage = [];
+    }
+    await finishMessageOutputState(state);
+    return;
+  }
+
+  state.ordinaryQuads = Array.from(parsed.quads || []);
+  state.parsedQuadCount = state.ordinaryQuads.length;
+  await finishOrdinaryOutputState(state);
+}
+
+function addInputPrefixes(state, prefixes) {
+  for (const [prefix, iri] of Object.entries(prefixes)) {
+    addInputPrefix(state, prefix, iri);
+  }
+}
+
 async function handleParsedItems(state, items) {
   for (const item of items) {
     if (state.api.isMessageQuad(item)) {
@@ -547,18 +569,26 @@ async function handleParsedItems(state, items) {
 async function finishStreamingState(state) {
   if (state.messagesMode) {
     await processCurrentMessage(state);
-    if (state.writer) {
-      await endWriter(state.writer);
-    }
-    appendInconsistencyComments(state.inconsistencyComments);
-    self.postMessage({
-      type: 'result',
-      status: 'Done · RDF Messages: ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' quad(s), ' + state.inferredCount + ' inferred' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state),
-      metrics: messageTimingMetrics(state),
-    });
+    await finishMessageOutputState(state);
     return;
   }
 
+  await finishOrdinaryOutputState(state);
+}
+
+async function finishMessageOutputState(state) {
+  if (state.writer) {
+    await endWriter(state.writer);
+  }
+  appendInconsistencyComments(state.inconsistencyComments);
+  self.postMessage({
+    type: 'result',
+    status: 'Done · RDF Messages: ' + state.processedMessageCount + ' message(s), ' + state.parsedQuadCount + ' quad(s), ' + state.inferredCount + ' inferred' + diagnosticStatusSuffix(state.inconsistencyComments) + statefulStoreSummary(state),
+    metrics: messageTimingMetrics(state),
+  });
+}
+
+async function finishOrdinaryOutputState(state) {
   const total = state.ordinaryQuads.length;
   self.postMessage({ type: 'status', message: 'Parsed ' + total + ' input quad(s). Running inference…' });
   const inference = state.reasoner.inferWithDiagnostics(state.ordinaryQuads);
@@ -974,26 +1004,6 @@ function progressMessage(state, prefix) {
 `;
   const blob = new Blob([source], { type: 'text/javascript' });
   return new Worker(URL.createObjectURL(blob));
-}
-
-async function getSource(kind: 'background' | 'data', signal: AbortSignal): Promise<string> {
-  const mode = getMode(kind);
-  if (mode === 'text') {
-    return kind === 'background' ? editors.backgroundText.getValue() : editors.dataText.getValue();
-  }
-
-  const input = kind === 'background' ? controls.backgroundUrl : controls.dataUrl;
-  const url = input.value.trim();
-  if (!url) {
-    throw new Error(`Enter a ${kind === 'background' ? 'background RDF' : 'data'} URL or switch to text input.`);
-  }
-
-  setStatus(`Fetching ${kind === 'background' ? 'background RDF' : 'input data'} before processing…`);
-  const response = await fetch(url, { signal });
-  if (!response.ok) {
-    throw new Error(`Could not fetch ${url}: ${response.status} ${response.statusText}`);
-  }
-  return response.text();
 }
 
 function stopActiveRun(): void {

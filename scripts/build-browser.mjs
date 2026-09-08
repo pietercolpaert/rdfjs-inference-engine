@@ -1,6 +1,24 @@
-import { access, mkdir, readdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { build } from 'esbuild';
+
+const require = createRequire(import.meta.url);
+
+const browserNodePolyfillsPlugin = {
+  name: 'browser-node-polyfills',
+  setup(build) {
+    const aliases = new Map([
+      ['http', 'stream-http'],
+      ['https', 'https-browserify'],
+      ['stream', 'stream-browserify'],
+    ]);
+
+    build.onResolve({ filter: /^(http|https|stream)$/ }, (args) => ({
+      path: require.resolve(aliases.get(args.path)),
+    }));
+  },
+};
 
 await mkdir('browser', { recursive: true });
 
@@ -12,6 +30,10 @@ const common = {
   sourcemap: false,
   platform: 'browser',
   target: ['es2020'],
+  define: {
+    global: 'globalThis',
+  },
+  inject: ['browser-src/node-globals.ts'],
   legalComments: 'none',
   logLevel: 'info',
 };
@@ -158,6 +180,7 @@ await build({
   outfile: 'browser/rdfjs-inference-engine.min.js',
   format: 'iife',
   globalName: 'RdfjsInferenceEngine',
+  plugins: [browserNodePolyfillsPlugin],
 });
 
 await build({
@@ -165,9 +188,22 @@ await build({
   entryPoints: ['browser-src/playground.ts'],
   outfile: 'browser/playground.min.js',
   format: 'iife',
-  plugins: [bundledRulesPlugin, bundledExamplesPlugin],
+  plugins: [browserNodePolyfillsPlugin, bundledRulesPlugin, bundledExamplesPlugin],
   loader: {
     '.n3': 'text',
     '.trig': 'text',
   },
 });
+
+await Promise.all([
+  trimTrailingWhitespace('browser/rdfjs-inference-engine.min.js'),
+  trimTrailingWhitespace('browser/playground.min.js'),
+]);
+
+async function trimTrailingWhitespace(path) {
+  const source = await readFile(path, 'utf8');
+  const normalized = source.replace(/[ \t]+$/gm, '');
+  if (normalized !== source) {
+    await writeFile(path, normalized, 'utf8');
+  }
+}

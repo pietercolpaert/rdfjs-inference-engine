@@ -1,5 +1,6 @@
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling/browser';
+import LDFetch from 'ldfetch';
 import {
   DataFactory as RdfParserDataFactory,
   IncrementalParser,
@@ -493,6 +494,33 @@ export function parseRdfOrMessages(source: string, options: Record<string, unkno
     quads: raw as Quad[],
     messages: [],
     raw,
+  };
+}
+
+export type DereferencedRdfInput = ParsedRdfInput & {
+  prefixes: Record<string, string>;
+  statusCode?: number;
+  url: string;
+};
+
+export async function dereferenceRdfUrl(url: string): Promise<DereferencedRdfInput> {
+  const fetcher = new LDFetch();
+  const response = await fetcher.get(url);
+  const messages: Quad[][] = response.messages
+    ? Array.from(response.messages, (message) => Array.from(message))
+    : [];
+  const quads: Quad[] = messages.length > 0
+    ? messages.flatMap((message) => message)
+    : Array.from(response.triples ?? []);
+
+  return {
+    isMessages: messages.length > 0,
+    quads,
+    messages,
+    raw: quads,
+    prefixes: response.prefixes ?? {},
+    statusCode: response.statusCode ?? response.responseCode,
+    url: response.url ?? url,
   };
 }
 

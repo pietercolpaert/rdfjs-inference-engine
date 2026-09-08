@@ -769,7 +769,8 @@
   <div class="page">
     <header>
       <h1>RDF-JS inference playground</h1>
-      <p class="meta">Align RDF Message logs from a documented source contract towards the RDF contract your application accepts.</p>
+      <p class="meta">Align RDF input from a documented source contract towards the RDF contract your application accepts.</p>
+      <p class="meta">Editor fields use rdf-parser-ts for Turtle, TriG, N-Triples, N-Quads, and RDF Message Logs; URL sources are dereferenced with ldfetch for JSON-LD, RDF/XML, RDFa, Microdata, SHACL Compact, Jelly-RDF, and negotiated RDF serializations.</p>
       <p class="meta"><a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM package</a> · <a href="https://github.com/pietercolpaert/rdfjs-inference-engine">GitHub repository</a></p>
     </header>
     <main class="workflow">
@@ -813,19 +814,19 @@
                 <div id="backgroundUrlPanel" class="uri-input-row">
                   <label for="backgroundUrl">Ontology URL</label>
                   <input id="backgroundUrl" type="url" placeholder="https://.../ontology.ttl">
-                  <span class="hint">The server must allow browser CORS requests.</span>
+                  <span class="hint">URL sources are dereferenced with ldfetch; editor input is parsed locally with rdf-parser-ts.</span>
                 </div>
                 <div class="mode-row">
-                  <label for="dataMode">Message-log source</label>
+                  <label for="dataMode">RDF input source</label>
                   <select id="dataMode">
                     <option value="text">Editor</option>
                     <option value="url">URL</option>
                   </select>
                 </div>
                 <div id="dataUrlPanel" class="uri-input-row">
-                  <label for="dataUrl">RDF Message log URL</label>
+                  <label for="dataUrl">RDF input URL</label>
                   <input id="dataUrl" type="url" placeholder="https://.../messages.trig">
-                  <span class="hint">Remote message logs are streamed when possible.</span>
+                  <span class="hint">Remote Turtle, TriG, N-Triples, N-Quads, and RDF Message Logs are streamed when possible.</span>
                 </div>
               </div>
             </div>
@@ -876,15 +877,15 @@
       <section class="stage messages-stage">
         <div class="stage-header">
           <div>
-            <h2 class="section-title">RDF Messages</h2>
-            <p class="meta">Messages are processed independently unless stateful materialization is enabled.</p>
+            <h2 class="section-title">RDF Input</h2>
+            <p class="meta">RDF Message Logs preserve message boundaries; ordinary RDF input is processed as one batch.</p>
           </div>
         </div>
         <div class="message-flow">
           <div class="editor-pane source-pane">
             <div class="editor-heading">
               <h3 class="section-title">MESSAGES IN</h3>
-              <p class="meta">Editable RDF 1.2 Message log supplied by the source.</p>
+              <p class="meta">Editable Turtle, TriG, N-Triples, N-Quads, or RDF Message Log supplied by the source.</p>
             </div>
             <div id="dataTextPanel">
               <textarea id="dataText" spellcheck="false"></textarea>
@@ -894,7 +895,7 @@
           <div class="editor-pane target-pane output">
             <div class="editor-heading">
               <h3 class="section-title">MESSAGES OUT</h3>
-              <p class="meta">Newly inferred RDF, preserving the input message boundaries.</p>
+              <p class="meta">Newly inferred RDF, preserving input message boundaries when present.</p>
             </div>
             <textarea id="outputText" spellcheck="false" readonly></textarea>
           </div>
