@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SPARQL CONSTRUCT playground</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      color-scheme: light;
+      --bg: #f5f5f7;
+      --panel: #ffffff;
+      --panel-soft: #f9fafb;
+      --border: #d1d5db;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    input, textarea, button { font: inherit; }
+    .page {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: calc(1.5rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right))
+        calc(3rem + env(safe-area-inset-bottom)) calc(1rem + env(safe-area-inset-left));
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    header h1 { margin: 0; font-size: 1.9rem; font-weight: 650; text-align: center; letter-spacing: -0.02em; }
+    header p { max-width: 62rem; margin: 0.35rem auto 0; color: var(--muted); font-size: 0.92rem; line-height: 1.55; text-align: center; }
+    a { color: var(--accent); }
+    .card {
+      min-width: 0;
+      overflow: hidden;
+      background: var(--panel);
+      border-radius: 1rem;
+      padding: 1rem 1.25rem 1.25rem;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .section-title { margin: 0 0 0.45rem; font-size: 1rem; font-weight: 600; }
+    .hint, .meta, .status { color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+    label { display: inline-block; margin-bottom: 0.35rem; color: #374151; font-size: 0.9rem; font-weight: 500; }
+    .uri-input-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem; margin: 0.8rem 0 0.75rem; }
+    input[type="url"] { min-width: 0; width: 100%; flex: 1 1 10rem; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-soft); color: var(--text); padding: 0.55rem 0.9rem; }
+    input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    button { min-height: 44px; border: none; border-radius: 999px; background: var(--accent); color: #fff; cursor: pointer; font-size: 0.9rem; font-weight: 600; padding: 0.55rem 1.25rem; box-shadow: 0 10px 15px rgba(37, 99, 235, 0.25); }
+    button:hover:not(:disabled) { background: #1d4ed8; }
+    button:disabled { cursor: default; opacity: 0.5; }
+    button.secondary { background: #e5e7eb; color: #374151; box-shadow: none; }
+    button.secondary:hover:not(:disabled) { background: #d1d5db; }
+    .construct-inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .CodeMirror { border: 1px solid var(--border); border-radius: 0.75rem; font-size: 0.82rem; line-height: 1.5; }
+    .construct-inputs .CodeMirror { height: 360px; }
+    .construct-output .CodeMirror { height: 420px; }
+    #diagnostics { white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 1000px) { .construct-inputs { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>SPARQL CONSTRUCT</h1>
+      <p>Map a provider’s RDF message to a consumer’s contract using an ontology and two SHACL shapes.</p>
+      <p class="meta"><a href="index.html">RDF-JS inference playground</a> · <a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM package</a></p>
+    </header>
+    <main>
+      <div class="construct-inputs">
+        <section class="card">
+          <h2 class="section-title">1. Ontology of the data provider</h2>
+          <p class="hint">Describe class and property relationships between the vocabularies.</p>
+          <label for="ontologyUrl">Document URL</label>
+          <div class="uri-input-row">
+            <input id="ontologyUrl" type="url" placeholder="https://example.org/ontology.ttl">
+            <button id="ontologyLoad" type="button">Load</button>
+          </div>
+          <p id="ontologyStatus" class="status" role="status"></p>
+          <label for="ontologyText">RDF contents</label>
+          <textarea id="ontologyText" spellcheck="false"></textarea>
+        </section>
+        <section class="card">
+          <h2 class="section-title">2. SHACL shape of the data provider</h2>
+          <p class="hint">Describe the paths and types available in an input message.</p>
+          <label for="shaclInUrl">Document URL</label>
+          <div class="uri-input-row">
+            <input id="shaclInUrl" type="url" placeholder="https://example.org/shaclIn.ttl">
+            <button id="shaclInLoad" type="button">Load</button>
+          </div>
+          <p id="shaclInStatus" class="status" role="status"></p>
+          <label for="shaclInText">RDF contents</label>
+          <textarea id="shaclInText" spellcheck="false"></textarea>
+        </section>
+        <section class="card">
+          <h2 class="section-title">3. SHACL shape of the data consumer</h2>
+          <p class="hint">Describe the paths and types wanted in the output message.</p>
+          <label for="shaclOutUrl">Document URL</label>
+          <div class="uri-input-row">
+            <input id="shaclOutUrl" type="url" placeholder="https://example.org/shaclOut.ttl">
+            <button id="shaclOutLoad" type="button">Load</button>
+          </div>
+          <p id="shaclOutStatus" class="status" role="status"></p>
+          <label for="shaclOutText">RDF contents</label>
+          <textarea id="shaclOutText" spellcheck="false"></textarea>
+        </section>
+      </div>
+      <div class="uri-input-row">
+        <button id="generateButton" type="button">Generate SPARQL CONSTRUCT</button>
+        <button id="resetButton" class="secondary" type="button">Reset example</button>
+        <span id="status" class="status" role="status" aria-live="polite"></span>
+      </div>
+      <section class="card construct-output">
+        <h2 class="section-title">SPARQL CONSTRUCT query</h2>
+        <p class="hint">Run this query on each input message as the default RDF graph. Values and focus-node identities are preserved. This maps data; validate the resulting message with SHACL when conformance is required.</p>
+        <div class="uri-input-row">
+          <button id="copyButton" class="secondary" type="button" disabled>Copy query</button>
+          <button id="downloadButton" class="secondary" type="button" disabled>Download .rq</button>
+        </div>
+        <label for="queryText">Generated query</label>
+        <textarea id="queryText" spellcheck="false"></textarea>
+        <p id="diagnostics" class="status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/turtle/turtle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/sparql/sparql.js"></script>
+  <script src="browser/rdfjs-inference-engine.min.js"></script>
+  <script src="browser/sparql-construct-playground.min.js"></script>
+</body>
+</html>

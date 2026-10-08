@@ -195,7 +195,15 @@ await build({
   },
 });
 
+await build({
+  ...common,
+  entryPoints: ['browser-src/sparql-construct-playground.ts'],
+  outfile: 'browser/sparql-construct-playground.min.js',
+  format: 'iife',
+});
+
 await Promise.all([
+  trimTrailingWhitespace('browser/sparql-construct-playground.min.js'),
   trimTrailingWhitespace('browser/rdfjs-inference-engine.min.js'),
   trimTrailingWhitespace('browser/playground.min.js'),
 ]);

@@ -21,7 +21,8 @@
     "rules/*/README.md",
     "ns/*/index.html",
     "index.html",
-    "README.md"
+    "README.md",
+    "sparql-construct.html"
   ],
   "directories": {
     "example": "examples"
@@ -91,9 +92,11 @@
     "test:owl": "npm run build:node --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "test:mobibench": "npm run test:owl:mobibench",
     "test:official": "npm run test:owl:official",
-    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:vocabularies:run --silent && npm run test:playground:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:qudt:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
+    "test": "npm run build:node --silent && npm run test:default-rules:run --silent && npm run test:stateful-skolemization:run --silent && npm run test:vocabularies:run --silent && npm run test:playground:run --silent && npm run test:sparql-construct:run --silent && npm run test:marc-list-ontology:run --silent && npm run test:skos:run --silent && npm run test:qudt:run --silent && npm run test:owl:mobibench:run --silent && npm run test:owl:official:run --silent",
     "perf": "npm run build:node --silent && node dist/perf/run.js",
-    "perf:list": "npm run build:node --silent && node dist/perf/run.js --list"
+    "perf:list": "npm run build:node --silent && node dist/perf/run.js --list",
+    "test:sparql-construct": "npm run build:node --silent && npm run test:sparql-construct:run --silent",
+    "test:sparql-construct:run": "node dist/tests/run-sparql-construct.js"
   },
   "repository": {
     "type": "git",
@@ -120,6 +123,10 @@
     "esbuild": "^0.28.0",
     "rdfa-streaming-parser": "^3.0.2",
     "rdfxml-streaming-parser": "^3.2.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "@comunica/query-sparql-rdfjs-lite": "^5.3.0",
+    "sparqljs": "^3.7.4",
+    "@types/sparqljs": "^3.1.12",
+    "n3": "^1.26.0"
   }
 }

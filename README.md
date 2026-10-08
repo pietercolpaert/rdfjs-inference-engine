@@ -64,6 +64,38 @@ The main class is `InferenceEngine`.
 - `inferAsync(quads, { store })` runs with Eyeling's async runner and optional named persistent fact store.
 - `createInferenceStream()` / `stream()` creates an object-mode transform stream.
 
+## SPARQL CONSTRUCT mapping
+
+The [SPARQL CONSTRUCT playground](sparql-construct.html), linked from the inference playground, accepts a provider ontology, a provider SHACL shape, and a consumer SHACL shape. Each input has an editable CodeMirror field and a URL **Load** button. URLs use the same RDF negotiation and page extraction as the main playground; fetched RDF is displayed as editable Turtle. Remote servers must allow browser access through CORS. Generate, copy, or download the resulting `.rq` query.
+
+The same compiler is exported by the Node.js package and the browser API:
+
+```ts
+import { readFileSync } from 'node:fs';
+import { Parser } from 'rdf-parser-ts';
+import { generateSparqlConstruct } from 'rdfjs-inference-engine';
+
+const readRdf = (path: string) => new Parser().parse(readFileSync(path, 'utf8'));
+const result = generateSparqlConstruct({
+  ontology: readRdf('provider-ontology.ttl'),
+  shaclIn: readRdf('provider-shape.ttl'),
+  shaclOut: readRdf('consumer-shape.ttl'),
+});
+
+if (result.query === null) {
+  throw new Error(result.diagnostics.map(d => d.message).join('\n'));
+}
+console.log(result.query);
+```
+
+Inputs are RDF-JS quad iterables. The result contains `query`, `mappings` (provider/consumer shapes and paths), and `diagnostics` with `error` or `warning` severity. Missing required mappings and unsupported consumer constraints return `query: null`; missing optional mappings produce warnings. Invalid RDF terms throw an error. No runtime rule profiles or network access are needed by the compiler.
+
+The compiler follows transitive `rdfs:subPropertyOf`, `owl:equivalentProperty`, `owl:inverseOf`, `rdfs:subClassOf`, and `owl:equivalentClass` relationships. It maps predicates, inverse paths, and matching sequences, preserving existing intermediate nodes. Provider alternative paths can supply multiple source predicates. Consumer alternative and repeated paths cannot determine an unambiguous output structure and are reported as errors. Nested `sh:node`, logical constraints, custom unit conversions, and general OWL/N3 rule execution are not supported.
+
+Run the query separately on each message as the default RDF graph, using a SPARQL 1.1 engine. The query preserves focus-node identities and values, copies all mapped values, uses `OPTIONAL` for optional fields, and filters consumer datatypes, allowed values, node kinds, and class constraints. It requires existing `sh:hasValue` constants rather than inventing them. It does not cast datatypes, convert units, or repair cardinality. These are trusted mapping contracts; validate the constructed graph with SHACL when conformance is required. [SPARQL CONSTRUCT templates](https://www.w3.org/TR/sparql11-query/#construct) contain triples; [SHACL property paths](https://www.w3.org/TR/shacl/#property-paths) describe the source and target paths.
+
+Run `npm run test:sparql-construct` to execute the generated queries against RDF fixtures and check browser/Node API parity.
+
 ## Bundled Rule Profiles
 
 Default profiles are discovered from rule-set folders under `rules/`:

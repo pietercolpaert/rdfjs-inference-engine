@@ -2174,3 +2174,6 @@ export {
   isMessageQuad,
   toMessages,
 };
+
+export { generateSparqlConstruct } from '../src/sparql-construct';
+export type { SparqlConstructInput, SparqlConstructResult, SparqlConstructMapping, SparqlConstructDiagnostic } from '../src/sparql-construct';

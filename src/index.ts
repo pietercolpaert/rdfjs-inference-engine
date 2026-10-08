@@ -28,3 +28,6 @@ export type {
   ShapePlan,
   ShapePlanning,
 } from './shacl-shape-planning';
+
+export { generateSparqlConstruct } from './sparql-construct';
+export type { SparqlConstructInput, SparqlConstructResult, SparqlConstructMapping, SparqlConstructDiagnostic } from './sparql-construct';
