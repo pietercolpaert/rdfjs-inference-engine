@@ -192,7 +192,11 @@ export function compileShaclShapeGraph(quads: Iterable<Quad>, direction: ShapeDi
     direction,
     shapes,
     relevantPredicates: sortedUnion(shapes.flatMap((shape) => shape.relevantPredicates)),
-    relevantClasses: sortedUnion(shapes.flatMap((shape) => shape.relevantClasses)),
+    // Logical value alternatives and referenced node shapes can carry class
+    // constraints without their own property paths or targets.
+    relevantClasses: sortedUnion([...shapes.flatMap((shape) => shape.relevantClasses),
+      ...graphQuads.filter(q => [SH + 'class', SH + 'datatype'].includes(q.predicate.value)
+        && q.object.termType === 'NamedNode').map(q => q.object.value)]),
     pathTexts: sortedUnion(shapes.flatMap((shape) => shape.propertyPlans.map((property) => property.pathText))),
     scalarPaths: sortedUnion(shapes.flatMap((shape) => shape.scalarPaths)),
     repeatedPaths: sortedUnion(shapes.flatMap((shape) => shape.repeatedPaths)),
@@ -636,6 +640,10 @@ function compilePropertyShapePlan(propertyShape: Term, index: ShapeGraphIndex): 
     indexSpecs: indexSpecsForPath(path, pathToText(path), metadata),
     joinOrderHints: joinOrderHintsForPath(path, pathToText(path), maxCount === 1, minCount !== undefined && minCount > 0),
   };
+}
+
+export function compileShaclPath(term: Term, quads: Iterable<Quad>): CompiledShaclPath | undefined {
+  return compilePath(term, buildShapeGraphIndex(Array.from(quads)));
 }
 
 function compilePath(term: Term, index: ShapeGraphIndex): CompiledShaclPath | undefined {

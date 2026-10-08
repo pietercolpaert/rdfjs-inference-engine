@@ -131,7 +131,7 @@
       </div>
       <section class="card construct-output">
         <h2 class="section-title">SPARQL CONSTRUCT output query</h2>
-        <p class="hint">The output query runs on the input graph and facts inferred by the translated N3 rules. Comunica first executes the rule queries until no new facts are added, then executes this exact output query. This maps data; validate the result with SHACL when conformance is required.</p>
+        <p class="hint">The output query runs on the input graph and facts inferred by the translated N3 rules. Comunica first executes the rule queries until no new facts are added, then executes this exact output query. The consumer shape guides best-effort field selection: all values are retained, even when cardinality or other constraints fail. Validate the result with SHACL afterwards when conformance is required.</p>
         <div class="uri-input-row">
           <button id="copyButton" class="secondary" type="button" disabled>Copy query</button>
           <button id="downloadButton" class="secondary" type="button" disabled>Download runtime .json</button>

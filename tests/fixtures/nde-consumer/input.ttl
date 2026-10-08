@@ -1,0 +1,22 @@
+@prefix ex: <urn:nde-test:> .
+@prefix schema: <https://schema.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+ex:work a schema:CreativeWork ; schema:name "Testcollectie"@nl ;
+  schema:sdDatePublished "2026-10-09"^^xsd:date ;
+  schema:creator ex:person, ex:untyped ;
+  schema:about ex:subject ; schema:size "32 cm"@nl, ex:height ;
+  schema:associatedMedia ex:image, <https://example.org/iiif/manifest> ;
+  schema:contentLocation ex:place .
+ex:person a schema:Person ; schema:name "Maker"@nl ; schema:birthDate "1889"^^schema:Date .
+ex:untyped schema:name "Onbekende maker"@nl .
+ex:subject a schema:DefinedTerm ; schema:name "Testonderwerp"@nl ; schema:sameAs <https://example.org/terms/subject> .
+ex:height a schema:QuantitativeValue ; schema:value 32.0 ; schema:unitCode ex:cm ; schema:valueReference ex:dimension .
+ex:cm a schema:DefinedTerm, schema:URL ; schema:name "centimeter"@nl ; schema:sameAs <https://example.org/terms/cm> .
+ex:dimension a schema:DefinedTerm ; schema:name "hoogte"@nl .
+ex:image a schema:ImageObject ; schema:license <https://creativecommons.org/publicdomain/zero/1.0/> .
+<https://example.org/iiif/manifest> schema:license <https://creativecommons.org/publicdomain/zero/1.0/> ;
+  schema:encodingFormat "application/ld+json;profile='http://iiif.io/api/presentation/3/context.json'" .
+ex:place a schema:Place ; schema:name "Amsterdam"@nl ; schema:geo ex:coordinates .
+ex:coordinates a schema:GeoCoordinates ; schema:latitude 52.37 ; schema:longitude 4.9 .
+# A helper shape must not independently select unrelated data.
+ex:unrelated a schema:DefinedTerm ; schema:name "Do not include"@nl .

@@ -1,0 +1,10 @@
+@prefix ex: <https://example.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:ConsumerShape a sh:NodeShape ;
+  sh:targetClass ex:Observation ;
+  sh:property [ sh:path ex:value ; sh:datatype xsd:decimal ; sh:minCount 1 ] ;
+  sh:property [ sh:path ex:time ; sh:datatype xsd:dateTime ] .

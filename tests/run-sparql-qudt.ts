@@ -23,7 +23,10 @@ async function run(result: SparqlConstructResult, data: string): Promise<Quad[]>
   assert.ok(result.program && result.query);
   return (await executeSparqlRuntime(result.program, parse(data), createRdfjsSparqlExecutor(engine), { outputQuery: result.query })).output;
 }
-const numericValue = (quads: Quad[]) => quads.find(q => q.predicate.value === 'http://qudt.org/schema/qudt/numericValue')?.object;
+const numericValue = (quads: Quad[], unit?: string) => {
+  const subject = unit ? quads.find(q => q.predicate.value === 'http://qudt.org/schema/qudt/unit' && q.object.value === 'http://qudt.org/vocab/unit/' + unit)?.subject : undefined;
+  return quads.find(q => q.predicate.value === 'http://qudt.org/schema/qudt/numericValue' && (!unit || subject && q.subject.equals(subject)))?.object;
+};
 async function main(): Promise<void> {
   const result = compile();
   assert.ok(result.query);
@@ -52,7 +55,7 @@ async function main(): Promise<void> {
     profiles: [qudtProfile], ontology: parse(background), shaclIn: parse(input), shaclOut: parse(output.replaceAll('schema:about', 'museum:heightOf')) });
   const reverse = compileQudt(ontology + configuration('CentiM', 'cm'), shaclIn, shaclOut.replaceAll('unit:M', 'unit:CentiM'));
   assert.ok(reverse.query);
-  assert.equal(Number(numericValue(await run(reverse, sample('"0.32"^^xsd:decimal', 'M')))?.value), 32);
+  assert.equal(Number(numericValue(await run(reverse, sample('"0.32"^^xsd:decimal', 'M')), 'CentiM')?.value), 32);
   const temperatureOntology = `
 @prefix museum: <https://example.org/museum/ontology#> .
 @prefix qudt: <http://qudt.org/schema/qudt/> .
@@ -70,7 +73,7 @@ unit:K qudt:hasDimensionVector qkdv:A0E0L0I0M0H1T0D0 ; qudt:conversionMultiplier
   assert.equal(Number(numericValue(await run(affine, sample('"20"^^xsd:decimal', 'DEG_C')))?.value), 293.15);
   const reverseAffine = compileQudt(temperatureOntology + configuration('DEG_C', 'Cel'), temperatureIn, shaclOut.replaceAll('unit:M', 'unit:DEG_C'));
   assert.ok(reverseAffine.query);
-  assert.equal(Number(numericValue(await run(reverseAffine, sample('"293.15"^^xsd:decimal', 'K')))?.value), 20, 'Subtract target offsets when converting Kelvin to Celsius.');
+  assert.equal(Number(numericValue(await run(reverseAffine, sample('"293.15"^^xsd:decimal', 'K')), 'DEG_C')?.value), 20, 'Subtract target offsets when converting Kelvin to Celsius.');
   const actualEngine = new InferenceEngine();
   actualEngine.load(loadDefaultRuleProfiles(), parse(ontology), { shaclIn: parse(shaclIn), shaclOut: parse(shaclOut) });
   const normalizeAllocation = (runtime: string) => runtime.replace(/https:\/\/eyereasoner\.github\.io\/\.well-known\/genid\/[a-f0-9-]+/g, 'urn:allocated');

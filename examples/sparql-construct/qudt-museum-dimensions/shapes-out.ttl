@@ -8,7 +8,8 @@
 
 # The consumer needs heights expressed in metres, not merely relabelled units.
 museum:ConsumerShape a sh:NodeShape ;
-  sh:targetClass qudt:QuantityValue ;
+  sh:targetSubjectsOf qcr:sourceQuantity ;
+  sh:class qudt:QuantityValue ;
   sh:property [ sh:path (qcr:sourceQuantity schema:about) ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
   sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:datatype xsd:decimal ; sh:unit unit:M ] ;
   sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:hasValue unit:M ] .

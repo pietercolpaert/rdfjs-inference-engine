@@ -1,0 +1,4 @@
+{
+  "label": "Sensor readings",
+  "description": "Map temperature readings to an observation contract, preserving optional timestamps."
+}

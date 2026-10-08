@@ -1,0 +1,49 @@
+# Synthetic regression profile for the SHACL features used by the NDE profile.
+# This is a test contract, not a copy of or replacement for the official profile.
+@prefix ex: <urn:nde-test:> .
+@prefix schema: <https://schema.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+ex:Work a sh:NodeShape ; sh:targetClass schema:CreativeWork ; sh:nodeKind sh:IRI ;
+  sh:property [ sh:path schema:name ; sh:datatype rdf:langString ; sh:uniqueLang true ; sh:minCount 1 ],
+    [ sh:path schema:sdDatePublished ; sh:minCount 1 ; sh:maxCount 1 ;
+      sh:or ( [ sh:datatype xsd:date ; sh:pattern "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" ]
+        [ sh:datatype xsd:dateTime ; sh:pattern "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" ] ) ],
+    [ sh:path schema:creator ; sh:or ( [ sh:class schema:Person ] [ sh:class schema:Organization ] [ sh:node ex:UnknownCreator ] ) ],
+    [ sh:path schema:associatedMedia ; sh:or ( [ sh:node ex:Media ] [ sh:node ex:Manifest ] ) ],
+    [ sh:path schema:about ; sh:node ex:Term ],
+    [ sh:path schema:size ; sh:or ( [ sh:datatype rdf:langString ] [ sh:datatype xsd:string ] [ sh:node ex:Measurement ] ) ],
+    [ sh:path schema:contentLocation ; sh:node ex:Place ] .
+ex:UnknownCreator a sh:NodeShape ; sh:not [ sh:path rdf:type ; sh:minCount 1 ] ;
+  sh:property [ sh:path schema:name ; sh:datatype rdf:langString ; sh:minCount 1 ] .
+ex:Term a sh:NodeShape ; sh:class schema:DefinedTerm ;
+  sh:property [ sh:path schema:name ; sh:datatype rdf:langString ; sh:minCount 1 ],
+    [ sh:path schema:sameAs ; sh:nodeKind sh:IRI ] .
+ex:Measurement a sh:NodeShape ; sh:class schema:QuantitativeValue ;
+  sh:property [ sh:path schema:value ; sh:minCount 1 ; sh:or ( [ sh:datatype xsd:integer ] [ sh:datatype xsd:decimal ] [ sh:datatype xsd:double ] ) ],
+    [ sh:path schema:valueReference ; sh:node ex:Term ; sh:minCount 1 ],
+    [ sh:path schema:unitCode ; sh:node ex:Term ; sh:minCount 1 ] .
+ex:Person a sh:NodeShape ; sh:targetClass schema:Person ;
+  sh:property [ sh:path schema:name ; sh:datatype rdf:langString ; sh:minCount 1 ],
+    [ sh:path schema:birthDate ; sh:node ex:Date ] .
+ex:Date a sh:NodeShape ; sh:or (
+  [ sh:datatype schema:Date ; sh:pattern "^[0-9]{4}(-[0-9]{2})?(-[0-9]{2})?$" ]
+  [ sh:datatype xsd:date ; sh:pattern "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" ]
+  [ sh:datatype xsd:gYearMonth ] [ sh:datatype xsd:gYear ] ) .
+ex:Place a sh:NodeShape ; sh:targetClass schema:Place ;
+  sh:property [ sh:path schema:name ; sh:datatype rdf:langString ; sh:minCount 1 ],
+    [ sh:path schema:geo ; sh:or ( [ sh:class schema:GeoShape ]
+      [ sh:class schema:GeoCoordinates ; sh:node [ sh:property
+        [ sh:path schema:latitude ; sh:or ( [ sh:datatype xsd:decimal ] [ sh:datatype xsd:double ] ) ; sh:minCount 1 ],
+        [ sh:path schema:longitude ; sh:or ( [ sh:datatype xsd:decimal ] [ sh:datatype xsd:double ] ) ; sh:minCount 1 ] ] ] ) ] .
+ex:Media a sh:NodeShape ; sh:property
+  [ sh:path schema:license ; sh:nodeKind sh:IRI ; sh:pattern "^https?://" ; sh:minCount 1 ],
+  [ sh:path schema:contentUrl ; sh:nodeKind sh:IRI ; sh:minCount 1 ; sh:severity sh:Warning ],
+  [ sh:path schema:thumbnailUrl ; sh:nodeKind sh:IRI ; sh:minCount 1 ; sh:severity sh:Warning ] .
+ex:Manifest a sh:NodeShape ; sh:nodeKind sh:IRI ; sh:property
+  [ sh:path schema:license ; sh:nodeKind sh:IRI ; sh:minCount 1 ],
+  [ sh:path schema:encodingFormat ; sh:pattern "^application/ld\\+json;profile='http://iiif\\.io/api/presentation/\\d+/context\\.json'$" ; sh:minCount 1 ] .
+ex:MediaCounts a sh:NodeShape ; sh:targetClass schema:CreativeWork ; sh:property
+  [ sh:path schema:associatedMedia ; sh:qualifiedValueShape ex:Media ; sh:qualifiedMinCount 1 ; sh:severity sh:Warning ],
+  [ sh:path schema:associatedMedia ; sh:qualifiedValueShape ex:Manifest ; sh:qualifiedMaxCount 1 ] .

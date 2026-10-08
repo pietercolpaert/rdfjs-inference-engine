@@ -1,0 +1,7 @@
+@prefix ex: <https://example.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:reading-1 a ex:SensorReading ; ex:temperature "18.4"^^xsd:decimal ; ex:recordedAt "2026-10-08T12:00:00Z"^^xsd:dateTime .
