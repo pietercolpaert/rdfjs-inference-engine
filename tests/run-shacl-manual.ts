@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { Quad, Term } from '@rdfjs/types';
 import { reasonStream } from 'eyeling';
-import { DataFactory } from 'rdf-parser-ts';
+import { DataFactory } from 'rdf-data-factory';
 import { parseRdf, termKey } from './utils';
 
 const EX = 'https://example.org/manual-shacl#';
+const dataFactory = new DataFactory();
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
 const SH = 'http://www.w3.org/ns/shacl#';
 const SHN = 'https://www.pieter.pm/rdfjs-inference-engine/ns/internal#';
@@ -125,9 +126,9 @@ assert.ok(hasObject(classResults[0], SH + 'focusNode', EX + 'Root'), 'class viol
 assert.ok(hasObject(classResults[0], SH + 'value', EX + 'badLeaf'), 'class violation should be for the non-conforming leaf');
 assert.ok(!hasObject(classResults[0], SH + 'value', EX + 'step2'), 'three-step path must not also validate the two-step prefix');
 
-assert.ok(pathValueObjects.has(termKey(DataFactory.namedNode(EX + 'altValue'))), 'alternative paths should resolve values from any alternative');
-assert.ok(pathValueObjects.has(termKey(DataFactory.namedNode(EX + 'chain2'))), 'zero-or-more and one-or-more paths should resolve transitive values');
-assert.ok(pathValueObjects.has(termKey(DataFactory.namedNode(EX + 'maybeValue'))), 'zero-or-one paths should resolve the optional value');
+assert.ok(pathValueObjects.has(termKey(dataFactory.namedNode(EX + 'altValue'))), 'alternative paths should resolve values from any alternative');
+assert.ok(pathValueObjects.has(termKey(dataFactory.namedNode(EX + 'chain2'))), 'zero-or-more and one-or-more paths should resolve transitive values');
+assert.ok(pathValueObjects.has(termKey(dataFactory.namedNode(EX + 'maybeValue'))), 'zero-or-one paths should resolve the optional value');
 
 assert.equal(patternResults.length, 1, 'pattern validation should produce exactly one violation');
 assert.ok(hasObject(patternResults[0], SH + 'resultPath', EX + 'strictCode'), 'unflagged strict pattern should still fail');

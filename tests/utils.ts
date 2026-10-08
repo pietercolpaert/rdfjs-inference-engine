@@ -3,19 +3,21 @@ import { dirname } from 'node:path';
 import { Readable } from 'node:stream';
 import { get } from 'node:https';
 import type { Quad, Term } from '@rdfjs/types';
-import { DataFactory, isMessageQuad, Parser } from 'rdf-parser-ts';
+import { DataFactory } from 'rdf-data-factory';
+import { isMessageQuad, Parser } from 'rdf-parser-ts';
 import { RdfXmlParser } from 'rdfxml-streaming-parser';
 
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
+const dataFactory = new DataFactory();
 
 export function parseRdf(source: string): Quad[] {
-  const parser = new Parser({ factory: DataFactory });
+  const parser = new Parser({ factory: dataFactory });
   const parsed = parser.parse(source) ?? [];
   return Array.from(parsed as Iterable<unknown>, (item) => (isMessageQuad(item) ? item.quad : item) as Quad);
 }
 
 export function parseRdfWithBase(source: string, baseIRI: string): Quad[] {
-  const parser = new Parser({ factory: DataFactory, baseIRI, relax: true });
+  const parser = new Parser({ factory: dataFactory, baseIRI, relax: true });
   const parsed = parser.parse(source.replace(/\]([.;,])/g, '] $1')) ?? [];
   return Array.from(parsed as Iterable<unknown>, (item) => (isMessageQuad(item) ? item.quad : item) as Quad);
 }
@@ -107,7 +109,7 @@ export function addReflexiveSameAsClosure(quads: Quad[]): Quad[] {
   const result = [...quads];
   const seen = new Set(result.map(quadKey));
   for (const term of allConcreteTerms(quads)) {
-    const quad = DataFactory.quad(term as any, DataFactory.namedNode(OWL_SAME_AS), term as any) as Quad;
+    const quad = dataFactory.quad(term as any, dataFactory.namedNode(OWL_SAME_AS), term as any) as Quad;
     const key = quadKey(quad);
     if (!seen.has(key)) {
       seen.add(key);

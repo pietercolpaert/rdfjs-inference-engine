@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Quad } from '@rdfjs/types';
-import { DataFactory } from 'rdf-parser-ts';
+import { DataFactory } from 'rdf-data-factory';
 import { InferenceEngine } from '../../src';
 import { assertContainsQuads, parseToQuads, writeQuads } from '../util';
 
@@ -31,8 +31,9 @@ async function main(): Promise<void> {
 }
 
 function selectedExpectedQuads(): Quad[] {
-  const nn = DataFactory.namedNode;
-  const q = DataFactory.quad;
+  const dataFactory = new DataFactory();
+  const nn = dataFactory.namedNode.bind(dataFactory);
+  const q = dataFactory.quad.bind(dataFactory);
 
   return [
     q(nn(`${EX}shipment-1`), nn(RDF + 'type'), nn(`${EX}ExpressShipment`)) as Quad,

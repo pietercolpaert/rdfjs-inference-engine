@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import type { Quad } from '@rdfjs/types';
-import { DataFactory as df, Writer } from 'rdf-parser-ts';
+import { DataFactory } from 'rdf-data-factory';
+import { Writer } from 'rdf-writer-ts';
 import { PrefixedWriter } from '../browser-src/prefixed-writer';
+const df = new DataFactory();
 const EX = 'https://example.org/', SCHEMA = 'https://schema.org/', XSD = 'http://www.w3.org/2001/XMLSchema#';
 const quad = (s: string, p: string, value = df.literal('value')) => df.quad(df.namedNode(s), df.namedNode(p), value) as Quad;
 function serialize(quads: Quad[], prefixes: Record<string, string> = {}) {

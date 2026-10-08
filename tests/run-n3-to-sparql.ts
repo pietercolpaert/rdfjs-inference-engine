@@ -4,13 +4,19 @@ import { QueryEngine } from '@comunica/query-sparql-rdfjs-lite';
 import { Parser as SparqlParser } from 'sparqljs';
 import { reasonStream } from 'eyeling';
 import { InferenceEngine, translateN3RuntimeToSparql, executeSparqlRuntime, createRdfjsSparqlExecutor } from '../src';
-const { Parser, Writer } = require('n3');
+const { DataFactory, Parser, Writer } = require('n3');
 const prefixes = `@prefix ex:<urn:ex:>. @prefix math:<http://www.w3.org/2000/10/swap/math#>.
 @prefix log:<http://www.w3.org/2000/10/swap/log#>. @prefix string:<http://www.w3.org/2000/10/swap/string#>.
 @prefix dt:<https://eyereasoner.github.io/eyeling/datatype#>. @prefix xsd:<http://www.w3.org/2001/XMLSchema#>.\n`;
 const parse = (source: string): Quad[] => new Parser({ format: 'N3' }).parse(prefixes + source);
 const executor = createRdfjsSparqlExecutor(new QueryEngine());
-const key = (q: Quad) => new Writer({ format: 'N-Triples' }).quadsToString([q]);
+const key = (q: Quad) => {
+  // Arithmetic engines can spell the same decimal as "6" or "6.0".
+  // Compare values while still checking the RDF datatype and all other terms.
+  const object = q.object.termType === 'Literal' && q.object.datatype.value === 'http://www.w3.org/2001/XMLSchema#decimal'
+    ? DataFactory.literal(String(Number(q.object.value)), q.object.datatype) : q.object;
+  return new Writer({ format: 'N-Triples' }).quadsToString([DataFactory.quad(q.subject, q.predicate, object, q.graph)]);
+};
 async function run(runtime: string, data: string, maxRounds?: number) {
   const compiled = translateN3RuntimeToSparql(prefixes + runtime);
   assert.ok(compiled.program, JSON.stringify(compiled.diagnostics));

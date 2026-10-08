@@ -7,11 +7,11 @@ import { translateN3RuntimeToSparql, type N3SparqlOptions, type N3SparqlResult }
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling/browser';
 import LDFetch from 'ldfetch';
+import { DataFactory as RdfDataFactory } from 'rdf-data-factory';
+import { Writer } from 'rdf-writer-ts/browser';
 import {
-  DataFactory as RdfParserDataFactory,
   IncrementalParser,
   Parser,
-  Writer,
   isMessageQuad,
   toMessages,
 } from 'rdf-parser-ts/browser';
@@ -25,6 +25,7 @@ import {
   type ShapePlanning,
 } from '../src/shacl-shape-planning';
 
+const dataFactory = new RdfDataFactory();
 const XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const RDFS_DOMAIN = 'http://www.w3.org/2000/01/rdf-schema#domain';
@@ -1501,7 +1502,7 @@ function parseWithAutomaticMessages(source: string, options: Record<string, unkn
   const parse = (parserOptions: Record<string, unknown>) => {
     const raw: unknown[] = [], prefixes: Record<string, string> = Object.create(null);
     let failure: Error | null = null;
-    new Parser({ factory: RdfParserDataFactory, ...parserOptions }).parse(source, (error, quad, declared, messageCounter) => {
+    new Parser({ factory: dataFactory, ...parserOptions }).parse(source, (error, quad, declared, messageCounter) => {
       if (error) { failure = error; return; }
       if (quad) raw.push(messageCounter === undefined ? quad : { quad, messageCounter });
       else for (const [label, iri] of Object.entries(declared ?? {})) prefixes[label] = iri.value;
@@ -2197,7 +2198,7 @@ function deterministicSkolemIdFromKey(key: string): string {
 }
 
 export {
-  RdfParserDataFactory as DataFactory,
+  dataFactory as DataFactory,
   IncrementalParser,
   Parser,
   Writer,

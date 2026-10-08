@@ -28,7 +28,8 @@ npm run build
 ```ts
 import { readFileSync } from 'node:fs';
 import type { Quad } from '@rdfjs/types';
-import { DataFactory, isMessageQuad, Parser } from 'rdf-parser-ts';
+import { DataFactory } from 'rdf-data-factory';
+import { isMessageQuad, Parser } from 'rdf-parser-ts';
 import { InferenceEngine } from 'rdfjs-inference-engine';
 
 const ontology = parseToQuads(readFileSync('examples/transit-fleet/ontology.n3', 'utf8'));
@@ -40,7 +41,7 @@ reasoner.load(ontology);
 const inferred = Array.from(reasoner.infer(data));
 
 function parseToQuads(source: string): Quad[] {
-  const parser = new Parser({ factory: DataFactory });
+  const parser = new Parser({ factory: new DataFactory() });
   const parsed = parser.parse(source) ?? [];
   return Array.from(parsed as Iterable<unknown>, (item) => (isMessageQuad(item) ? item.quad : item) as Quad);
 }

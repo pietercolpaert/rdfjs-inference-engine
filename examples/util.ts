@@ -1,5 +1,9 @@
 import type { Quad } from '@rdfjs/types';
-import { DataFactory, isMessageQuad, Parser, toMessages, Writer } from 'rdf-parser-ts';
+import { DataFactory } from 'rdf-data-factory';
+import { isMessageQuad, Parser, toMessages } from 'rdf-parser-ts';
+import { Writer } from 'rdf-writer-ts';
+
+const dataFactory = new DataFactory();
 
 export interface ParsedRdfInput {
   isMessages: boolean;
@@ -63,12 +67,12 @@ export function assertContainsQuads(actual: Quad[], expected: Quad[], label: str
 
 function parseWithAutomaticMessages(source: string): Iterable<unknown> {
   try {
-    return new Parser({ factory: DataFactory }).parse(source) ?? [];
+    return new Parser({ factory: dataFactory }).parse(source) ?? [];
   } catch (error) {
     if (!hasMessageSyntax(source)) {
       throw error;
     }
-    return new Parser({ factory: DataFactory, rdfMessages: true }).parse(source) ?? [];
+    return new Parser({ factory: dataFactory, rdfMessages: true }).parse(source) ?? [];
   }
 }
 

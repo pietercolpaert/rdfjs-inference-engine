@@ -1,4 +1,4 @@
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { build } from 'esbuild';
@@ -30,6 +30,9 @@ const common = {
   sourcemap: false,
   platform: 'browser',
   target: ['es2020'],
+  // Escape multiline strings so generated bundles have no trailing whitespace.
+  // Trimming the output would corrupt significant spaces inside string literals.
+  supported: { 'template-literal': false },
   define: {
     global: 'globalThis',
   },
@@ -210,18 +213,3 @@ await build({
   format: 'iife',
   plugins: [browserNodePolyfillsPlugin],
 });
-
-await Promise.all([
-  trimTrailingWhitespace('browser/sparql-construct-worker.min.js'),
-  trimTrailingWhitespace('browser/sparql-construct-playground.min.js'),
-  trimTrailingWhitespace('browser/rdfjs-inference-engine.min.js'),
-  trimTrailingWhitespace('browser/playground.min.js'),
-]);
-
-async function trimTrailingWhitespace(path) {
-  const source = await readFile(path, 'utf8');
-  const normalized = source.replace(/[ \t]+$/gm, '');
-  if (normalized !== source) {
-    await writeFile(path, normalized, 'utf8');
-  }
-}
