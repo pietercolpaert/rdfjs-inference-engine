@@ -16,31 +16,26 @@ const expectedOutputs: Record<string, string> = {
 };
 
 async function main(): Promise<void> {
-  const directories = readdirSync(EXAMPLES, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(join(EXAMPLES, entry.name, 'ontology.n3')))
-    .map((entry) => entry.name)
-    .sort();
+  const directories = discoverExamples(EXAMPLES).sort();
 
-  assert.equal(directories.length, 14, 'Expected all fourteen repository examples in the playground contract suite.');
+  assert.equal(directories.length, 17, 'Both playgrounds must include the fourteen original and three mapping examples.');
 
   let messages = 0;
-  for (const name of directories) {
-    const directory = join(EXAMPLES, name);
-    const inputPath = join(directory, 'input.messages.trig');
-    const shaclInPath = join(directory, 'shapes-in.n3');
-    const shaclOutPath = join(directory, 'shapes-out.n3');
-    assert.ok(existsSync(inputPath), `${name} must use input.messages.trig.`);
-    assert.ok(existsSync(shaclInPath), `${name} must provide shapes-in.n3.`);
-    assert.ok(existsSync(shaclOutPath), `${name} must provide shapes-out.n3.`);
+  for (const directory of directories) {
+    const name = directory.split('/').at(-1)!;
+    const inputPath = fixture(directory, ['input.messages.trig', 'input.ttl']);
+    const shaclInPath = fixture(directory, ['shapes-in.n3', 'shapes-in.ttl']);
+    const shaclOutPath = fixture(directory, ['shapes-out.n3', 'shapes-out.ttl']);
 
     const input = parseRdfOrMessages(readFileSync(inputPath, 'utf8'));
-    assert.ok(input.isMessages && input.messages.length > 0, `${name} input must parse as an RDF Message log.`);
-    messages += input.messages.length;
+    const inputMessages = input.isMessages ? input.messages : [input.quads];
+    assert.ok(inputMessages.length > 0, `${name} must provide input data.`);
+    messages += inputMessages.length;
 
     const reasoner = new InferenceEngine();
     reasoner.load(
       loadDefaultRuleProfiles(),
-      parseToQuads(readFileSync(join(directory, 'ontology.n3'), 'utf8')),
+      parseToQuads(readFileSync(fixture(directory, ['ontology.n3', 'ontology.ttl']), 'utf8')),
       {
         shaclIn: parseToQuads(readFileSync(shaclInPath, 'utf8')),
         shaclOut: parseToQuads(readFileSync(shaclOutPath, 'utf8')),
@@ -49,7 +44,21 @@ async function main(): Promise<void> {
         selectRuntimeRules: name === 'shipment-logistics' ? false : undefined,
       },
     );
-    const output = input.messages.flatMap((message) => Array.from(reasoner.infer(message)));
+    const output = inputMessages.flatMap((message) => Array.from(reasoner.infer(message)));
+    if (name === 'qudt-museum-dimensions') {
+      assert.deepEqual(output.filter(q => q.predicate.value === 'http://qudt.org/schema/qudt/numericValue')
+        .map(q => Number(q.object.value)), [0.32, 0.45, 1.2], 'The shared museum example also normalizes heights in the main playground.');
+    }
+    if (name === 'nde-amsterdam-photograph') {
+      const expected = parseToQuads(readFileSync(join(directory, 'expected-output.messages.trig'), 'utf8'))
+        .filter(q => q.predicate.value !== 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type');
+      // The main playground projects inferred properties; the CONSTRUCT
+      // projection additionally emits the consumer's target class.
+      assertContains(output, expected, 'Shared NDE example, including Dutch language tags');
+    }
+    if (name === 'sensor-reading') {
+      assert.ok(output.some(q => q.predicate.value === 'https://example.org/value' && q.object.value === '18.4'), 'The shared sensor example maps temperature in the main playground.');
+    }
 
     const expectedFile = expectedOutputs[name];
     if (expectedFile) {
@@ -58,7 +67,38 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`Playground contracts: ${directories.length} examples and ${messages} RDF Messages verified.`);
+  console.log(`Playground contracts: ${directories.length} shared examples and ${messages} input messages verified.`);
+  await checkLanguageTags();
+}
+
+async function checkLanguageTags(): Promise<void> {
+  const input = parseToQuads(`
+@prefix ex: <urn:language:> .
+_:photo ex:title "A quoted \\"title\\""@nl .
+ex:second ex:title "Hello"@en-US .
+ex:third ex:title "Plain @nl" .
+ex:fourth ex:title ex:identifier .`);
+  const engine = new InferenceEngine({ runtime: '{ ?s <urn:language:title> ?v } => { ?s <urn:language:name> ?v } .' });
+  for (const output of [Array.from(engine.infer(input)), engine.inferWithDiagnostics(input).quads,
+    await engine.inferAsync(input), (await engine.inferAsyncWithDiagnostics(input)).quads]) {
+    assert.equal(output.length, input.length);
+    for (const quad of input) {
+      assert.ok(output.some(result => result.subject.equals(quad.subject) && result.object.equals(quad.object)),
+        'Sync and async inference preserve literal language, escaping, ordinary terms and blank-node identity.');
+    }
+  }
+}
+
+function fixture(directory: string, names: string[]): string {
+  const path = names.map(name => join(directory, name)).find(path => existsSync(path));
+  assert.ok(path, `${directory} must provide ${names.join(' or ')}.`);
+  return path;
+}
+
+function discoverExamples(directory: string): string[] {
+  if (['ontology.n3', 'ontology.ttl'].some(file => existsSync(join(directory, file)))) return [directory];
+  return readdirSync(directory, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name !== 'src')
+    .flatMap(entry => discoverExamples(join(directory, entry.name)));
 }
 
 function assertContains(actual: Quad[], expected: Quad[], label: string): void {

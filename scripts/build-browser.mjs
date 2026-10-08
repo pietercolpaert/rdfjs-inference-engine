@@ -111,46 +111,46 @@ const bundledExamplesPlugin = {
   setup(build) {
     build.onResolve({ filter: /^bundled-examples$/ }, () => ({ path: 'bundled-examples', namespace: 'bundled-examples' }));
     build.onLoad({ filter: /.*/, namespace: 'bundled-examples' }, async () => {
-      const entries = await readdir('examples', { withFileTypes: true });
       const examples = [];
-      for (const entry of entries) {
-        if (!entry.isDirectory() || entry.name === 'src') {
-          continue;
-        }
-
-        const dir = join('examples', entry.name);
-        const files = await readdir(dir);
-        const backgroundFile = ['ontology.n3', 'shapes.n3']
-          .find((candidate) => files.includes(candidate));
-        if (!backgroundFile) {
-          continue;
-        }
-
+      const ids = new Set();
+      async function collectExamples(dir) {
+        const entries = await readdir(dir, { withFileTypes: true });
+        const files = entries.filter(entry => entry.isFile()).map(entry => entry.name);
+        const backgroundFile = ['ontology.n3', 'ontology.ttl', 'shapes.n3', 'shapes.ttl']
+          .find(candidate => files.includes(candidate));
         const inputFile = ['input.messages.trig', 'input.trig', 'input.n3', 'input.ttl']
-          .find((candidate) => files.includes(candidate));
-        if (!inputFile) {
-          continue;
+          .find(candidate => files.includes(candidate));
+        if (backgroundFile && inputFile) {
+          const id = dir.split('/').at(-1);
+          if (ids.has(id)) throw new Error(`Duplicate playground example ID: ${id}`);
+          ids.add(id);
+          const shaclInFile = ['shapes-in.n3', 'shapes-in.ttl'].find(file => files.includes(file));
+          const shaclOutFile = ['shapes-out.n3', 'shapes-out.ttl'].find(file => files.includes(file));
+          if (!shaclInFile || !shaclOutFile) {
+            throw new Error(`Playground example ${id} must provide provider and consumer SHACL shapes.`);
+          }
+          const metadata = files.includes('example.json')
+            ? JSON.parse(await readFile(join(dir, 'example.json'), 'utf8')) : {};
+          examples.push({
+            id,
+            label: metadata.label ?? humanizeExampleId(id),
+            description: metadata.description ?? `Load ${humanizeExampleId(id)} with its ontology, provider and consumer SHACL, and input data.`,
+            backgroundFile: join(dir, backgroundFile),
+            dataFile: join(dir, inputFile),
+            background: await readFile(join(dir, backgroundFile), 'utf8'),
+            data: await readFile(join(dir, inputFile), 'utf8'),
+            shaclInFile: join(dir, shaclInFile),
+            shaclOutFile: join(dir, shaclOutFile),
+            shaclIn: await readFile(join(dir, shaclInFile), 'utf8'),
+            shaclOut: await readFile(join(dir, shaclOutFile), 'utf8'),
+          });
+          return;
         }
-
-        const shaclInFile = files.includes('shapes-in.n3') ? 'shapes-in.n3' : undefined;
-        const shaclOutFile = files.includes('shapes-out.n3') ? 'shapes-out.n3' : undefined;
-        if (!shaclInFile || !shaclOutFile) {
-          throw new Error(`Playground example ${entry.name} must provide shapes-in.n3 and shapes-out.n3.`);
+        for (const entry of entries) {
+          if (entry.isDirectory() && entry.name !== 'src') await collectExamples(join(dir, entry.name));
         }
-
-        examples.push({
-          id: entry.name,
-          label: humanizeExampleId(entry.name),
-          backgroundFile: `examples/${entry.name}/${backgroundFile}`,
-          dataFile: `examples/${entry.name}/${inputFile}`,
-          background: await readFile(join(dir, backgroundFile), 'utf8'),
-          data: await readFile(join(dir, inputFile), 'utf8'),
-          shaclInFile: shaclInFile ? `examples/${entry.name}/${shaclInFile}` : undefined,
-          shaclOutFile: shaclOutFile ? `examples/${entry.name}/${shaclOutFile}` : undefined,
-          shaclIn: shaclInFile ? await readFile(join(dir, shaclInFile), 'utf8') : undefined,
-          shaclOut: shaclOutFile ? await readFile(join(dir, shaclOutFile), 'utf8') : undefined,
-        });
       }
+      await collectExamples('examples');
 
       examples.sort((left, right) => left.label.localeCompare(right.label));
 
@@ -203,7 +203,7 @@ await build({
   entryPoints: ['browser-src/sparql-construct-playground.ts'],
   outfile: 'browser/sparql-construct-playground.min.js',
   format: 'iife',
-  loader: { '.ttl': 'text', '.trig': 'text' },
+  plugins: [bundledExamplesPlugin],
 });
 
 await build({

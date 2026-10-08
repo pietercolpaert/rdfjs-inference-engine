@@ -12,14 +12,15 @@ declare module 'bundled-examples' {
   export const bundledExamples: Array<{
     id: string;
     label: string;
+    description: string;
     backgroundFile: string;
     dataFile: string;
     background: string;
     data: string;
-    shaclInFile?: string;
-    shaclOutFile?: string;
-    shaclIn?: string;
-    shaclOut?: string;
+    shaclInFile: string;
+    shaclOutFile: string;
+    shaclIn: string;
+    shaclOut: string;
   }>;
 }
 

@@ -112,7 +112,7 @@ async function testPlayground(api: any): Promise<void> {
     'exampleSelect', 'exampleDescription', 'ndeGuidance', 'dataText', 'dataUrl', 'dataLoad', 'dataLoadStatus',
     'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton']) {
     elements.set(id, { id, value: '', textContent: '', disabled: false, handlers: {} as Record<string, (...args: any[]) => unknown>,
-      appendChild: () => {}, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
+      options: [] as any[], appendChild(option: any) { this.options.push(option); }, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
   }
   let resolveLoad: (result: any) => void = () => {};
   const workers: any[] = [];
@@ -142,6 +142,11 @@ async function testPlayground(api: any): Promise<void> {
   assert.equal(editors.size, 8, 'Mapping inputs, generated runtime, query, data and result use CodeMirror.');
   assert.equal(elements.get('executionPanel').hidden, false);
   assert.equal(elements.get('exampleSelect').value, 'nde-amsterdam-photograph');
+  const exampleIds = elements.get('exampleSelect').options.map((option: any) => option.value);
+  assert.equal(exampleIds.length, 17, 'The SPARQL playground includes the complete shared example catalog.');
+  for (const id of ['owl-skos-catalog', 'transit-fleet', 'stateful-materialization', 'qudt-logarithmic', 'sensor-reading']) {
+    assert.ok(exampleIds.includes(id), `Shared example ${id} is selectable.`);
+  }
   assert.ok(editors.get('ontologyText').getValue().includes('dcterms:title rdfs:subPropertyOf schema:name'));
   elements.get('runQueryButton').handlers.click();
   assert.equal(workers[0].request.query, editors.get('queryText').getValue(), 'Send the displayed query unchanged to Comunica.');

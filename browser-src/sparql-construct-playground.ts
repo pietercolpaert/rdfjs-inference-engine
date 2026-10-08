@@ -10,7 +10,7 @@ const names = ['ontology', 'shaclIn', 'shaclOut'] as const;
 const get = (id: string) => document.getElementById(id)!;
 const button = (id: string) => get(id) as HTMLButtonElement;
 const exampleSelect = get('exampleSelect') as HTMLSelectElement;
-const initialExample = constructExamples[0];
+const initialExample = constructExamples.find(example => example.id === 'nde-amsterdam-photograph') ?? constructExamples[0];
 const editors = Object.fromEntries(names.map(name => [name, editor(`${name}Text`, initialExample[name])])) as Record<typeof names[number], any>;
 const output = editor('queryText', '', true, 'application/sparql-query');
 const runtimeEditor = editor('runtimeText', '', true);

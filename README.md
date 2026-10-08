@@ -67,7 +67,7 @@ The main class is `InferenceEngine`.
 
 ## N3 runtime to SPARQL CONSTRUCT
 
-The [SPARQL CONSTRUCT playground](sparql-construct.html), linked from the main playground, accepts a provider ontology, provider SHACL, and consumer SHACL. Each RDF input has an editable CodeMirror field and a URL **Load** button. The examples include NDE-inspired Amsterdam photographs, QUDT museum object heights, and sensor readings.
+The [SPARQL CONSTRUCT playground](sparql-construct.html), linked from the main playground, accepts a provider ontology, provider SHACL, and consumer SHACL. Each RDF input has an editable CodeMirror field and a URL **Load** button. Both playgrounds share the same example collection, labels, ontology, SHACL contracts and input data, including NDE-inspired Amsterdam photographs, QUDT museum object heights, and sensor readings. Examples using features outside the SPARQL translator’s supported subset report diagnostics in that playground.
 
 `generateSparqlConstruct` loads the engine’s bundled OWL 2 RL, SKOS and QUDT profiles, including the prepared QUDT runtime. It uses the same ontology and SHACL specialization as `InferenceEngine.load`, keeps its RDF/JS-compatible background closure, translates the generated N3 runtime, and builds the consumer output projection. Generalized RDF background facts with literal subjects are excluded with a diagnostic because SPARQL cannot materialize them. There is no separate mapping-rule profile or required rules editor. Provider SHACL guides runtime specialization; consumer SHACL selects output fields and configured units. These contracts do not validate messages. The library accepts `profiles` to select or extend rule profiles, or `rules` to translate an explicit N3 source/runtime instead of the defaults.
 
@@ -181,7 +181,7 @@ npm run build:browser
 
 ## Examples
 
-Examples are self-contained folders under `examples/`, with their own README, `input.messages.trig`, `shapes-in.n3`, `shapes-out.n3`, and background ontology fixtures.
+Examples are self-contained folders under `examples/`, including nested folders. Both playgrounds discover the same ontology (`ontology.n3` or `ontology.ttl`), provider and consumer SHACL (`shapes-in`/`shapes-out` in N3 or Turtle), and input fixtures. Input can be RDF Messages or ordinary RDF. An optional `example.json` supplies a shared label and description.
 
 - [Transit fleet](examples/transit-fleet/README.md)
 - [Shipment logistics](examples/shipment-logistics/README.md)

@@ -1,4 +1,5 @@
 /// <reference path="./types.d.ts" />
+import { preserveEyelingLanguage } from '../src/eyeling-rdfjs-compat';
 import { bundledRuleProfiles } from 'bundled-rules';
 import { createSparqlConstructGenerator, withRdfBackground, type SparqlConstructDiagnostic } from '../src/sparql-construct-core';
 import { PrefixedWriter } from './prefixed-writer';
@@ -252,7 +253,9 @@ export class InferenceEngine {
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
         builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
-        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[]; triple?: string }) => {
+          if (item.quad) item.quad = preserveEyelingLanguage(item.quad, item.triple, this.dataFactory);
+          if (item.quads) item.quads = item.quads.map(quad => preserveEyelingLanguage(quad, item.triple, this.dataFactory));
           if (item.quad) {
             diagnostics.push(item.quad);
             addDerived(derived, seen, item.quad, outputMode);
@@ -291,7 +294,9 @@ export class InferenceEngine {
         dataFactory: this.dataFactory,
         skipUnsupportedRdfJs: true,
         builtinModules: deterministicSkolemBuiltinModules(deterministicSkolem),
-        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[]; triple?: string }) => {
+          if (item.quad) item.quad = preserveEyelingLanguage(item.quad, item.triple, this.dataFactory);
+          if (item.quads) item.quads = item.quads.map(quad => preserveEyelingLanguage(quad, item.triple, this.dataFactory));
           if (item.quad) {
             diagnostics.push(item.quad);
             addDerived(derived, seen, item.quad, outputMode);
@@ -337,7 +342,9 @@ export class InferenceEngine {
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
-        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[]; triple?: string }) => {
+          if (item.quad) item.quad = preserveEyelingLanguage(item.quad, item.triple, this.dataFactory);
+          if (item.quads) item.quads = item.quads.map(quad => preserveEyelingLanguage(quad, item.triple, this.dataFactory));
           if (item.quad) {
             diagnostics.push(item.quad);
             addDerived(derived, seen, item.quad, outputMode);
@@ -387,7 +394,9 @@ export class InferenceEngine {
         store: options.store,
         storePath: options.storePath,
         storeClear: options.storeClear,
-        onDerived: (item: { quad?: Quad; quads?: Quad[] }) => {
+        onDerived: (item: { quad?: Quad; quads?: Quad[]; triple?: string }) => {
+          if (item.quad) item.quad = preserveEyelingLanguage(item.quad, item.triple, this.dataFactory);
+          if (item.quads) item.quads = item.quads.map(quad => preserveEyelingLanguage(quad, item.triple, this.dataFactory));
           if (item.quad) {
             diagnostics.push(item.quad);
             addDerived(derived, seen, item.quad, outputMode);
