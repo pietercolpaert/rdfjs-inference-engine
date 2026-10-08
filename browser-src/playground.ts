@@ -1,3 +1,4 @@
+import { createRdfUrlLoader } from './rdf-url-loader';
 import { bundledRuleFiles, bundledRuleProfiles } from 'bundled-rules';
 import { bundledExamples } from 'bundled-examples';
 
@@ -24,6 +25,8 @@ type PlaygroundState = {
   disabledRuleFiles?: string[];
   backgroundUrl?: string;
   dataUrl?: string;
+  shaclInUrl?: string;
+  shaclOutUrl?: string;
   backgroundText?: string;
   dataText?: string;
   shaclInText?: string;
@@ -93,8 +96,6 @@ type WorkerMessage =
   | { type: 'error'; message: string };
 
 const defaultState = {
-  backgroundMode: 'text' as InputMode,
-  dataMode: 'text' as InputMode,
   backgroundText: defaultExample().background,
   dataText: defaultExample().data,
 };
@@ -111,15 +112,11 @@ const generatedRuntimeEditor = createEditor('generatedRuntimeText', '', { readOn
 
 const controls = {
   exampleSelect: getSelect('exampleSelect'),
-  backgroundMode: getSelect('backgroundMode'),
-  dataMode: getSelect('dataMode'),
   statefulMaterialization: getInput('statefulMaterialization'),
   backgroundUrl: getInput('backgroundUrl'),
   dataUrl: getInput('dataUrl'),
-  backgroundUrlPanel: getElement('backgroundUrlPanel'),
-  backgroundTextPanel: getElement('backgroundTextPanel'),
-  dataUrlPanel: getElement('dataUrlPanel'),
-  dataTextPanel: getElement('dataTextPanel'),
+  shaclInUrl: getInput('shaclInUrl'),
+  shaclOutUrl: getInput('shaclOutUrl'),
   generatedRuntimePanel: getElement('generatedRuntimePanel') as HTMLDetailsElement,
   runButton: getButton('runButton'),
   stopButton: getButton('stopButton'),
@@ -131,6 +128,18 @@ const controls = {
   ruleProfileList: getOptionalElement('ruleProfileList'),
 };
 
+let pendingUrlLoads = 0;
+const urlLoaders = Object.fromEntries((['background', 'data', 'shaclIn', 'shaclOut'] as const).map(kind => [kind, createRdfUrlLoader({
+  input: controls[`${kind}Url`],
+  button: getButton(`${kind}Load`),
+  status: getElement(`${kind}LoadStatus`),
+  editor: editors[`${kind}Text`],
+  api: (globalThis as any).RdfjsInferenceEngine,
+  onPendingChange: pending => {
+    pendingUrlLoads += pending ? 1 : -1;
+    controls.runButton.disabled = Boolean(activeRun) || pendingUrlLoads > 0;
+  },
+})]));
 let suppressStateUpdate = false;
 let stateUpdateTimer = 0;
 let activeRun: ActiveRun | null = null;
@@ -140,11 +149,15 @@ let outputAppendTimer = 0;
 populateExamples();
 populateRuleProfiles();
 loadStateFromHash();
-applyModeVisibility();
+refreshEditors();
 wireControls();
 scheduleStateUpdate();
 setRunning(false);
-setStatus('Ready. Choose an example, URL, or text input, then run inference.');
+setStatus('Ready. Edit the inputs or load a URL, then run inference.');
+// Migrate older shared URLs that selected direct URL inference into editable inputs.
+const legacyState = decodeState(window.location.hash);
+if (legacyState?.backgroundMode === 'url' && legacyState.backgroundUrl) void urlLoaders.background.load();
+if (legacyState?.dataMode === 'url' && legacyState.dataUrl) void urlLoaders.data.load();
 
 function createEditor(id: string, value: string, options: Record<string, unknown> = {}): Editor {
   const textarea = document.getElementById(id) as HTMLTextAreaElement | null;
@@ -185,26 +198,20 @@ function wireControls(): void {
     setStatus('Shareable URL copied when clipboard access is available.');
   });
 
-  for (const select of [controls.backgroundMode, controls.dataMode]) {
-    select.addEventListener('change', () => {
-      applyModeVisibility();
-      scheduleStateUpdate();
-    });
-  }
   for (const editor of Object.values(editors)) {
     editor.on('change', scheduleStateUpdate);
   }
   controls.generatedRuntimePanel.addEventListener('toggle', () => {
     window.setTimeout(() => generatedRuntimeEditor.refresh(), 0);
   });
-  for (const input of [controls.backgroundUrl, controls.dataUrl]) {
+  for (const input of [controls.backgroundUrl, controls.dataUrl, controls.shaclInUrl, controls.shaclOutUrl]) {
     input.addEventListener('input', scheduleStateUpdate);
   }
   controls.statefulMaterialization.addEventListener('change', scheduleStateUpdate);
 }
 
 async function runInference(): Promise<void> {
-  if (activeRun) {
+  if (activeRun || pendingUrlLoads > 0) {
     return;
   }
 
@@ -221,20 +228,10 @@ async function runInference(): Promise<void> {
     editors.outputText.setValue('');
     setRunStatus(run, 'Preparing inference…');
 
-    const backgroundMode = getMode('background');
-    const backgroundSource = backgroundMode === 'text' ? editors.backgroundText.getValue() : undefined;
-    const backgroundUrl = backgroundMode === 'url' ? controls.backgroundUrl.value.trim() : undefined;
-    const dataMode = getMode('data');
-    const dataSource = dataMode === 'text' ? editors.dataText.getValue() : undefined;
-    const dataUrl = dataMode === 'url' ? controls.dataUrl.value.trim() : undefined;
+    const backgroundSource = editors.backgroundText.getValue();
+    const dataSource = editors.dataText.getValue();
     const shaclInSource = editors.shaclInText.getValue().trim() || undefined;
     const shaclOutSource = editors.shaclOutText.getValue().trim() || undefined;
-    if (backgroundMode === 'url' && !backgroundUrl) {
-      throw new Error('Enter an ontology URL or switch to text input.');
-    }
-    if (dataMode === 'url' && !dataUrl) {
-      throw new Error('Enter a data URL or switch to text input.');
-    }
 
     const selectedProfiles = selectedRuleProfiles();
     if (selectedProfiles.length === 0) {
@@ -247,21 +244,19 @@ async function runInference(): Promise<void> {
       bundledRuleProfiles: selectedProfiles,
       bundledRuleCount: selectedProfiles.length,
       bundledRuleLabels: selectedProfiles.map((profile) => profile.file),
-      backgroundMode,
+      backgroundMode: 'text',
       backgroundSource,
-      backgroundUrl,
-      dataMode,
+      dataMode: 'text',
       statefulMaterialization: controls.statefulMaterialization.checked,
       // This fixture exercises OWL list and restriction rules that the selector cannot yet
       // reduce soundly. Its SHACL contracts still prune input and project output.
       selectRuntimeRules: controls.exampleSelect.value === 'shipment-logistics' ? false : undefined,
       statefulStoreName: controls.statefulMaterialization.checked
-        ? createStatefulStoreName(backgroundSource ?? backgroundUrl ?? '', dataMode === 'url' ? dataUrl ?? '' : dataSource ?? '')
+        ? createStatefulStoreName(backgroundSource, dataSource)
         : undefined,
       shaclInSource,
       shaclOutSource,
       dataSource,
-      dataUrl,
     });
   } catch (error) {
     if (isAbortError(error)) {
@@ -1016,7 +1011,7 @@ function stopActiveRun(): void {
 }
 
 function setRunning(running: boolean): void {
-  controls.runButton.disabled = running;
+  controls.runButton.disabled = running || pendingUrlLoads > 0;
   controls.stopButton.hidden = !running;
   controls.stopButton.disabled = !running;
 }
@@ -1141,11 +1136,7 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
-function applyModeVisibility(): void {
-  setPanelVisibility(controls.backgroundUrlPanel, getMode('background') === 'url');
-  setPanelVisibility(controls.backgroundTextPanel, getMode('background') === 'text');
-  setPanelVisibility(controls.dataUrlPanel, getMode('data') === 'url');
-  setPanelVisibility(controls.dataTextPanel, getMode('data') === 'text');
+function refreshEditors(): void {
   window.setTimeout(() => {
     editors.backgroundText.refresh();
     editors.dataText.refresh();
@@ -1155,24 +1146,12 @@ function applyModeVisibility(): void {
   }, 0);
 }
 
-function setPanelVisibility(element: HTMLElement, visible: boolean): void {
-  element.hidden = !visible;
-}
-
-function getMode(kind: 'background' | 'data'): InputMode {
-  const value = kind === 'background' ? controls.backgroundMode.value : controls.dataMode.value;
-  return value === 'url' ? 'url' : 'text';
-}
-
 function resetDefaults(): void {
   const example = defaultExample();
   suppressStateUpdate = true;
   controls.exampleSelect.value = example.id;
-  controls.backgroundMode.value = defaultState.backgroundMode;
-  controls.dataMode.value = defaultState.dataMode;
   controls.statefulMaterialization.checked = false;
-  controls.backgroundUrl.value = '';
-  controls.dataUrl.value = '';
+  for (const loader of Object.values(urlLoaders)) loader.reset();
   setDisabledRuleFiles([]);
   editors.backgroundText.setValue(example.background);
   editors.dataText.setValue(example.data);
@@ -1180,7 +1159,7 @@ function resetDefaults(): void {
   editors.shaclOutText.setValue(example.shaclOut ?? '');
   editors.outputText.setValue('');
   suppressStateUpdate = false;
-  applyModeVisibility();
+  refreshEditors();
   updateHashNow();
   setStatus(`Reset to ${example.label}.`);
 }
@@ -1317,18 +1296,15 @@ function loadBundledExample(id: string): void {
   suppressStateUpdate = true;
   applyBundledExample(example);
   suppressStateUpdate = false;
-  applyModeVisibility();
+  refreshEditors();
   updateHashNow();
   setStatus(`Loaded ${example.label} from ${exampleFilesLabel(example)}.`);
 }
 
 function applyBundledExample(example: BundledExample): void {
   controls.exampleSelect.value = example.id;
-  controls.backgroundMode.value = 'text';
-  controls.dataMode.value = 'text';
   controls.statefulMaterialization.checked = shouldEnableStatefulMaterialization(example.id);
-  controls.backgroundUrl.value = '';
-  controls.dataUrl.value = '';
+  for (const loader of Object.values(urlLoaders)) loader.reset();
   editors.backgroundText.setValue(example.background);
   editors.dataText.setValue(example.data);
   editors.shaclInText.setValue(example.shaclIn ?? '');
@@ -1357,11 +1333,11 @@ function collectState(): PlaygroundState {
 
   const state: PlaygroundState = {
     disabledRuleFiles: disabledRules.length > 0 ? disabledRules : undefined,
-    backgroundMode: getMode('background') === defaultState.backgroundMode ? undefined : getMode('background'),
-    dataMode: getMode('data') === defaultState.dataMode ? undefined : getMode('data'),
     statefulMaterialization: controls.statefulMaterialization.checked || undefined,
     backgroundUrl: controls.backgroundUrl.value.trim() || undefined,
     dataUrl: controls.dataUrl.value.trim() || undefined,
+    shaclInUrl: controls.shaclInUrl.value.trim() || undefined,
+    shaclOutUrl: controls.shaclOutUrl.value.trim() || undefined,
   };
 
   const backgroundText = editors.backgroundText.getValue();
@@ -1390,11 +1366,11 @@ function collectState(): PlaygroundState {
 }
 
 function isUntouchedExample(example: BundledExample): boolean {
-  return getMode('background') === 'text'
-    && getMode('data') === 'text'
-    && controls.statefulMaterialization.checked === shouldEnableStatefulMaterialization(example.id)
+  return controls.statefulMaterialization.checked === shouldEnableStatefulMaterialization(example.id)
     && controls.backgroundUrl.value.trim() === ''
     && controls.dataUrl.value.trim() === ''
+    && controls.shaclInUrl.value.trim() === ''
+    && controls.shaclOutUrl.value.trim() === ''
     && editors.backgroundText.getValue() === example.background
     && editors.dataText.getValue() === example.data
     && editors.shaclInText.getValue() === (example.shaclIn ?? '')
@@ -1426,13 +1402,13 @@ function loadStateFromHash(): void {
       applyBundledExample(example);
     }
   }
-  controls.backgroundMode.value = state.backgroundMode ?? defaultState.backgroundMode;
-  controls.dataMode.value = state.dataMode ?? defaultState.dataMode;
   if (state.statefulMaterialization !== undefined) {
     controls.statefulMaterialization.checked = state.statefulMaterialization;
   }
   controls.backgroundUrl.value = state.backgroundUrl ?? '';
   controls.dataUrl.value = state.dataUrl ?? '';
+  controls.shaclInUrl.value = state.shaclInUrl ?? '';
+  controls.shaclOutUrl.value = state.shaclOutUrl ?? '';
   if (state.backgroundText !== undefined) {
     editors.backgroundText.setValue(state.backgroundText);
   }

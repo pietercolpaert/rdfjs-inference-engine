@@ -128,6 +128,8 @@ The browser bundle exposes `window.RdfjsInferenceEngine`, including `InferenceEn
 
 The root [index.html](index.html) file is a browser playground. Every scenario starts with an RDF Message Log and a pair of trusted SHACL contracts: SHACL IN describes the source representation and SHACL OUT describes the representation the application needs. The playground shows that alignment flow, background ontology, input messages, and output messages directly; rule-profile selection, stateful materialization, and the generated N3 runtime are available under advanced controls.
 
+Each ontology, SHACL IN, SHACL OUT, and message editor has a URL field and **Load** button directly in its panel. Loading fills the visible CodeMirror editor with editable RDF; inference uses those editor contents. RDF Message Logs retain their message boundaries.
+
 The playground parses editor fields with `rdf-parser-ts`, covering Turtle, TriG, N-Triples, N-Quads, RDF 1.2, and RDF Message Logs. URL sources are dereferenced with [ldfetch](https://www.npmjs.com/package/ldfetch), which negotiates and parses Linked Data formats such as JSON-LD, RDF/XML, RDFa, Microdata, SHACL Compact syntax, Jelly-RDF, and the same Turtle-family formats. This keeps the local text-field parser predictable while broadening remote data ingestion.
 
 At browser-build time the playground bundles the default rule profiles from `rules/`, including QUDT's precompiled runtime snapshot. SHACL contracts specialize applicable rules where supported, prune irrelevant input facts, and project inferred output while preserving message boundaries. They are optimization contracts rather than a replacement for validation.

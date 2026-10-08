@@ -763,6 +763,7 @@
         min-height: 44px;
       }
     }
+    .editor-url-row input[type="url"] { min-width: 0; width: 100%; flex: 1 1 12rem; }
   </style>
 </head>
 <body>
@@ -796,37 +797,13 @@
                 <div id="ruleProfileList" class="rule-profile-list" aria-label="Bundled N3 rule files"></div>
               </div>
               <div class="advanced-column">
-                <h3>Execution and sources</h3>
+                <h3>Execution</h3>
                 <div class="option-row">
                   <input id="statefulMaterialization" type="checkbox">
                   <div class="option-copy">
                     <label for="statefulMaterialization">Stateful materialization</label>
                     <span class="hint">Retain facts across message boundaries. Enable only when earlier messages remain universally true.</span>
                   </div>
-                </div>
-                <div class="mode-row">
-                  <label for="backgroundMode">Ontology source</label>
-                  <select id="backgroundMode">
-                    <option value="text">Editor</option>
-                    <option value="url">URL</option>
-                  </select>
-                </div>
-                <div id="backgroundUrlPanel" class="uri-input-row">
-                  <label for="backgroundUrl">Ontology URL</label>
-                  <input id="backgroundUrl" type="url" placeholder="https://.../ontology.ttl">
-                  <span class="hint">URL sources are dereferenced with ldfetch; editor input is parsed locally with rdf-parser-ts.</span>
-                </div>
-                <div class="mode-row">
-                  <label for="dataMode">RDF input source</label>
-                  <select id="dataMode">
-                    <option value="text">Editor</option>
-                    <option value="url">URL</option>
-                  </select>
-                </div>
-                <div id="dataUrlPanel" class="uri-input-row">
-                  <label for="dataUrl">RDF input URL</label>
-                  <input id="dataUrl" type="url" placeholder="https://.../messages.trig">
-                  <span class="hint">Remote Turtle, TriG, N-Triples, N-Quads, and RDF Message Logs are streamed when possible.</span>
                 </div>
               </div>
             </div>
@@ -847,6 +824,12 @@
               <h3 class="section-title">SHACL IN</h3>
               <p class="meta">What each incoming message may contain.</p>
             </div>
+            <label for="shaclInUrl">SHACL IN URL</label>
+            <div class="uri-input-row editor-url-row">
+              <input id="shaclInUrl" type="url" placeholder="https://example.org/shapes-in.ttl">
+              <button id="shaclInLoad" type="button">Load</button>
+            </div>
+            <p id="shaclInLoadStatus" class="status" role="status" aria-live="polite"></p>
             <textarea id="shaclInText" spellcheck="false"></textarea>
           </div>
           <div class="flow-arrow" aria-hidden="true"><span>→</span>Align towards</div>
@@ -855,6 +838,12 @@
               <h3 class="section-title">SHACL OUT</h3>
               <p class="meta">What the receiving application can handle.</p>
             </div>
+            <label for="shaclOutUrl">SHACL OUT URL</label>
+            <div class="uri-input-row editor-url-row">
+              <input id="shaclOutUrl" type="url" placeholder="https://example.org/shapes-out.ttl">
+              <button id="shaclOutLoad" type="button">Load</button>
+            </div>
+            <p id="shaclOutLoadStatus" class="status" role="status" aria-live="polite"></p>
             <textarea id="shaclOutText" spellcheck="false"></textarea>
           </div>
         </div>
@@ -868,6 +857,12 @@
           </div>
         </div>
         <div class="ontology-body">
+          <label for="backgroundUrl">Ontology URL</label>
+          <div class="uri-input-row editor-url-row">
+            <input id="backgroundUrl" type="url" placeholder="https://example.org/ontology.ttl">
+            <button id="backgroundLoad" type="button">Load</button>
+          </div>
+          <p id="backgroundLoadStatus" class="status" role="status" aria-live="polite"></p>
           <div id="backgroundTextPanel">
             <textarea id="backgroundText" spellcheck="false"></textarea>
           </div>
@@ -887,6 +882,12 @@
               <h3 class="section-title">MESSAGES IN</h3>
               <p class="meta">Editable Turtle, TriG, N-Triples, N-Quads, or RDF Message Log supplied by the source.</p>
             </div>
+            <label for="dataUrl">RDF input URL</label>
+            <div class="uri-input-row editor-url-row">
+              <input id="dataUrl" type="url" placeholder="https://example.org/messages.trig">
+              <button id="dataLoad" type="button">Load</button>
+            </div>
+            <p id="dataLoadStatus" class="status" role="status" aria-live="polite"></p>
             <div id="dataTextPanel">
               <textarea id="dataText" spellcheck="false"></textarea>
             </div>

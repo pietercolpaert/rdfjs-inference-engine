@@ -72,7 +72,7 @@
     "test:vocabularies": "npm run build:node --silent && npm run test:vocabularies:run --silent",
     "test:vocabularies:run": "node dist/tests/run-vocabularies.js",
     "test:playground": "npm run build:node --silent && npm run test:playground:run --silent",
-    "test:playground:run": "node dist/tests/run-playground-contracts.js",
+    "test:playground:run": "node dist/tests/run-playground-contracts.js && node dist/tests/run-playground-url-loading.js",
     "test:marc-list-ontology": "npm run build:node --silent && npm run test:marc-list-ontology:run --silent",
     "test:marc-list-ontology:run": "node dist/tests/run-marc-list-ontology.js",
     "test:skos": "npm run build:node --silent && npm run test:skos:run --silent",
