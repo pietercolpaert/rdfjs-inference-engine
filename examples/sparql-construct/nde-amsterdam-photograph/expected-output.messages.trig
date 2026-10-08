@@ -1,0 +1,19 @@
+VERSION "1.2-messages"
+PREFIX photo: <https://example.org/nde-photo/objects/>
+PREFIX person: <https://example.org/nde-photo/people/>
+PREFIX term: <https://example.org/nde-photo/terms/>
+PREFIX schema: <https://schema.org/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+photo:prinsengracht-1900 a schema:Photograph ;
+  schema:name "Gezicht op de Prinsengracht in Amsterdam"@nl ;
+  schema:creator person:photographer-1 ;
+  schema:dateCreated "1900-06-15"^^xsd:date ;
+  schema:about term:amsterdam-canals ;
+  schema:license <https://creativecommons.org/publicdomain/zero/1.0/> .
+
+MESSAGE
+photo:herengracht-undated a schema:Photograph ;
+  schema:name "Brug over de Herengracht"@nl ;
+  schema:about term:amsterdam-canals ;
+  schema:license <https://creativecommons.org/publicdomain/zero/1.0/> .

@@ -68,6 +68,10 @@ The main class is `InferenceEngine`.
 
 The [SPARQL CONSTRUCT playground](sparql-construct.html), linked from the inference playground, accepts a provider ontology, a provider SHACL shape, and a consumer SHACL shape. Each input has an editable CodeMirror field and a URL **Load** button. URLs use the same RDF negotiation and page extraction as the main playground; fetched RDF is displayed as editable Turtle. Remote servers must allow browser access through CORS. Generate, copy, or download the resulting `.rq` query.
 
+The example selector includes [Amsterdam archival photographs (NDE-inspired)](examples/sparql-construct/nde-amsterdam-photograph/README.md) and the original sensor example. The heritage example has explicit ontology relationships mapping Dublin Core fields to Schema.org, Dutch titles, linked identifiers, and two fictional photographs showing optional metadata.
+
+Once a query is generated, an execution panel appears directly below it. Its CodeMirror input supports pasted RDF, RDF Message Logs, and a URL **Load** button. **Run SPARQL CONSTRUCT** executes the exact displayed query with a locally bundled Comunica RDF/JS engine in a Web Worker, with progress, output, and **Stop** controls. Each message's contents form a separate default graph; messages are never combined for query joins. Ordinary RDF is processed as one message. The result preserves message boundaries, and an expandable panel shows the selected example's expected output. Editing mapping inputs invalidates the query; editing input data clears execution results while keeping the query available.
+
 The same compiler is exported by the Node.js package and the browser API:
 
 ```ts
@@ -94,7 +98,7 @@ The compiler follows transitive `rdfs:subPropertyOf`, `owl:equivalentProperty`, 
 
 Run the query separately on each message as the default RDF graph, using a SPARQL 1.1 engine. The query preserves focus-node identities and values, copies all mapped values, uses `OPTIONAL` for optional fields, and filters consumer datatypes, allowed values, node kinds, and class constraints. It requires existing `sh:hasValue` constants rather than inventing them. It does not cast datatypes, convert units, or repair cardinality. These are trusted mapping contracts; validate the constructed graph with SHACL when conformance is required. [SPARQL CONSTRUCT templates](https://www.w3.org/TR/sparql11-query/#construct) contain triples; [SHACL property paths](https://www.w3.org/TR/shacl/#property-paths) describe the source and target paths.
 
-Run `npm run test:sparql-construct` to execute the generated queries against RDF fixtures and check browser/Node API parity.
+Run `npm run test:sparql-construct` to execute the generated queries against RDF fixtures and check browser/Node API parity, execute the browser Comunica worker, and verify message isolation.
 
 ## Bundled Rule Profiles
 

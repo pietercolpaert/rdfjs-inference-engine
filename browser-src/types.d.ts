@@ -31,3 +31,7 @@ declare module '*.trig' {
   const source: string;
   export default source;
 }
+declare module '*.ttl' {
+  const source: string;
+  export default source;
+}

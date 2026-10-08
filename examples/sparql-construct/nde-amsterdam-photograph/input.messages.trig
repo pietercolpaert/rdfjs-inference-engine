@@ -1,0 +1,23 @@
+# Illustrative records: these are not real archival catalogue entries.
+# The photographer and subject identifiers are example URIs.
+VERSION "1.2-messages"
+PREFIX archive: <https://example.org/nde-photo/ontology#>
+PREFIX photo: <https://example.org/nde-photo/objects/>
+PREFIX person: <https://example.org/nde-photo/people/>
+PREFIX term: <https://example.org/nde-photo/terms/>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+photo:prinsengracht-1900 a archive:ArchivalPhotograph ;
+  dcterms:title "Gezicht op de Prinsengracht in Amsterdam"@nl ;
+  dcterms:creator person:photographer-1 ;
+  dcterms:created "1900-06-15"^^xsd:date ;
+  dcterms:subject term:amsterdam-canals ;
+  dcterms:license <https://creativecommons.org/publicdomain/zero/1.0/> .
+
+MESSAGE
+# An unidentified photographer and an unknown exact date are valid here.
+photo:herengracht-undated a archive:ArchivalPhotograph ;
+  dcterms:title "Brug over de Herengracht"@nl ;
+  dcterms:subject term:amsterdam-canals ;
+  dcterms:license <https://creativecommons.org/publicdomain/zero/1.0/> .

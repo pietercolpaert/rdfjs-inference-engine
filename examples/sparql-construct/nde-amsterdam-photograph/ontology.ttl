@@ -1,0 +1,20 @@
+@prefix archive: <https://example.org/nde-photo/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix schema: <https://schema.org/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+# Illustrative collection profile inspired by NDE's Schema.org guidance.
+# These explicit alignment statements apply to this example's use of Dublin Core.
+# They are not an official NDE ontology or a universal vocabulary alignment.
+archive:ArchivalPhotograph a owl:Class ;
+  rdfs:label "Archieffoto"@nl ;
+  rdfs:subClassOf schema:Photograph .
+
+schema:Photograph a owl:Class ; rdfs:subClassOf schema:CreativeWork .
+
+dcterms:title rdfs:subPropertyOf schema:name .
+dcterms:creator rdfs:subPropertyOf schema:creator .
+dcterms:created rdfs:subPropertyOf schema:dateCreated .
+dcterms:subject rdfs:subPropertyOf schema:about .
+dcterms:license rdfs:subPropertyOf schema:license .

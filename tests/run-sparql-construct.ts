@@ -93,19 +93,29 @@ async function testPlayground(api: any): Promise<void> {
   const editors = new Map<string, any>();
   const names = ['ontology', 'shaclIn', 'shaclOut'];
   for (const id of [...names.flatMap(name => [`${name}Text`, `${name}Url`, `${name}Load`, `${name}Status`]),
-    'queryText', 'status', 'diagnostics', 'generateButton', 'resetButton', 'copyButton', 'downloadButton']) {
+    'queryText', 'status', 'diagnostics', 'generateButton', 'resetButton', 'copyButton', 'downloadButton',
+    'exampleSelect', 'exampleDescription', 'ndeGuidance', 'dataText', 'dataUrl', 'dataLoad', 'dataLoadStatus',
+    'resultText', 'expectedText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton', 'expectedPanel']) {
     elements.set(id, { id, value: '', textContent: '', disabled: false, handlers: {} as Record<string, (...args: any[]) => unknown>,
-      reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
+      appendChild: () => {}, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
   }
   let resolveLoad: (result: any) => void = () => {};
-  const sandbox = vm.createContext({ URL, Blob, setTimeout, clearTimeout,
+  const workers: any[] = [];
+  class FakeWorker {
+    request: any;
+    terminated = false;
+    constructor() { workers.push(this); }
+    postMessage(request: any) { this.request = request; }
+    terminate() { this.terminated = true; }
+  }
+  const sandbox = vm.createContext({ URL, Blob, setTimeout, clearTimeout, Worker: FakeWorker,
     navigator: { clipboard: { writeText: async () => {} } },
-    document: { baseURI: 'https://example.org/sparql-construct.html', getElementById: (id: string) => elements.get(id) },
+    document: { baseURI: 'https://example.org/sparql-construct.html', getElementById: (id: string) => elements.get(id), createElement: () => ({}) },
     RdfjsInferenceEngine: { ...api, dereferenceRdfUrl: () => new Promise(resolve => { resolveLoad = resolve; }) },
     CodeMirror: { fromTextArea: (element: any) => {
       let text = element.value;
       const listeners: (() => void)[] = [];
-      const editor = { getValue: () => text, setValue: (value: string) => { text = value; listeners.forEach(listener => listener()); },
+      const editor = { refresh: () => {}, getValue: () => text, setValue: (value: string) => { text = value; listeners.forEach(listener => listener()); },
         on: (_event: string, listener: () => void) => listeners.push(listener) };
       editors.set(element.id, editor);
       return editor;
@@ -113,7 +123,25 @@ async function testPlayground(api: any): Promise<void> {
   });
   vm.runInContext(readFileSync('browser/sparql-construct-playground.min.js', 'utf8'), sandbox);
   assert.ok(editors.get('queryText').getValue().startsWith('CONSTRUCT'));
-  assert.equal(editors.size, 4, 'All three inputs and the output use CodeMirror.');
+  assert.equal(editors.size, 7, 'Mapping inputs, query, data, result and expected output use CodeMirror.');
+  assert.equal(elements.get('executionPanel').hidden, false);
+  assert.equal(elements.get('exampleSelect').value, 'nde-amsterdam-photograph');
+  assert.ok(editors.get('ontologyText').getValue().includes('dcterms:title rdfs:subPropertyOf schema:name'));
+  elements.get('runQueryButton').handlers.click();
+  assert.equal(workers[0].request.query, editors.get('queryText').getValue(), 'Send the displayed query unchanged to Comunica.');
+  assert.equal(workers[0].request.dataSource, editors.get('dataText').getValue());
+  elements.get('stopQueryButton').handlers.click();
+  assert.equal(workers[0].terminated, true);
+  elements.get('runQueryButton').handlers.click();
+  workers[1].onmessage({ data: { type: 'result', output: 'constructed RDF', processedMessages: 2, outputQuads: 10, elapsedMs: 10 } });
+  assert.equal(editors.get('resultText').getValue(), 'constructed RDF');
+  assert.equal(workers[1].terminated, true);
+  elements.get('runQueryButton').handlers.click();
+  editors.get('dataText').setValue('changed input');
+  assert.equal(workers[2].terminated, true, 'Editing data stops the active execution.');
+  assert.ok(editors.get('queryText').getValue(), 'Editing data preserves the generated query.');
+  workers[2].onmessage({ data: { type: 'result', output: 'stale result', processedMessages: 1, outputQuads: 1, elapsedMs: 1 } });
+  assert.equal(editors.get('resultText').getValue(), '', 'Late results cannot replace current output.');
   const input = elements.get('ontologyUrl');
   const load = elements.get('ontologyLoad');
   input.value = 'https://example.org/ontology.ttl';
@@ -125,6 +153,7 @@ async function testPlayground(api: any): Promise<void> {
   assert.equal(load.disabled, false);
   assert.ok(editors.get('ontologyText').getValue().includes('equivalentProperty'));
   assert.equal(editors.get('queryText').getValue(), '', 'Loading or editing invalidates stale queries.');
+  assert.equal(elements.get('executionPanel').hidden, true, 'Execution is hidden until a current query exists.');
   load.handlers.click();
   editors.get('ontologyText').setValue('edited while loading');
   resolveLoad({ quads: loaded, prefixes: {}, url: input.value });
@@ -140,4 +169,9 @@ async function testPlayground(api: any): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 30));
   assert.match(elements.get('ontologyStatus').textContent, /HTTP 404/);
   assert.ok(editors.get('ontologyText').getValue().includes('subClassOf'), 'Failed loading preserves editor contents.');
+  elements.get('exampleSelect').value = 'sensor-reading';
+  elements.get('exampleSelect').handlers.change();
+  assert.ok(editors.get('ontologyText').getValue().includes('SensorReading'));
+  assert.ok(editors.get('queryText').getValue().includes('Observation'));
+  assert.equal(elements.get('ndeGuidance').hidden, true);
 }

@@ -19,7 +19,7 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     body { margin: 0; background: var(--bg); color: var(--text); }
-    input, textarea, button { font: inherit; }
+    input, select, textarea, button { font: inherit; }
     .page {
       max-width: 1500px;
       margin: 0 auto;
@@ -56,8 +56,19 @@
     .CodeMirror { border: 1px solid var(--border); border-radius: 0.75rem; font-size: 0.82rem; line-height: 1.5; }
     .construct-inputs .CodeMirror { height: 360px; }
     .construct-output .CodeMirror { height: 420px; }
+    main { display: flex; flex-direction: column; gap: 1rem; }
+    [hidden] { display: none !important; }
+    .example-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+    select { max-width: 100%; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-soft); padding: 0.55rem 0.9rem; }
+    .message-flow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 1rem; align-items: start; }
+    .editor-pane { min-width: 0; }
+    .flow-arrow { align-self: center; color: var(--muted); text-align: center; font-size: 0.85rem; }
+    .flow-arrow span { display: block; font-size: 1.5rem; color: var(--accent); }
+    .execution-panel .CodeMirror { height: 360px; }
+    .expected-panel { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+    .expected-panel summary { cursor: pointer; margin-bottom: 0.75rem; }
     #diagnostics { white-space: pre-wrap; overflow-wrap: anywhere; }
-    @media (max-width: 1000px) { .construct-inputs { grid-template-columns: 1fr; } }
+    @media (max-width: 1000px) { .construct-inputs, .message-flow { grid-template-columns: 1fr; } .flow-arrow { display: none; } }
   </style>
 </head>
 <body>
@@ -68,6 +79,14 @@
       <p class="meta"><a href="index.html">RDF-JS inference playground</a> · <a href="https://www.npmjs.com/package/rdfjs-inference-engine">NPM package</a></p>
     </header>
     <main>
+      <section class="card">
+        <div class="example-row">
+          <label for="exampleSelect">Example</label>
+          <select id="exampleSelect"></select>
+        </div>
+        <p id="exampleDescription" class="hint"></p>
+        <p id="ndeGuidance" class="hint"><a href="https://netwerkdigitaalerfgoed.nl/wegwijzer/verspreiden/" target="_blank" rel="noopener">NDE guidance: sharing collection information with Schema.org</a></p>
+      </section>
       <div class="construct-inputs">
         <section class="card">
           <h2 class="section-title">1. Ontology of the data provider</h2>
@@ -121,6 +140,41 @@
         <label for="queryText">Generated query</label>
         <textarea id="queryText" spellcheck="false"></textarea>
         <p id="diagnostics" class="status" role="status" aria-live="polite"></p>
+      </section>
+      <section id="executionPanel" class="card execution-panel" hidden>
+        <h2 class="section-title">Execute with Comunica</h2>
+        <p class="hint">Execute the exact query shown above on your input data. RDF Message Logs are processed one message at a time as the default RDF graph; ordinary RDF is processed as one message.</p>
+        <div class="message-flow">
+          <div class="editor-pane">
+            <h3 class="section-title">MESSAGES IN</h3>
+            <label for="dataUrl">RDF input URL</label>
+            <div class="uri-input-row">
+              <input id="dataUrl" type="url" placeholder="https://example.org/messages.trig">
+              <button id="dataLoad" type="button">Load</button>
+            </div>
+            <p id="dataLoadStatus" class="status" role="status"></p>
+            <label for="dataText">Input RDF or RDF Message Log</label>
+            <textarea id="dataText" spellcheck="false"></textarea>
+          </div>
+          <div class="flow-arrow" aria-hidden="true"><span>→</span>CONSTRUCT</div>
+          <div class="editor-pane">
+            <h3 class="section-title">MESSAGES OUT</h3>
+            <p class="hint">The RDF graph constructed by Comunica, preserving input message boundaries.</p>
+            <label for="resultText">Constructed output</label>
+            <textarea id="resultText" spellcheck="false" readonly></textarea>
+          </div>
+        </div>
+        <div class="uri-input-row">
+          <button id="runQueryButton" type="button" disabled>Run SPARQL CONSTRUCT</button>
+          <button id="stopQueryButton" class="secondary" type="button" hidden>Stop</button>
+          <span id="executionStatus" class="status" role="status" aria-live="polite"></span>
+        </div>
+        <details id="expectedPanel" class="expected-panel">
+          <summary>Expected output for the selected example</summary>
+          <p class="hint">Compare the constructed result with this sample. Triple order and prefix choices may differ.</p>
+          <label for="expectedText">Expected RDF</label>
+          <textarea id="expectedText" spellcheck="false" readonly></textarea>
+        </details>
       </section>
     </main>
   </div>

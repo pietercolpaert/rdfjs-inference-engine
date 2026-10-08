@@ -1,0 +1,13 @@
+@prefix archive: <https://example.org/nde-photo/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# A small discovery-portal contract, not the complete NDE collection profile.
+archive:ConsumerShape a sh:NodeShape ;
+  sh:targetClass schema:Photograph ;
+  sh:property [ sh:path schema:name ; sh:nodeKind sh:Literal ; sh:minCount 1 ] ;
+  sh:property [ sh:path schema:creator ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path schema:dateCreated ; sh:datatype xsd:date ] ;
+  sh:property [ sh:path schema:about ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path schema:license ; sh:nodeKind sh:IRI ] .

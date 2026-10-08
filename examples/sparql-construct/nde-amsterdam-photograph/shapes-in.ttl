@@ -1,0 +1,12 @@
+@prefix archive: <https://example.org/nde-photo/ontology#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+archive:ProviderShape a sh:NodeShape ;
+  sh:targetClass archive:ArchivalPhotograph ;
+  sh:property [ sh:path dcterms:title ; sh:nodeKind sh:Literal ; sh:minCount 1 ] ;
+  sh:property [ sh:path dcterms:creator ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path dcterms:created ; sh:datatype xsd:date ] ;
+  sh:property [ sh:path dcterms:subject ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path dcterms:license ; sh:nodeKind sh:IRI ] .
