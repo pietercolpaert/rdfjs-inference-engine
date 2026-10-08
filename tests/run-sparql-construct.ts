@@ -97,7 +97,7 @@ async function testPlayground(api: any): Promise<void> {
   for (const id of [...names.flatMap(name => [`${name}Text`, `${name}Url`, `${name}Load`, `${name}Status`]),
     'queryText', 'status', 'diagnostics', 'generateButton', 'resetButton', 'copyButton', 'downloadButton',
     'exampleSelect', 'exampleDescription', 'ndeGuidance', 'dataText', 'dataUrl', 'dataLoad', 'dataLoadStatus',
-    'rulesText', 'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'expectedText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton', 'expectedPanel']) {
+    'rulesText', 'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton']) {
     elements.set(id, { id, value: '', textContent: '', disabled: false, handlers: {} as Record<string, (...args: any[]) => unknown>,
       appendChild: () => {}, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
   }
@@ -126,7 +126,7 @@ async function testPlayground(api: any): Promise<void> {
   sandbox.self = sandbox;
   vm.runInContext(readFileSync('browser/sparql-construct-playground.min.js', 'utf8'), sandbox);
   assert.ok(editors.get('queryText').getValue().startsWith('CONSTRUCT'));
-  assert.equal(editors.size, 10, 'Mapping inputs, query, data, result and expected output use CodeMirror.');
+  assert.equal(editors.size, 9, 'Mapping inputs, rules, generated runtime, query, data and result use CodeMirror.');
   assert.equal(elements.get('executionPanel').hidden, false);
   assert.equal(elements.get('exampleSelect').value, 'nde-amsterdam-photograph');
   assert.ok(editors.get('ontologyText').getValue().includes('dcterms:title rdfs:subPropertyOf schema:name'));

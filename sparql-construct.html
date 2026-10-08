@@ -65,8 +65,6 @@
     .flow-arrow { align-self: center; color: var(--muted); text-align: center; font-size: 0.85rem; }
     .flow-arrow span { display: block; font-size: 1.5rem; color: var(--accent); }
     .execution-panel .CodeMirror { height: 360px; }
-    .expected-panel { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
-    .expected-panel summary { cursor: pointer; margin-bottom: 0.75rem; }
     #diagnostics { white-space: pre-wrap; overflow-wrap: anywhere; }
     @media (max-width: 1000px) { .construct-inputs, .message-flow { grid-template-columns: 1fr; } .flow-arrow { display: none; } }
   </style>
@@ -183,12 +181,6 @@
           <button id="stopQueryButton" class="secondary" type="button" hidden>Stop</button>
           <span id="executionStatus" class="status" role="status" aria-live="polite"></span>
         </div>
-        <details id="expectedPanel" class="expected-panel">
-          <summary>Expected output for the selected example</summary>
-          <p class="hint">Compare the constructed result with this sample. Triple order and prefix choices may differ.</p>
-          <label for="expectedText">Expected RDF</label>
-          <textarea id="expectedText" spellcheck="false" readonly></textarea>
-        </details>
       </section>
     </main>
   </div>

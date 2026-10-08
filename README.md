@@ -72,7 +72,7 @@ The **N3 mapping rules** editor is the source of the inference behavior. `genera
 
 A general recursive N3 runtime cannot be represented by one finite SPARQL CONSTRUCT query. The generated program loads static facts once, executes its rule queries in source order until no new facts appear, then executes the displayed output query on rule-head facts. The expandable runtime panel shows the complete N3 source and every translated query. **Download runtime .json** exports the program and output query together; copying the output query alone does not export the inference stage.
 
-The bundled Comunica worker runs this same program without Eyeling or background fetches. Messages are isolated default graphs; ordinary RDF forms one message. Input data supports URL loading, progress, **Stop**, output and expected-output editors. Editing rules or mapping inputs invalidates the program. Editing data clears results while preserving the program.
+The bundled Comunica worker runs this same program without Eyeling or background fetches. Both playgrounds preserve input prefix names in RDF output and use a bundled prefix.cc snapshot for other namespaces. Only prefixes actually used in the output are declared, and conflicting labels receive numeric aliases. Messages are isolated default graphs; ordinary RDF forms one message. Input data supports URL loading, progress, **Stop**, and an output editor. Editing rules or mapping inputs invalidates the program. Editing data clears results while preserving the program.
 
 Node.js and the browser export the same compiler and executor:
 

@@ -52,6 +52,9 @@ async function main(): Promise<void> {
   actual.messages.forEach((message: Quad[], index: number) => {
     assert.deepEqual(new Set(message.map(key)), new Set(expected.messages[index].map(key)), 'Browser Comunica output must match the heritage fixture per message.');
   });
+  assert.match(result.output, /@prefix schema:/, 'Output-only namespaces use prefix.cc defaults.');
+  assert.match(result.output, /@prefix photo:/, 'Keep prefixes from the input message log.');
+  assert.ok(!result.output.includes('@prefix archive:') && !result.output.includes('@prefix dcterms:'), 'Do not declare unused source prefixes.');
   assert.ok(actual.quads.some((q: Quad) => q.object.termType === 'Literal' && q.object.language === 'nl'), 'Dutch title language tags survive execution.');
   const qudtDirectory = 'examples/sparql-construct/qudt-museum-dimensions/';
   const qudtRead = (file: string) => readFileSync(qudtDirectory + file, 'utf8');
@@ -80,6 +83,9 @@ async function main(): Promise<void> {
     assert.equal(ordinary.processedMessages, 1);
     assert.equal(api.parseRdfOrMessages(ordinary.output).quads[0].predicate.value, 'urn:result', 'Execute exactly the supplied query.');
   }
+  const prefixed = await execute('CONSTRUCT { ?s <https://schema.org/name> ?o } WHERE { ?s <urn:source> ?o }', '@prefix schema: <https://example.org/items/>. schema:one <urn:source> "title".');
+  assert.equal(prefixed.type, 'result');
+  if (prefixed.type === 'result') assert.match(prefixed.output, /schema:one schema2:name/, 'Source labels take priority over conflicting registry names.');
   const named = await execute('CONSTRUCT { ?s <urn:result> ?o } WHERE { ?s <urn:source> ?o }', '<urn:g> { <urn:s> <urn:source> "named" . }');
   assert.equal(named.type, 'result');
   if (named.type === 'result') assert.equal(named.outputQuads, 1, 'Treat message contents as the default graph.');

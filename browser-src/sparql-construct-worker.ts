@@ -40,9 +40,7 @@ scope.onmessage = async ({ data: request }) => {
       output.push(result);
       outputQuads += result.length;
     }
-    const prefixes = { schema: 'https://schema.org/', ex: 'https://example.org/',
-      photo: 'https://example.org/nde-photo/objects/', person: 'https://example.org/nde-photo/people/',
-      term: 'https://example.org/nde-photo/terms/', xsd: 'http://www.w3.org/2001/XMLSchema#' };
+    const prefixes = parsed.prefixes;
     const text = parsed.isMessages ? await api.writeMessages(output, prefixes) : await api.writeQuads(output[0], prefixes);
     scope.postMessage({ type: 'result', output: text, processedMessages: messages.length, outputQuads, elapsedMs: performance.now() - started });
   } catch (error) {

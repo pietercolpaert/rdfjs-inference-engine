@@ -18,7 +18,6 @@ const runtimeEditor = editor('runtimeText', '', true);
 const translatedEditor = editor('translatedText', '', true, 'application/sparql-query');
 const dataEditor = editor('dataText', initialExample.data);
 const resultEditor = editor('resultText', '', true);
-const expectedEditor = editor('expectedText', initialExample.expected, true);
 const status = get('status');
 const diagnostics = get('diagnostics');
 const copy = button('copyButton');
@@ -91,7 +90,6 @@ function loadExample(): void {
   for (const name of names) editors[name].setValue(example[name]);
   rulesEditor.setValue(api.defaultSparqlMappingRules);
   dataEditor.setValue(example.data);
-  expectedEditor.setValue(example.expected);
   get('exampleDescription').textContent = example.description;
   get('ndeGuidance').hidden = example.id !== 'nde-amsterdam-photograph';
   generate();
@@ -164,7 +162,6 @@ get('resetButton').addEventListener('click', loadExample);
 exampleSelect.addEventListener('change', loadExample);
 run.addEventListener('click', executeQuery);
 stop.addEventListener('click', () => stopExecution());
-get('expectedPanel').addEventListener('toggle', () => { setTimeout(() => expectedEditor.refresh(), 0); });
 get('runtimePanel').addEventListener('toggle', () => { setTimeout(() => { runtimeEditor.refresh(); translatedEditor.refresh(); }, 0); });
 copy.addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(output.getValue()); status.textContent = 'Query copied.'; }

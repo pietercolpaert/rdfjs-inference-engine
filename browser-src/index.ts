@@ -1,3 +1,5 @@
+import { PrefixedWriter } from './prefixed-writer';
+export { PrefixedWriter } from './prefixed-writer';
 import { translateN3RuntimeToSparql, type N3SparqlOptions, type N3SparqlResult } from '../src/n3-to-sparql';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling/browser';
@@ -118,6 +120,7 @@ export interface ParsedRdfInput {
   quads: Quad[];
   messages: Quad[][];
   raw: unknown[];
+  prefixes: Record<string, string>;
 }
 
 export type RuntimeCompiler = (input: RuntimeCompilerInput) => string;
@@ -481,8 +484,7 @@ export class BrowserInferenceStream {
 }
 
 export function parseRdfOrMessages(source: string, options: Record<string, unknown> = {}): ParsedRdfInput {
-  const parsed = parseWithAutomaticMessages(source, options);
-  const raw = Array.from(parsed as Iterable<unknown>);
+  const { raw, prefixes } = parseWithAutomaticMessages(source, options);
   const messageQuads = raw.filter((item) => isMessageQuad(item));
 
   if (messageQuads.length > 0) {
@@ -492,6 +494,7 @@ export function parseRdfOrMessages(source: string, options: Record<string, unkno
       quads: messageQuads.map((item: any) => item.quad as Quad),
       messages,
       raw,
+      prefixes,
     };
   }
 
@@ -500,6 +503,7 @@ export function parseRdfOrMessages(source: string, options: Record<string, unkno
     quads: raw as Quad[],
     messages: [],
     raw,
+    prefixes,
   };
 }
 
@@ -531,7 +535,8 @@ export async function dereferenceRdfUrl(url: string): Promise<DereferencedRdfInp
 }
 
 export async function writeQuads(quads: Iterable<Quad>, prefixes: Record<string, string> = {}): Promise<string> {
-  const writer = new Writer({ prefixes });
+  const writer = new PrefixedWriter(new Writer({ format: 'TriG' }));
+  writer.addPrefixes(prefixes);
   writer.addQuads(quads);
 
   return new Promise<string>((resolve, reject) => {
@@ -540,7 +545,8 @@ export async function writeQuads(quads: Iterable<Quad>, prefixes: Record<string,
 }
 
 export async function writeMessages(messages: Iterable<Iterable<Quad>>, prefixes: Record<string, string> = {}): Promise<string> {
-  const writer = new Writer({ prefixes, rdfMessages: true, format: 'N-Quads' });
+  const writer = new PrefixedWriter(new Writer({ rdfMessages: true, format: 'TriG' }));
+  writer.addPrefixes(prefixes);
   for (const message of messages) {
     writer.addMessage(message);
   }
@@ -1488,14 +1494,22 @@ export function serializeQuadsAsN3(quads: Iterable<Quad>): string {
   return Array.from(quads, quadToN3).join('\n');
 }
 
-function parseWithAutomaticMessages(source: string, options: Record<string, unknown>): Iterable<unknown> {
-  try {
-    return new Parser({ factory: RdfParserDataFactory, ...options }).parse(source) ?? [];
-  } catch (error) {
-    if (!hasMessageSyntax(source)) {
-      throw error;
-    }
-    return new Parser({ factory: RdfParserDataFactory, ...options, rdfMessages: true }).parse(source) ?? [];
+function parseWithAutomaticMessages(source: string, options: Record<string, unknown>): { raw: unknown[]; prefixes: Record<string, string> } {
+  const parse = (parserOptions: Record<string, unknown>) => {
+    const raw: unknown[] = [], prefixes: Record<string, string> = Object.create(null);
+    let failure: Error | null = null;
+    new Parser({ factory: RdfParserDataFactory, ...parserOptions }).parse(source, (error, quad, declared, messageCounter) => {
+      if (error) { failure = error; return; }
+      if (quad) raw.push(messageCounter === undefined ? quad : { quad, messageCounter });
+      else for (const [label, iri] of Object.entries(declared ?? {})) prefixes[label] = iri.value;
+    });
+    if (failure) throw failure;
+    return { raw, prefixes };
+  };
+  try { return parse(options); }
+  catch (error) {
+    if (!hasMessageSyntax(source)) throw error;
+    return parse({ ...options, rdfMessages: true });
   }
 }
 

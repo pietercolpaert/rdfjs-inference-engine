@@ -464,7 +464,7 @@ function createProcessingState(api, reasoner, compiledAt, started, sourceLabel, 
     started,
     statefulMaterialization,
     statefulStoreName,
-    outputPrefixes: outputPrefixes(),
+    outputPrefixes: {},
     messagesMode: false,
     ordinaryQuads: [],
     currentMessage: [],
@@ -595,7 +595,8 @@ async function finishOrdinaryOutputState(state) {
 
 async function processCurrentMessage(state) {
   if (!state.writer) {
-    state.writer = createMessageWriter(state.api, state.outputPrefixes);
+    state.writer = createMessageWriter(state.api);
+    state.writer.addPrefixes(state.outputPrefixes);
   }
   const messageNumber = state.currentMessageCounter + 1;
   postProgressStatus(state, 'Processing message ' + messageNumber + ' after parsing ' + state.parsedQuadCount + ' quad(s)…', state.processedMessageCount === 0);
@@ -657,8 +658,8 @@ function formatWorkerDuration(ms) {
   return minutes + ' min ' + wholeSeconds + ' s';
 }
 
-function createMessageWriter(api, prefixes) {
-  return new api.Writer({
+function createMessageWriter(api) {
+  return new api.PrefixedWriter(new api.Writer({
     write(chunk, _encoding, callback) {
       self.postMessage({ type: 'append', chunk });
       callback?.(null);
@@ -666,7 +667,7 @@ function createMessageWriter(api, prefixes) {
     end(callback) {
       callback?.(null, '');
     },
-  }, { prefixes, rdfMessages: true });
+  }, { rdfMessages: true, format: 'TriG' }));
 }
 
 function endWriter(writer) {
