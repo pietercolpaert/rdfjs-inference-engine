@@ -5,7 +5,8 @@ import { createRdfUrlLoader } from '../browser-src/rdf-url-loader';
 import type { RdfUrlLoaderOptions } from '../browser-src/rdf-url-loader';
 
 async function main(): Promise<void> {
-  const context = vm.createContext({ console, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
+  const context = vm.createContext({ console, AbortController, AbortSignal, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
+  context.self = context;
   vm.runInContext(readFileSync('browser/rdfjs-inference-engine.min.js', 'utf8'), context);
   const api = context.RdfjsInferenceEngine;
   Object.assign(globalThis, { document: { baseURI: 'https://example.org/index.html' } });

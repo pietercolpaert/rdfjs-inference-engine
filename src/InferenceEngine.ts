@@ -1,3 +1,4 @@
+import { translateN3RuntimeToSparql, type N3SparqlOptions, type N3SparqlResult } from './n3-to-sparql';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { Transform, type TransformCallback } from 'node:stream';
@@ -156,6 +157,11 @@ export class InferenceEngine {
     } else if (options.shapePlanningPath) {
       this.shapePlanning = deserializeShapePlanning(readFileSync(options.shapePlanningPath, 'utf8'));
     }
+  }
+
+  /** Translate the actual generated N3 runtime; unsupported constructs are reported. */
+  public getSparqlRuntime(options: N3SparqlOptions = {}): N3SparqlResult {
+    return translateN3RuntimeToSparql(this.getRuntime(), options);
   }
 
   public getRuntime(): string {

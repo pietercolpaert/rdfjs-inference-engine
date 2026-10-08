@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import type { Quad } from '@rdfjs/types';
 import { Parser } from 'rdf-parser-ts';
-import { generateSparqlConstruct } from '../src';
+import { generateSparqlConstruct, type SparqlRuntimeProgram } from '../src';
 import type { ConstructWorkerMessage, ConstructWorkerRequest } from '../browser-src/sparql-construct-worker';
 
 const directory = 'examples/sparql-construct/nde-amsterdam-photograph/';
@@ -13,7 +13,7 @@ const key = (q: Quad) => [q.subject, q.predicate, q.object].map(t => `${t.termTy
 const apiSource = readFileSync('browser/rdfjs-inference-engine.min.js', 'utf8');
 const workerSource = readFileSync('browser/sparql-construct-worker.min.js', 'utf8');
 
-async function execute(query: string, dataSource: string): Promise<ConstructWorkerMessage> {
+async function execute(query: string, dataSource: string, program?: SparqlRuntimeProgram): Promise<ConstructWorkerMessage> {
   const sandbox = vm.createContext({ URL, URLSearchParams, TextEncoder, TextDecoder, performance,
     AbortController, AbortSignal, setTimeout, clearTimeout, setInterval, clearInterval, setImmediate, clearImmediate, queueMicrotask,
     fetch: () => { throw new Error('Execution must not fetch background data.'); },
@@ -21,7 +21,7 @@ async function execute(query: string, dataSource: string): Promise<ConstructWork
   sandbox.self = sandbox;
   sandbox.importScripts = () => { vm.runInContext(apiSource, sandbox); };
   vm.runInContext(workerSource, sandbox);
-  const request: ConstructWorkerRequest = { apiScriptUrl: 'https://example.org/api.js', query, dataSource, baseIRI: 'https://example.org/input/' };
+  const request: ConstructWorkerRequest = { apiScriptUrl: 'https://example.org/api.js', query, program, dataSource, baseIRI: 'https://example.org/input/' };
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Comunica worker did not finish.')), 10000);
     sandbox.postMessage = (message: ConstructWorkerMessage) => {
@@ -35,13 +35,14 @@ async function main(): Promise<void> {
     shaclIn: parse(read('shapes-in.ttl')), shaclOut: parse(read('shapes-out.ttl')) });
   assert.ok(compiled.query);
   assert.equal(compiled.mappings.length, 5);
-  assert.equal(compiled.diagnostics.length, 0);
-  const result = await execute(compiled.query, read('input.messages.trig'));
+  assert.ok(!compiled.diagnostics.some(d => d.severity === 'error'));
+  const result = await execute(compiled.query, read('input.messages.trig'), compiled.program!);
   assert.equal(result.type, 'result');
   if (result.type !== 'result') throw new Error(JSON.stringify(result));
   assert.equal(result.processedMessages, 2);
   assert.equal(result.outputQuads, 10);
-  const apiContext = vm.createContext({ URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
+  const apiContext = vm.createContext({ AbortController, AbortSignal, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
+  apiContext.self = apiContext;
   vm.runInContext(apiSource, apiContext);
   const api = apiContext.RdfjsInferenceEngine;
   const expected = api.parseRdfOrMessages(read('expected-output.messages.trig'));
@@ -54,11 +55,12 @@ async function main(): Promise<void> {
   assert.ok(actual.quads.some((q: Quad) => q.object.termType === 'Literal' && q.object.language === 'nl'), 'Dutch title language tags survive execution.');
   const qudtDirectory = 'examples/sparql-construct/qudt-museum-dimensions/';
   const qudtRead = (file: string) => readFileSync(qudtDirectory + file, 'utf8');
-  const qudtQuery = generateSparqlConstruct({ ontology: parse(qudtRead('ontology.ttl')),
-    shaclIn: parse(qudtRead('shapes-in.ttl')), shaclOut: parse(qudtRead('shapes-out.ttl')) }).query;
+  const qudtCompiled = generateSparqlConstruct({ ontology: parse(qudtRead('ontology.ttl')),
+    shaclIn: parse(qudtRead('shapes-in.ttl')), shaclOut: parse(qudtRead('shapes-out.ttl')) });
+  const qudtQuery = qudtCompiled.query;
   assert.ok(qudtQuery);
   assert.equal(api.generateSparqlConstruct({ ontology: parse(qudtRead('ontology.ttl')), shaclIn: parse(qudtRead('shapes-in.ttl')), shaclOut: parse(qudtRead('shapes-out.ttl')) }).query, qudtQuery, 'Browser and Node generate the same QUDT arithmetic.');
-  const qudtResult = await execute(qudtQuery, qudtRead('input.messages.trig'));
+  const qudtResult = await execute(qudtQuery, qudtRead('input.messages.trig'), qudtCompiled.program!);
   if (qudtResult.type !== 'result') throw new Error(JSON.stringify(qudtResult));
   assert.equal(qudtResult.processedMessages, 3);
   assert.equal(qudtResult.outputQuads, 12);
@@ -70,7 +72,8 @@ async function main(): Promise<void> {
     assert.deepEqual(new Set(message.map(normalize)), new Set(qudtExpected.messages[index].map(normalize)), 'Browser Comunica performs the QUDT conversion in each message.');
   });
   const noOntology = generateSparqlConstruct({ ontology: [], shaclIn: parse(read('shapes-in.ttl')), shaclOut: parse(read('shapes-out.ttl')) });
-  assert.equal(noOntology.query, null, 'The example mapping depends on the explicit ontology.');
+  const unmapped = await execute(noOntology.query!, read('input.messages.trig'), noOntology.program!);
+  assert.equal(unmapped.type === 'result' && unmapped.outputQuads, 0, 'The example mapping depends on the explicit ontology.');
   const ordinary = await execute('CONSTRUCT { ?s <urn:result> ?o } WHERE { ?s <urn:source> ?o }', '<urn:s> <urn:source> "ordinary" .');
   assert.equal(ordinary.type, 'result');
   if (ordinary.type === 'result') {

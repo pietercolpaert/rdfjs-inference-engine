@@ -1,4 +1,4 @@
-import { generateSparqlConstruct } from '../src/sparql-construct';
+import { generateSparqlConstruct, type SparqlConstructResult } from '../src/sparql-construct';
 import { constructExamples } from './sparql-construct-examples';
 import { createRdfUrlLoader } from './rdf-url-loader';
 import type { ConstructWorkerMessage, ConstructWorkerRequest } from './sparql-construct-worker';
@@ -13,6 +13,9 @@ const exampleSelect = get('exampleSelect') as HTMLSelectElement;
 const initialExample = constructExamples[0];
 const editors = Object.fromEntries(names.map(name => [name, editor(`${name}Text`, initialExample[name])])) as Record<typeof names[number], any>;
 const output = editor('queryText', '', true, 'application/sparql-query');
+const rulesEditor = editor('rulesText', api.defaultSparqlMappingRules);
+const runtimeEditor = editor('runtimeText', '', true);
+const translatedEditor = editor('translatedText', '', true, 'application/sparql-query');
 const dataEditor = editor('dataText', initialExample.data);
 const resultEditor = editor('resultText', '', true);
 const expectedEditor = editor('expectedText', initialExample.expected, true);
@@ -26,6 +29,7 @@ const run = button('runQueryButton');
 const stop = button('stopQueryButton');
 let activeWorker: Worker | null = null;
 let pendingLoads = 0;
+let generated: SparqlConstructResult | null = null;
 
 function editor(id: string, value: string, readOnly = false, mode = 'text/turtle'): any {
   const textarea = get(id) as HTMLTextAreaElement;
@@ -50,8 +54,11 @@ function invalidateExecution(): void {
   executionStatus.textContent = 'Ready. Load or edit input data, then execute the generated query.';
 }
 function invalidate(): void {
+  generated = null;
   stopExecution('Mapping inputs changed. Generate a query again.');
   output.setValue('');
+  runtimeEditor.setValue('');
+  translatedEditor.setValue('');
   resultEditor.setValue('');
   executionPanel.hidden = true;
   copy.disabled = download.disabled = true;
@@ -68,6 +75,7 @@ const urlLoaders = Object.fromEntries([...names, 'data' as const].map(name => [n
   onPendingChange: pending => { pendingLoads += pending ? 1 : -1; updateRunControls(); },
 })]));
 for (const name of names) editors[name].on('change', invalidate);
+rulesEditor.on('change', invalidate);
 dataEditor.on('change', invalidateExecution);
 
 for (const example of constructExamples) {
@@ -81,6 +89,7 @@ function loadExample(): void {
   const example = constructExamples.find(example => example.id === exampleSelect.value) ?? initialExample;
   for (const loader of Object.values(urlLoaders)) loader.reset();
   for (const name of names) editors[name].setValue(example[name]);
+  rulesEditor.setValue(api.defaultSparqlMappingRules);
   dataEditor.setValue(example.data);
   expectedEditor.setValue(example.expected);
   get('exampleDescription').textContent = example.description;
@@ -96,12 +105,15 @@ function generate(): void {
         return [name, api.parseRdfOrMessages(editors[name].getValue(), { baseIRI: document.baseURI }).quads as Quad[]];
       } catch (error) { throw new Error(`${name}: ${error instanceof Error ? error.message : String(error)}`); }
     })) as { ontology: Quad[]; shaclIn: Quad[]; shaclOut: Quad[] };
-    const result = generateSparqlConstruct(inputs);
+    const result = generateSparqlConstruct({ ...inputs, rules: rulesEditor.getValue() });
+    runtimeEditor.setValue(result.runtime);
+    translatedEditor.setValue(result.program ? [result.program.seedQuery ?? '', ...result.program.rules.map(rule => rule.query)].filter(Boolean).join('\n') : '');
     diagnostics.textContent = result.diagnostics.map(d => `${d.severity.toUpperCase()}: ${d.message}${d.path ? `\nPath: ${d.path}` : ''}${d.shape ? `\nShape: ${d.shape}` : ''}`).join('\n\n');
     if (result.query) {
+      generated = result;
       output.setValue(result.query);
       copy.disabled = download.disabled = false;
-      status.textContent = `Generated query with ${result.mappings.length} property mappings.`;
+      status.textContent = `Translated ${result.program!.rules.length} N3 rules and generated the output projection.`;
       executionPanel.hidden = false;
       invalidateExecution();
       setTimeout(() => { dataEditor.refresh(); resultEditor.refresh(); }, 0);
@@ -139,6 +151,7 @@ function executeQuery(): void {
     const request: ConstructWorkerRequest = {
       apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', document.baseURI).href,
       query: output.getValue(), dataSource: dataEditor.getValue(), baseIRI: document.baseURI,
+      program: generated?.program ?? undefined,
     };
     worker.postMessage(request);
   } catch (error) {
@@ -152,15 +165,16 @@ exampleSelect.addEventListener('change', loadExample);
 run.addEventListener('click', executeQuery);
 stop.addEventListener('click', () => stopExecution());
 get('expectedPanel').addEventListener('toggle', () => { setTimeout(() => expectedEditor.refresh(), 0); });
+get('runtimePanel').addEventListener('toggle', () => { setTimeout(() => { runtimeEditor.refresh(); translatedEditor.refresh(); }, 0); });
 copy.addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(output.getValue()); status.textContent = 'Query copied.'; }
   catch { status.textContent = 'Clipboard access is unavailable. Select and copy the query from the editor.'; }
 });
 download.addEventListener('click', () => {
-  const url = URL.createObjectURL(new Blob([output.getValue()], { type: 'application/sparql-query' }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ program: generated?.program, outputQuery: output.getValue() }, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'mapping.rq';
+  link.download = 'mapping-runtime.json';
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });

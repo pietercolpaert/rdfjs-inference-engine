@@ -1,12 +1,13 @@
 import { QueryEngine } from '@comunica/query-sparql-rdfjs-lite';
 import type { Quad } from '@rdfjs/types';
-const { Store } = require('n3');
+import { createRdfjsSparqlExecutor, executeSparqlRuntime, type SparqlRuntimeProgram } from '../src/n3-to-sparql';
 
 export interface ConstructWorkerRequest {
   apiScriptUrl: string;
   query: string;
   dataSource: string;
   baseIRI: string;
+  program?: SparqlRuntimeProgram;
 }
 export type ConstructWorkerMessage =
   | { type: 'status'; message: string }
@@ -29,11 +30,13 @@ scope.onmessage = async ({ data: request }) => {
     const output: Quad[][] = [];
     let outputQuads = 0;
     for (const [index, message] of messages.entries()) {
-      scope.postMessage({ type: 'status', message: `Executing the generated query on ${parsed.isMessages ? `message ${index + 1} of ${messages.length}` : 'input RDF'}…` });
+      scope.postMessage({ type: 'status', message: `Executing ${request.program ? 'the translated runtime and output query' : 'the query'} on ${parsed.isMessages ? `message ${index + 1} of ${messages.length}` : 'input RDF'}…` });
       // Each input message is the default graph, including input originally carried in named graphs.
-      const source = new Store(message.map(q => api.DataFactory.quad(q.subject, q.predicate, q.object)));
-      const stream = await engine.queryQuads(request.query, { sources: [source], baseIRI: request.baseIRI });
-      const result = await stream.toArray();
+      const source = message.map(q => api.DataFactory.quad(q.subject, q.predicate, q.object));
+      const execute = createRdfjsSparqlExecutor(engine, { baseIRI: request.baseIRI });
+      const result = request.program
+        ? (await executeSparqlRuntime(request.program, source, execute, { outputQuery: request.query })).output
+        : Array.from(await execute(request.query, source));
       output.push(result);
       outputQuads += result.length;
     }

@@ -31,3 +31,7 @@ export type {
 
 export { generateSparqlConstruct } from './sparql-construct';
 export type { SparqlConstructInput, SparqlConstructResult, SparqlConstructMapping, SparqlConstructDiagnostic } from './sparql-construct';
+
+export { translateN3RuntimeToSparql, executeSparqlRuntime, createRdfjsSparqlExecutor } from './n3-to-sparql';
+export type { RdfjsSparqlEngine, N3SparqlDiagnostic, N3SparqlResult, N3SparqlOptions, SparqlRuntimeProgram, SparqlQueryExecutor, SparqlRuntimeExecutionOptions, SparqlRuntimeExecutionResult } from './n3-to-sparql';
+export { defaultSparqlMappingRules } from './sparql-rule-profile';

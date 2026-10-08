@@ -5,8 +5,7 @@ import type { Quad } from '@rdfjs/types';
 import { Parser as RdfParser } from 'rdf-parser-ts';
 import { Parser as SparqlParser } from 'sparqljs';
 import { QueryEngine } from '@comunica/query-sparql-rdfjs-lite';
-import { generateSparqlConstruct } from '../src';
-const { Store } = require('n3');
+import { generateSparqlConstruct, executeSparqlRuntime, createRdfjsSparqlExecutor, type SparqlConstructResult } from '../src';
 const prefix = `@prefix ex: <https://example.org/> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -26,46 +25,48 @@ sh:property [ sh:path ex:time ; sh:datatype xsd:dateTime ] ;
 sh:property [ sh:path [ sh:inversePath ex:observed ] ] ;
 sh:property [ sh:path (ex:part ex:name) ] .`);
 const engine = new QueryEngine();
-async function execute(query: string | null, data: string): Promise<Quad[]> {
-  assert.ok(query, 'Expected a generated query.');
+async function execute(result: SparqlConstructResult, data: string): Promise<Quad[]> {
+  const query = result.query;
+  assert.ok(query && result.program, 'Expected a translated runtime.');
   const parsed = new SparqlParser().parse(query);
   assert.ok('queryType' in parsed);
   assert.equal(parsed.queryType, 'CONSTRUCT');
-  return (await engine.queryQuads(query, { sources: [new Store(parse(data))] })).toArray();
+  return (await executeSparqlRuntime(result.program, parse(data), createRdfjsSparqlExecutor(engine), { outputQuery: query })).output;
 }
 const key = (q: Quad): string => [q.subject, q.predicate, q.object].map(t => `${t.termType}:${t.value}${t.termType === 'Literal' ? ':' + t.datatype.value + ':' + t.language : ''}`).join(' ');
 async function main(): Promise<void> {
   const result = generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: consumer });
   assert.equal(result.mappings.length, 4);
-  assert.equal(result.diagnostics.length, 0);
-  const actual = await execute(result.query, `ex:m a ex:Reading ; ex:temperature "18.4"^^xsd:decimal ; ex:sensor ex:s ; ex:child ex:c . ex:c ex:label "inside" .
+  assert.ok(!result.diagnostics.some(d => d.severity === 'error'));
+  const actual = await execute(result, `ex:m a ex:Reading ; ex:temperature "18.4"^^xsd:decimal ; ex:sensor ex:s ; ex:child ex:c . ex:c ex:label "inside" .
 ex:n a ex:Reading ; ex:temperature "20"^^xsd:decimal ; ex:timestamp "2026-10-08T12:00:00Z"^^xsd:dateTime .`);
   const expected = parse(`ex:m a ex:Observation ; ex:value "18.4"^^xsd:decimal ; ex:part ex:c . ex:s ex:observed ex:m . ex:c ex:name "inside" .
 ex:n a ex:Observation ; ex:value "20"^^xsd:decimal ; ex:time "2026-10-08T12:00:00Z"^^xsd:dateTime .`);
   assert.deepEqual(new Set(actual.map(key)), new Set(expected.map(key)), 'Map classes, inverse properties and nested paths while preserving optional values.');
-  assert.equal((await execute(result.query, 'ex:m a ex:Reading ; ex:temperature "wrong datatype" .')).length, 0);
+  assert.equal((await execute(result, 'ex:m a ex:Reading ; ex:temperature "wrong datatype" .')).length, 0);
   const missing = generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: parse('ex:C sh:targetClass ex:Observation ; sh:property [ sh:path ex:missing ; sh:minCount 1 ] .') });
-  assert.equal(missing.query, null);
-  assert.ok(missing.diagnostics.some(d => d.severity === 'error' && d.path?.endsWith('missing')));
+  assert.ok(missing.query);
+  assert.equal((await execute(missing, 'ex:m a ex:Reading ; ex:temperature 1 .')).length, 0, 'Rules cannot fabricate missing required fields.');
   const optional = generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: parse('ex:C sh:targetClass ex:Observation ; sh:property [ sh:path ex:missing ] .') });
   assert.ok(optional.query);
-  assert.equal(optional.diagnostics[0].severity, 'warning');
+  assert.equal((await execute(optional, 'ex:m a ex:Reading .')).length, 1);
   for (const constraint of ['sh:node ex:Nested', 'sh:or (ex:A ex:B)', 'sh:deactivated true']) {
     assert.equal(generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: parse(`ex:C sh:targetClass ex:Observation ; ${constraint} .`) }).query, null);
   }
   for (const path of ['[ sh:alternativePath (ex:value ex:time) ]', '[ sh:oneOrMorePath ex:value ]']) {
     assert.equal(generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: parse(`ex:C sh:property [ sh:path ${path} ] .`) }).query, null);
   }
-  assert.equal(generateSparqlConstruct({ ontology: [], shaclIn: provider, shaclOut: consumer }).query, null, 'Do not invent class alignment.');
+  const unaligned = generateSparqlConstruct({ ontology: [], shaclIn: provider, shaclOut: consumer });
+  assert.equal((await execute(unaligned, 'ex:m a ex:Reading ; ex:temperature 1 .')).length, 0, 'Do not invent class alignment.');
   const reverse = generateSparqlConstruct({ ontology: parse('ex:value rdfs:subPropertyOf ex:temperature .'), shaclIn: provider, shaclOut: parse('ex:C sh:property [ sh:path ex:value ; sh:minCount 1 ] .') });
-  assert.equal(reverse.query, null, 'Subproperty mappings are directional.');
+  assert.equal((await execute(reverse, 'ex:m a ex:Reading ; ex:temperature 1 .')).length, 0, 'Subproperty mappings are directional.');
   const alternatives = generateSparqlConstruct({ ontology, shaclIn: parse('ex:P sh:targetClass ex:Reading ; sh:property [ sh:path [ sh:alternativePath (ex:temperature ex:value) ] ] .'), shaclOut: parse('ex:C sh:property [ sh:path ex:value ; sh:minCount 1 ] .') });
-  assert.equal((await execute(alternatives.query, 'ex:m a ex:Reading ; ex:temperature 1 ; ex:value 2 .')).length, 2);
+  assert.equal((await execute(alternatives, 'ex:m a ex:Reading ; ex:temperature 1 ; ex:value 2 .')).length, 2);
   const constants = generateSparqlConstruct({ ontology: [], shaclIn: parse('ex:P sh:targetSubjectsOf ex:label ; sh:property [ sh:path ex:label ] .'), shaclOut: parse('ex:C sh:property [ sh:path ex:label ; sh:hasValue "a\\\"b" ; sh:in ("a\\\"b" "other") ] .') });
-  assert.equal((await execute(constants.query, 'ex:m ex:label "other" .')).length, 0, 'Never fabricate hasValue constants.');
-  assert.equal((await execute(constants.query, 'ex:m ex:label "a\\\"b" .')).length, 1, 'Serialize escaped RDF literals.');
+  assert.equal((await execute(constants, 'ex:m ex:label "other" .')).length, 0, 'Never fabricate hasValue constants.');
+  assert.equal((await execute(constants, 'ex:m ex:label "a\\\"b" .')).length, 1, 'Serialize escaped RDF literals.');
   const multiple = generateSparqlConstruct({ ontology: [], shaclIn: parse('ex:P sh:targetClass ex:A, ex:B ; sh:property [ sh:path ex:value ] .'), shaclOut: parse('ex:C sh:targetClass ex:A, ex:B ; sh:property [ sh:path ex:value ] .') });
-  const multiOutput = await execute(multiple.query, 'ex:m a ex:A ; ex:value 1 . ex:n a ex:B ; ex:value 2 .');
+  const multiOutput = await execute(multiple, 'ex:m a ex:A ; ex:value 1 . ex:n a ex:B ; ex:value 2 .');
   assert.deepEqual(new Set(multiOutput.map(key)), new Set(parse('ex:m a ex:A ; ex:value 1 . ex:n a ex:B ; ex:value 2 .').map(key)), 'Target classes are a union, and branch variables do not leak.');
   const namedProperty = generateSparqlConstruct({ ontology: [],
     shaclIn: parse('ex:P sh:targetClass ex:A ; sh:property ex:Field . ex:Field a sh:PropertyShape ; sh:path ex:value .'),
@@ -74,11 +75,12 @@ ex:n a ex:Observation ; ex:value "20"^^xsd:decimal ; ex:time "2026-10-08T12:00:0
   const targetUnion = generateSparqlConstruct({ ontology: [],
     shaclIn: parse('ex:P sh:targetClass ex:A ; sh:targetNode ex:untyped ; sh:property [ sh:path ex:value ] .'),
     shaclOut: parse('ex:C sh:targetClass ex:A ; sh:property [ sh:path ex:value ] .') });
-  assert.equal((await execute(targetUnion.query, 'ex:untyped ex:value 1 .')).length, 0, 'Target nodes do not imply target-class membership.');
+  assert.equal((await execute(targetUnion, 'ex:untyped ex:value 1 .')).length, 0, 'Target nodes do not imply target-class membership.');
   const cycle = parse('ex:temperature owl:equivalentProperty ex:measurement . ex:measurement rdfs:subPropertyOf ex:temperature, ex:value .');
   assert.ok(generateSparqlConstruct({ ontology: cycle, shaclIn: provider, shaclOut: parse('ex:C sh:property [ sh:path ex:value ; sh:minCount 1 ] .') }).query);
   assert.throws(() => generateSparqlConstruct({ ontology: [], shaclIn: parse('ex:P sh:property [ sh:path <urn:a> ] .'), shaclOut: parse('ex:C sh:targetNode [] ; sh:property [ sh:path <urn:a> ] .') }), /Blank nodes/);
-  const context = vm.createContext({ console, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
+  const context = vm.createContext({ console, AbortController, AbortSignal, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
+  context.self = context;
   vm.runInContext(readFileSync('browser/rdfjs-inference-engine.min.js', 'utf8'), context);
   assert.equal(typeof context.RdfjsInferenceEngine.generateSparqlConstruct, 'function');
   const browserResult = context.RdfjsInferenceEngine.generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: consumer });
@@ -95,7 +97,7 @@ async function testPlayground(api: any): Promise<void> {
   for (const id of [...names.flatMap(name => [`${name}Text`, `${name}Url`, `${name}Load`, `${name}Status`]),
     'queryText', 'status', 'diagnostics', 'generateButton', 'resetButton', 'copyButton', 'downloadButton',
     'exampleSelect', 'exampleDescription', 'ndeGuidance', 'dataText', 'dataUrl', 'dataLoad', 'dataLoadStatus',
-    'resultText', 'expectedText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton', 'expectedPanel']) {
+    'rulesText', 'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'expectedText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton', 'expectedPanel']) {
     elements.set(id, { id, value: '', textContent: '', disabled: false, handlers: {} as Record<string, (...args: any[]) => unknown>,
       appendChild: () => {}, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
   }
@@ -108,7 +110,7 @@ async function testPlayground(api: any): Promise<void> {
     postMessage(request: any) { this.request = request; }
     terminate() { this.terminated = true; }
   }
-  const sandbox = vm.createContext({ URL, Blob, setTimeout, clearTimeout, Worker: FakeWorker,
+  const sandbox = vm.createContext({ AbortController, AbortSignal, URL, Blob, setTimeout, clearTimeout, Worker: FakeWorker,
     navigator: { clipboard: { writeText: async () => {} } },
     document: { baseURI: 'https://example.org/sparql-construct.html', getElementById: (id: string) => elements.get(id), createElement: () => ({}) },
     RdfjsInferenceEngine: { ...api, dereferenceRdfUrl: () => new Promise(resolve => { resolveLoad = resolve; }) },
@@ -121,9 +123,10 @@ async function testPlayground(api: any): Promise<void> {
       return editor;
     } },
   });
+  sandbox.self = sandbox;
   vm.runInContext(readFileSync('browser/sparql-construct-playground.min.js', 'utf8'), sandbox);
   assert.ok(editors.get('queryText').getValue().startsWith('CONSTRUCT'));
-  assert.equal(editors.size, 7, 'Mapping inputs, query, data, result and expected output use CodeMirror.');
+  assert.equal(editors.size, 10, 'Mapping inputs, query, data, result and expected output use CodeMirror.');
   assert.equal(elements.get('executionPanel').hidden, false);
   assert.equal(elements.get('exampleSelect').value, 'nde-amsterdam-photograph');
   assert.ok(editors.get('ontologyText').getValue().includes('dcterms:title rdfs:subPropertyOf schema:name'));
@@ -171,7 +174,15 @@ async function testPlayground(api: any): Promise<void> {
   assert.ok(editors.get('ontologyText').getValue().includes('subClassOf'), 'Failed loading preserves editor contents.');
   elements.get('exampleSelect').value = 'qudt-museum-dimensions';
   elements.get('exampleSelect').handlers.change();
-  assert.ok(editors.get('queryText').getValue().includes('BIND'));
+  assert.ok(editors.get('translatedText').getValue().includes('BIND'));
+  assert.ok(editors.get('rulesText').getValue().includes('math:product'));
+  elements.get('runQueryButton').handlers.click();
+  assert.ok(workers.at(-1).request.program.rules.length);
+  editors.get('rulesText').setValue('@prefix math: <http://www.w3.org/2000/10/swap/math#>. { (1 2) math:exponentiation ?x } => { <urn:s> <urn:p> ?x }.');
+  assert.equal(workers.at(-1).terminated, true);
+  elements.get('generateButton').handlers.click();
+  assert.equal(editors.get('queryText').getValue(), '');
+  assert.match(elements.get('diagnostics').textContent, /Unsupported N3 built-in/);
   assert.ok(editors.get('ontologyText').getValue().includes('conversionMultiplier'));
   assert.ok(editors.get('dataText').getValue().includes('450'));
   elements.get('exampleSelect').value = 'sensor-reading';

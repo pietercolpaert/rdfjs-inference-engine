@@ -64,43 +64,70 @@ The main class is `InferenceEngine`.
 - `inferAsync(quads, { store })` runs with Eyeling's async runner and optional named persistent fact store.
 - `createInferenceStream()` / `stream()` creates an object-mode transform stream.
 
-## SPARQL CONSTRUCT mapping
+## N3 runtime to SPARQL CONSTRUCT
 
-The [SPARQL CONSTRUCT playground](sparql-construct.html), linked from the inference playground, accepts a provider ontology, a provider SHACL shape, and a consumer SHACL shape. Each input has an editable CodeMirror field and a URL **Load** button. URLs use the same RDF negotiation and page extraction as the main playground; fetched RDF is displayed as editable Turtle. Remote servers must allow browser access through CORS. Generate, copy, or download the resulting `.rq` query.
+The [SPARQL CONSTRUCT playground](sparql-construct.html), linked from the main playground, accepts a provider ontology, provider SHACL, and consumer SHACL. Each RDF input has an editable CodeMirror field and a URL **Load** button. The examples include NDE-inspired Amsterdam photographs, QUDT museum object heights, and sensor readings.
 
-The example selector includes [Amsterdam archival photographs (NDE-inspired)](examples/sparql-construct/nde-amsterdam-photograph/README.md), [Museum object heights with QUDT](examples/sparql-construct/qudt-museum-dimensions/README.md), and the original sensor example. The heritage example has explicit ontology relationships mapping Dublin Core fields to Schema.org, Dutch titles, linked identifiers, and two fictional photographs showing optional metadata.
+The **N3 mapping rules** editor is the source of the inference behavior. `generateSparqlConstruct` assembles these rules with ontology and consumer-shape facts, translates the N3 runtime, and generates a separate consumer output projection. Ontology entailment and QUDT arithmetic are defined in the editable [N3 profile](src/sparql-rule-profile.ts); the translator has no hardcoded unit conversion or property mapping. Changing a supported rule changes its emitted SPARQL and executed result. Provider SHACL documents the input contract; it does not invent inference rules or validate messages.
 
-Once a query is generated, an execution panel appears directly below it. Its CodeMirror input supports pasted RDF, RDF Message Logs, and a URL **Load** button. **Run SPARQL CONSTRUCT** executes the exact displayed query with a locally bundled Comunica RDF/JS engine in a Web Worker, with progress, output, and **Stop** controls. Each message's contents form a separate default graph; messages are never combined for query joins. Ordinary RDF is processed as one message. The result preserves message boundaries, and an expandable panel shows the selected example's expected output. Editing mapping inputs invalidates the query; editing input data clears execution results while keeping the query available.
+A general recursive N3 runtime cannot be represented by one finite SPARQL CONSTRUCT query. The generated program loads static facts once, executes its rule queries in source order until no new facts appear, then executes the displayed output query on rule-head facts. The expandable runtime panel shows the complete N3 source and every translated query. **Download runtime .json** exports the program and output query together; copying the output query alone does not export the inference stage.
 
-The same compiler is exported by the Node.js package and the browser API:
+The bundled Comunica worker runs this same program without Eyeling or background fetches. Messages are isolated default graphs; ordinary RDF forms one message. Input data supports URL loading, progress, **Stop**, output and expected-output editors. Editing rules or mapping inputs invalidates the program. Editing data clears results while preserving the program.
+
+Node.js and the browser export the same compiler and executor:
 
 ```ts
 import { readFileSync } from 'node:fs';
 import { Parser } from 'rdf-parser-ts';
-import { generateSparqlConstruct } from 'rdfjs-inference-engine';
+import { QueryEngine } from '@comunica/query-sparql-rdfjs-lite';
+import {
+  generateSparqlConstruct, executeSparqlRuntime, createRdfjsSparqlExecutor,
+} from 'rdfjs-inference-engine';
 
 const readRdf = (path: string) => new Parser().parse(readFileSync(path, 'utf8'));
 const result = generateSparqlConstruct({
   ontology: readRdf('provider-ontology.ttl'),
   shaclIn: readRdf('provider-shape.ttl'),
   shaclOut: readRdf('consumer-shape.ttl'),
+  // rules: readFileSync('mapping.n3', 'utf8'), // optional editable/custom runtime
 });
-
-if (result.query === null) {
+if (!result.program || !result.query) {
   throw new Error(result.diagnostics.map(d => d.message).join('\n'));
 }
-console.log(result.query);
+const execution = await executeSparqlRuntime(
+  result.program, readRdf('message.ttl'),
+  createRdfjsSparqlExecutor(new QueryEngine()),
+  { outputQuery: result.query },
+);
+console.log(execution.output); // RDF-JS quads
 ```
 
-Inputs are RDF-JS quad iterables. The result contains `query`, `mappings` (provider/consumer shapes and paths), and `diagnostics` with `error` or `warning` severity. Missing required mappings and unsupported consumer constraints return `query: null`; missing optional mappings produce warnings. Invalid RDF terms throw an error. No runtime rule profiles or network access are needed by the compiler.
+Install Comunica separately when using that adapter; the library does not require it. Any SPARQL executor can be supplied as `(query, dataset) => Promise<Iterable<Quad>>`, provided it preserves RDF term identities. The Comunica adapter restores source-scoped blank-node identities before reinserting results. Call the executor separately for each message; flatten any named graphs to that message's default graph first.
 
-The compiler follows transitive `rdfs:subPropertyOf`, `owl:equivalentProperty`, `owl:inverseOf`, `rdfs:subClassOf`, and `owl:equivalentClass` relationships. It maps predicates, inverse paths, and matching sequences, preserving existing intermediate nodes. Provider alternative paths can supply multiple source predicates. Consumer alternative and repeated paths cannot determine an unambiguous output structure and are reported as errors. Nested `sh:node`, logical constraints, CDT unit encodings, logarithmic conversions, and general OWL/N3 rule execution are not supported.
+To translate an existing generated runtime directly, use `translateN3RuntimeToSparql(engine.getRuntime())` or `engine.getSparqlRuntime()`. Translation returns `{ program, diagnostics }`; any unsupported construct makes `program` null. `generateSparqlConstruct` additionally returns the exact `runtime`, an output `query`, projection `mappings`, and diagnostics. Its projection mappings describe already inferred consumer paths, not an inventory of ontology mappings. Missing data or metadata normally causes rules not to fire rather than a compile-time error.
 
-Run the query separately on each message as the default RDF graph, using a SPARQL 1.1 engine. The query preserves focus-node identities, copies ordinary mapped values, uses `OPTIONAL` for optional fields, and filters consumer datatypes, allowed values, node kinds, and class constraints. For ordinary mappings, it requires existing `sh:hasValue` constants rather than inventing them. It does not repair cardinality or cast ordinary mapped values. QUDT conversion casts numeric inputs to decimals and the result to the requested numeric datatype. These are trusted mapping contracts; validate the constructed graph with SHACL when conformance is required. [SPARQL CONSTRUCT templates](https://www.w3.org/TR/sparql11-query/#construct) contain triples; [SHACL property paths](https://www.w3.org/TR/shacl/#property-paths) describe the source and target paths.
+Supported N3 features are forward implications with conjunctive graph patterns, variable predicates, safe multi-triple heads, body blank nodes, static RDF facts/lists, and nonrecursive backward helpers (including list arguments and multiple clauses compiled to UNION). The emitted SPARQL uses these built-ins:
 
-QUDT quantity values can be converted using direct, required `qudt:numericValue` and `qudt:unit` paths. SHACL IN must declare allowed source units with `sh:in`/`sh:hasValue` on `qudt:unit` or `sh:unit` on the numeric field. SHACL OUT specifies one target unit through `sh:hasValue` on `qudt:unit`, optionally also using `sh:unit` on the numeric field. The ontology supplies dimension vectors and finite conversion multipliers, with optional offsets defaulting to zero. The compiler checks dimensions and embeds a `VALUES` table and `BIND` arithmetic into the query. Execution needs no background unit fetch. Mapping metadata includes `conversion: { sourceUnits, targetUnit }` for converted numeric fields. See the [QUDT example](examples/sparql-construct/qudt-museum-dimensions/README.md) for the representation and supported limits.
+| N3 built-ins | SPARQL |
+| --- | --- |
+| `math:sum`, `product`, `difference`, `quotient`, `negation` | arithmetic `BIND` / comparisons for already bound results |
+| `math:absoluteValue`, `rounded`, `floor`, `ceiling` | `ABS`, `ROUND`, `FLOOR`, `CEIL` |
+| `math:greaterThan`, `lessThan`, `notGreaterThan`, `notLessThan`, `equalTo`, `notEqualTo` | numeric comparisons |
+| `log:equalTo`, `notEqualTo` | term equality / equality binding |
+| `string:concatenation`, `contains`, `startsWith`, `endsWith`, `matches` | `CONCAT`, `CONTAINS`, `STRSTARTS`, `STRENDS`, `REGEX` |
+| `dt:datatype`, `dt:lexicalForm` (Eyeling datatype namespace) | `DATATYPE`, `STR` |
+| `log:dtlit` with bound lexical text and datatype | `STRDT` |
+| `1 log:includes/notIncludes { ... }` | current-store `FILTER EXISTS / NOT EXISTS` |
 
-Run `npm run test:sparql-construct` to execute the generated queries against RDF fixtures and check browser/Node API parity, execute the browser Comunica worker, and verify message isolation.
+Built-in dependencies are ordered automatically; unsupported binding directions are errors. Arithmetic and inspection bind their output from bound inputs; they do not solve inverse equations. Regex and numeric lexical rendering follow the SPARQL engine. Current-store containment is an explicitly limited extension: it emits a warning, runs eagerly in source order, and never retracts earlier heads. It does not implement general N3 formula containment or a truth-maintenance system.
+
+This is a supported-subset compiler, not a translation of every bundled Eyeling profile. Existential head nodes, recursive backward helpers, ordinary list-valued rule heads, named graphs, arbitrary formula operations, `log:skolem`, exponentiation/logarithmic QUDT conversions, CDT parsing, unsupported built-ins and unsafe/unbound heads produce diagnostics. The executor defaults to 100 rounds and 100,000 facts and throws on limit exhaustion instead of returning incomplete output. These limits can be configured.
+
+The consumer projection supports direct predicates, inverse paths and sequences, optional/required fields, literal datatype and node-kind filtering, class constraints, `sh:in` and existing `sh:hasValue`. It does not fabricate constants, repair cardinality, cast values or replace SHACL validation. Alternative/repeated output paths and nested/logical consumer shapes are rejected.
+
+The default N3 QUDT rules normalize direct quantity-value records to one output unit using matching dimension vectors and positive unambiguous multipliers. Missing offsets default to zero through a backward N3 helper. Consumer SHACL needs a target class, required `qudt:numericValue` and `qudt:unit`, and one target `sh:hasValue`; `sh:unit` on the numeric field can repeat the same target. Unknown or incompatible units do not yield a normalized record. Numeric result types follow SPARQL arithmetic and must match the consumer datatype. See the [QUDT example](examples/sparql-construct/qudt-museum-dimensions/README.md).
+
+Run `npm run test:sparql-construct` for translator/Eyeling parity, rule editing, chaining and recursion, compiler diagnostics, library and browser parity, Comunica execution and message isolation.
 
 ## Bundled Rule Profiles
 

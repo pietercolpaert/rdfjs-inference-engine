@@ -11,7 +11,7 @@ museum:heightOf rdfs:subPropertyOf schema:about .
 
 # A minimal QUDT unit projection. All three units share the length dimension.
 # Source: https://qudt.org/vocab/unit/CentiM, MilliM, and M.
-# Canonical value = numeric value * conversionMultiplier + conversionOffset.
+# Canonical value = (numeric value + conversionOffset) * conversionMultiplier.
 unit:CentiM a qudt:Unit ;
   qudt:hasDimensionVector qkdv:A0E0L1I0M0H0T0D0 ;
   qudt:conversionMultiplier "0.01"^^xsd:decimal ;

@@ -1,3 +1,4 @@
+import { translateN3RuntimeToSparql, type N3SparqlOptions, type N3SparqlResult } from '../src/n3-to-sparql';
 import type { DatasetCore, DataFactory, Quad, Term } from '@rdfjs/types';
 import { rdfjs, reasonStream, runAsync, type EyelingTerm } from 'eyeling/browser';
 import LDFetch from 'ldfetch';
@@ -152,6 +153,11 @@ export class InferenceEngine {
       this.runtime = options.runtime;
     }
     this.shapePlanning = options.shapePlanning;
+  }
+
+  /** Translate the actual generated N3 runtime; unsupported constructs are reported. */
+  public getSparqlRuntime(options: N3SparqlOptions = {}): N3SparqlResult {
+    return translateN3RuntimeToSparql(this.getRuntime(), options);
   }
 
   public getRuntime(): string {
@@ -2177,3 +2183,7 @@ export {
 
 export { generateSparqlConstruct } from '../src/sparql-construct';
 export type { SparqlConstructInput, SparqlConstructResult, SparqlConstructMapping, SparqlConstructDiagnostic } from '../src/sparql-construct';
+
+export { translateN3RuntimeToSparql, executeSparqlRuntime, createRdfjsSparqlExecutor } from '../src/n3-to-sparql';
+export type { RdfjsSparqlEngine, N3SparqlDiagnostic, N3SparqlResult, N3SparqlOptions, SparqlRuntimeProgram, SparqlQueryExecutor, SparqlRuntimeExecutionOptions, SparqlRuntimeExecutionResult } from '../src/n3-to-sparql';
+export { defaultSparqlMappingRules } from '../src/sparql-rule-profile';

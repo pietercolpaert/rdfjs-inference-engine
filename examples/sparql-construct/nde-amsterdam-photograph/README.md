@@ -2,7 +2,7 @@
 
 An illustrative example inspired by [Netwerk Digitaal Erfgoed's guidance on publishing collection information with Schema.org](https://netwerkdigitaalerfgoed.nl/wegwijzer/verspreiden/). It describes fictional photographs of Amsterdam's canals; it is not a real archive export or an official NDE SHACL profile. Photographer, photograph, and subject identifiers use example URIs.
 
-Select **Amsterdam archival photographs (NDE-inspired)** in the SPARQL CONSTRUCT playground. The ontology, provider shape, consumer shape, and input messages load together. Generate the query and use **Run SPARQL CONSTRUCT** to execute that exact query with the locally bundled Comunica engine. The expected output is available below the execution controls.
+Select **Amsterdam archival photographs (NDE-inspired)** in the SPARQL CONSTRUCT playground. The ontology, provider shape, consumer shape, and input messages load together. The editable N3 rules express the ontology entailment. Generate the SPARQL runtime and use **Run SPARQL CONSTRUCT** to execute its translated rule queries to a fixed point, followed by the displayed consumer output query, with the locally bundled Comunica engine. The expected output is available below the execution controls.
 
 The ontology explicitly provides these directional relationships:
 
@@ -15,7 +15,7 @@ The ontology explicitly provides these directional relationships:
 | `dcterms:subject` | subproperty of `schema:about` |
 | `dcterms:license` | subproperty of `schema:license` |
 
-These statements describe the vocabulary alignment assumed by this collection example. Removing them prevents the compiler from establishing the mapping; the generator does not match field names heuristically.
+These statements describe the vocabulary alignment assumed by this collection example. Removing them prevents the translated entailment rules from producing the mapped fields; the generator does not match field names heuristically.
 
 The title is required. Photographer, date, subject, and licence are optional. Titles use `sh:nodeKind sh:Literal` so Dutch language tags survive; dates use `xsd:date`, and linked identifiers are IRIs. The two messages demonstrate a fully described photograph and a photograph with an unknown maker and date. Each message is queried separately, keeping original identifiers and message boundaries.
 
