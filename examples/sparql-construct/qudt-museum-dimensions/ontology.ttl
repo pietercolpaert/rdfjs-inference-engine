@@ -1,0 +1,26 @@
+@prefix museum: <https://example.org/museum/ontology#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix qkdv: <http://qudt.org/vocab/dimensionvector/> .
+@prefix schema: <https://schema.org/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+museum:RecordedHeight rdfs:subClassOf qudt:QuantityValue .
+museum:heightOf rdfs:subPropertyOf schema:about .
+
+# A minimal QUDT unit projection. All three units share the length dimension.
+# Source: https://qudt.org/vocab/unit/CentiM, MilliM, and M.
+# Canonical value = numeric value * conversionMultiplier + conversionOffset.
+unit:CentiM a qudt:Unit ;
+  qudt:hasDimensionVector qkdv:A0E0L1I0M0H0T0D0 ;
+  qudt:conversionMultiplier "0.01"^^xsd:decimal ;
+  qudt:conversionOffset "0"^^xsd:decimal .
+unit:MilliM a qudt:Unit ;
+  qudt:hasDimensionVector qkdv:A0E0L1I0M0H0T0D0 ;
+  qudt:conversionMultiplier "0.001"^^xsd:decimal ;
+  qudt:conversionOffset "0"^^xsd:decimal .
+unit:M a qudt:Unit ;
+  qudt:hasDimensionVector qkdv:A0E0L1I0M0H0T0D0 ;
+  qudt:conversionMultiplier "1"^^xsd:decimal ;
+  qudt:conversionOffset "0"^^xsd:decimal .

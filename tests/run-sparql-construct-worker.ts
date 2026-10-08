@@ -52,6 +52,23 @@ async function main(): Promise<void> {
     assert.deepEqual(new Set(message.map(key)), new Set(expected.messages[index].map(key)), 'Browser Comunica output must match the heritage fixture per message.');
   });
   assert.ok(actual.quads.some((q: Quad) => q.object.termType === 'Literal' && q.object.language === 'nl'), 'Dutch title language tags survive execution.');
+  const qudtDirectory = 'examples/sparql-construct/qudt-museum-dimensions/';
+  const qudtRead = (file: string) => readFileSync(qudtDirectory + file, 'utf8');
+  const qudtQuery = generateSparqlConstruct({ ontology: parse(qudtRead('ontology.ttl')),
+    shaclIn: parse(qudtRead('shapes-in.ttl')), shaclOut: parse(qudtRead('shapes-out.ttl')) }).query;
+  assert.ok(qudtQuery);
+  assert.equal(api.generateSparqlConstruct({ ontology: parse(qudtRead('ontology.ttl')), shaclIn: parse(qudtRead('shapes-in.ttl')), shaclOut: parse(qudtRead('shapes-out.ttl')) }).query, qudtQuery, 'Browser and Node generate the same QUDT arithmetic.');
+  const qudtResult = await execute(qudtQuery, qudtRead('input.messages.trig'));
+  if (qudtResult.type !== 'result') throw new Error(JSON.stringify(qudtResult));
+  assert.equal(qudtResult.processedMessages, 3);
+  assert.equal(qudtResult.outputQuads, 12);
+  const qudtActual = api.parseRdfOrMessages(qudtResult.output);
+  const qudtExpected = api.parseRdfOrMessages(qudtRead('expected-output.messages.trig'));
+  assert.equal(qudtActual.messages.length, 3);
+  qudtActual.messages.forEach((message: Quad[], index: number) => {
+    const normalize = (q: Quad) => q.predicate.value.endsWith('/numericValue') ? key(q).replace(q.object.value, String(Number(q.object.value))) : key(q);
+    assert.deepEqual(new Set(message.map(normalize)), new Set(qudtExpected.messages[index].map(normalize)), 'Browser Comunica performs the QUDT conversion in each message.');
+  });
   const noOntology = generateSparqlConstruct({ ontology: [], shaclIn: parse(read('shapes-in.ttl')), shaclOut: parse(read('shapes-out.ttl')) });
   assert.equal(noOntology.query, null, 'The example mapping depends on the explicit ontology.');
   const ordinary = await execute('CONSTRUCT { ?s <urn:result> ?o } WHERE { ?s <urn:source> ?o }', '<urn:s> <urn:source> "ordinary" .');

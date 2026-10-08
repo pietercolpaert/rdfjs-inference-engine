@@ -1,0 +1,21 @@
+VERSION "1.2-messages"
+PREFIX measurement: <https://example.org/museum/measurements/>
+PREFIX object: <https://example.org/museum/objects/>
+PREFIX qudt: <http://qudt.org/schema/qudt/>
+PREFIX unit: <http://qudt.org/vocab/unit/>
+PREFIX schema: <https://schema.org/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+
+measurement:vase-height a qudt:QuantityValue ;
+  schema:about object:delftware-vase ;
+  qudt:numericValue "0.32"^^xsd:decimal ; qudt:unit unit:M .
+
+MESSAGE
+measurement:case-height a qudt:QuantityValue ;
+  schema:about object:display-case ;
+  qudt:numericValue "0.45"^^xsd:decimal ; qudt:unit unit:M .
+
+MESSAGE
+measurement:cabinet-height a qudt:QuantityValue ;
+  schema:about object:cabinet ;
+  qudt:numericValue "1.2"^^xsd:decimal ; qudt:unit unit:M .

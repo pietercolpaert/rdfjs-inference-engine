@@ -1,0 +1,13 @@
+@prefix museum: <https://example.org/museum/ontology#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix schema: <https://schema.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# The consumer needs heights expressed in metres, not merely relabelled units.
+museum:ConsumerShape a sh:NodeShape ;
+  sh:targetClass qudt:QuantityValue ;
+  sh:property [ sh:path schema:about ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:datatype xsd:decimal ; sh:unit unit:M ] ;
+  sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:hasValue unit:M ] .

@@ -1,3 +1,8 @@
+import qudtOntology from '../examples/sparql-construct/qudt-museum-dimensions/ontology.ttl';
+import qudtIn from '../examples/sparql-construct/qudt-museum-dimensions/shapes-in.ttl';
+import qudtOut from '../examples/sparql-construct/qudt-museum-dimensions/shapes-out.ttl';
+import qudtData from '../examples/sparql-construct/qudt-museum-dimensions/input.messages.trig';
+import qudtExpected from '../examples/sparql-construct/qudt-museum-dimensions/expected-output.messages.trig';
 import ontology from '../examples/sparql-construct/nde-amsterdam-photograph/ontology.ttl';
 import shaclIn from '../examples/sparql-construct/nde-amsterdam-photograph/shapes-in.ttl';
 import shaclOut from '../examples/sparql-construct/nde-amsterdam-photograph/shapes-out.ttl';
@@ -9,6 +14,9 @@ export const constructExamples = [
   { id: 'nde-amsterdam-photograph', label: 'Amsterdam archival photographs (NDE-inspired)',
     description: 'Illustrative Amsterdam canal photographs: Dublin Core collection metadata → Schema.org for a heritage discovery portal. The ontology explicitly aligns the photograph class and all five fields. Dutch titles and linked identifiers are preserved; photographer and date can be unknown. These are fictional records and example mappings, not an official NDE profile.',
     ontology, shaclIn, shaclOut, data, expected },
+  { id: 'qudt-museum-dimensions', label: 'Museum object heights (QUDT: cm/mm → m)',
+    description: 'Fictional museum measurements: a Delftware vase (32 cm → 0.32 m), a display case (450 mm → 0.45 m), and a cabinet already measured in metres. QUDT dimension vectors and conversion factors from the ontology become VALUES and BIND arithmetic in the generated query. Comunica converts the values and writes unit:M while preserving identifiers and message boundaries.',
+    ontology: qudtOntology, shaclIn: qudtIn, shaclOut: qudtOut, data: qudtData, expected: qudtExpected },
   { id: 'sensor-reading', label: 'Sensor readings',
     description: 'Map temperature readings to an observation contract, preserving optional timestamps.',
     ontology: prefixes + 'ex:SensorReading rdfs:subClassOf ex:Observation .\nex:temperature rdfs:subPropertyOf ex:value .\nex:recordedAt owl:equivalentProperty ex:time .\n',

@@ -1,4 +1,5 @@
 import type { Quad, Term } from '@rdfjs/types';
+import { isQudtProperty, planQudtConversion, type QudtConversionPlan } from './sparql-qudt';
 import { compileShaclShapeGraph, type CompiledShaclPath, type ShapePlan } from './shacl-shape-planning';
 
 const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
@@ -24,6 +25,7 @@ export interface SparqlConstructMapping {
   sourcePaths: string[];
   targetPath: string;
   required: boolean;
+  conversion?: { sourceUnits: string[]; targetUnit: string };
 }
 export interface SparqlConstructResult {
   /** Null when a required mapping or a supported output structure cannot be resolved. */
@@ -32,7 +34,7 @@ export interface SparqlConstructResult {
   diagnostics: SparqlConstructDiagnostic[];
 }
 
-/** Compile a per-message, default-graph mapping. Values and focus-node identities are preserved.
+/** Compile a per-message, default-graph mapping. Focus-node identities are preserved. Values are copied or converted using explicit QUDT metadata.
  * This is a mapping compiler, not a SHACL validator or a complete OWL reasoner.
  */
 export function generateSparqlConstruct(input: SparqlConstructInput): SparqlConstructResult {
@@ -66,10 +68,13 @@ export function generateSparqlConstruct(input: SparqlConstructInput): SparqlCons
   const supported = new Set(['NodeShape', 'PropertyShape', 'targetClass', 'targetNode',
     'property', 'path', 'inversePath', 'alternativePath', 'zeroOrMorePath',
     'oneOrMorePath', 'zeroOrOnePath', 'minCount', 'maxCount', 'datatype', 'class', 'nodeKind',
-    'hasValue', 'in', 'closed', 'ignoredProperties', 'name', 'description', 'order', 'message', 'severity']);
+    'hasValue', 'in', 'unit', 'closed', 'ignoredProperties', 'name', 'description', 'order', 'message', 'severity']);
   for (const quad of consumerQuads) {
+    if (quad.predicate.value === SH + 'unit' && quad.object.termType !== 'NamedNode') {
+      report('error', 'sh:unit must specify one unit IRI, not an RDF list or literal.', id(quad.subject));
+    }
     if (quad.predicate.value.startsWith('https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#')) {
-      report('error', 'Unit conversions are not supported by the SPARQL mapping compiler.', id(quad.subject));
+      report('error', 'CDT unit encodings and custom QUDT extensions are not supported by the SPARQL mapping compiler.', id(quad.subject));
     }
     if (quad.predicate.value.startsWith(SH) && !supported.has(quad.predicate.value.slice(SH.length))) {
       report('error', `Unsupported consumer constraint: ${quad.predicate.value}.`, id(quad.subject));
@@ -115,8 +120,17 @@ export function generateSparqlConstruct(input: SparqlConstructInput): SparqlCons
       }
       if (consumer.targetNodes.length) where.push(`VALUES ${root} { ${consumer.targetNodes.map(value => termById(consumerQuads, value)).join(' ')} }`);
       for (const value of wantedClasses) templates.push(`${root} ${iri(RDF + 'type')} ${iri(value)} .`);
+      let qudt: QudtConversionPlan | undefined;
+      try { qudt = planQudtConversion(ontology, provider, consumer, root, branchIndex, iri); }
+      catch (error) { report('error', error instanceof Error ? error.message : String(error), consumer.shape); continue; }
+      if (qudt) where.push(qudt.pattern);
       for (const [propertyIndex, target] of consumer.propertyPlans.entries()) {
         if (target.maxCount === 0) continue;
+        if (target.units.length && (!qudt || !isQudtProperty(target, 'numericValue'))) {
+          report('error', 'sh:unit conversion is supported on direct qudt:numericValue paths with a required output qudt:unit.', consumer.shape, target.pathText);
+          continue;
+        }
+        const converted = qudt && (isQudtProperty(target, 'numericValue') || isQudtProperty(target, 'unit'));
         const outputSteps = linearPath(target.path);
         if (!outputSteps) {
           report('error', 'Consumer paths must be predicates, inverse paths, or sequences; alternative and repeated output paths are ambiguous to construct.', consumer.shape, target.pathText);
@@ -131,10 +145,10 @@ export function generateSparqlConstruct(input: SparqlConstructInput): SparqlCons
             'No documented provider path maps to this consumer path.', consumer.shape, target.pathText);
           continue;
         }
-        const value = `?value${branchIndex}_${propertyIndex}`;
+        const value = converted ? (isQudtProperty(target, 'numericValue') ? qudt!.numericVariable : qudt!.unitVariable) : `?value${branchIndex}_${propertyIndex}`;
         const nodes = [root, ...outputSteps.slice(1).map((_, index) => `?node${branchIndex}_${propertyIndex}_${index}`), value];
         const patterns = candidates.map(candidate => `{ ${candidate.steps.map((step, index) => triple(nodes[index], step, nodes[index + 1])).join(' ')} }`);
-        let pattern = patterns.length === 1 ? patterns[0] : `{ ${patterns.join(' UNION ')} }`;
+        let pattern = converted ? '' : patterns.length === 1 ? patterns[0] : `{ ${patterns.join(' UNION ')} }`;
         const filters: string[] = [];
         if (target.datatype) filters.push(`isLiteral(${value}) && DATATYPE(${value}) = ${iri(target.datatype)}`);
         if (target.inValues.length) filters.push(`${value} IN (${target.inValues.map(v => termById(consumerQuads, v)).join(', ')})`);
@@ -157,12 +171,17 @@ export function generateSparqlConstruct(input: SparqlConstructInput): SparqlCons
         where.push(required ? pattern : `OPTIONAL { ${pattern} }`);
         // sh:hasValue requires the value to already exist; never fabricate a missing value.
         for (const constant of target.hasValues) {
+          if (converted) {
+            where.push(`FILTER (sameTerm(${value}, ${termById(consumerQuads, constant)}))`);
+            continue;
+          }
           const constantPatterns = candidates.map(candidate => `{ ${root} ${candidate.steps.map(step => step.inverse ? `^${iri(step.predicate)}` : iri(step.predicate)).join('/')} ${termById(consumerQuads, constant)} . }`);
           where.push(`FILTER EXISTS { ${constantPatterns.join(' UNION ')} }`);
         }
         templates.push(...outputSteps.map((step, index) => triple(nodes[index], step, nodes[index + 1])));
         mappings.push({ providerShape: provider.shape, consumerShape: consumer.shape,
-          sourcePaths: [...new Set(candidates.map(c => c.source.pathText))], targetPath: target.pathText, required });
+          sourcePaths: [...new Set(candidates.map(c => c.source.pathText))], targetPath: target.pathText, required,
+          ...(converted && isQudtProperty(target, 'numericValue') ? { conversion: { sourceUnits: qudt!.sourceUnits, targetUnit: qudt!.targetUnit } } : {}) });
         if ((target.minCount ?? 0) > 1 || target.maxCount !== undefined) {
           report('warning', 'Cardinality is not repaired or validated; validate the constructed message against the consumer shape.', consumer.shape, target.pathText);
         }

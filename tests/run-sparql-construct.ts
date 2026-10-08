@@ -169,6 +169,11 @@ async function testPlayground(api: any): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, 30));
   assert.match(elements.get('ontologyStatus').textContent, /HTTP 404/);
   assert.ok(editors.get('ontologyText').getValue().includes('subClassOf'), 'Failed loading preserves editor contents.');
+  elements.get('exampleSelect').value = 'qudt-museum-dimensions';
+  elements.get('exampleSelect').handlers.change();
+  assert.ok(editors.get('queryText').getValue().includes('BIND'));
+  assert.ok(editors.get('ontologyText').getValue().includes('conversionMultiplier'));
+  assert.ok(editors.get('dataText').getValue().includes('450'));
   elements.get('exampleSelect').value = 'sensor-reading';
   elements.get('exampleSelect').handlers.change();
   assert.ok(editors.get('ontologyText').getValue().includes('SensorReading'));

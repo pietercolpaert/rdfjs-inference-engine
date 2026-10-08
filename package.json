@@ -96,7 +96,7 @@
     "perf": "npm run build:node --silent && node dist/perf/run.js",
     "perf:list": "npm run build:node --silent && node dist/perf/run.js --list",
     "test:sparql-construct": "npm run build --silent && npm run test:sparql-construct:run --silent",
-    "test:sparql-construct:run": "node dist/tests/run-sparql-construct.js && node dist/tests/run-sparql-construct-worker.js"
+    "test:sparql-construct:run": "node dist/tests/run-sparql-construct.js && node dist/tests/run-sparql-construct-worker.js && node dist/tests/run-sparql-qudt.js"
   },
   "repository": {
     "type": "git",
