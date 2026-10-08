@@ -5,7 +5,7 @@ import type { Quad } from '@rdfjs/types';
 import { Parser as RdfParser } from 'rdf-parser-ts';
 import { Parser as SparqlParser } from 'sparqljs';
 import { QueryEngine } from '@comunica/query-sparql-rdfjs-lite';
-import { generateSparqlConstruct, executeSparqlRuntime, createRdfjsSparqlExecutor, type SparqlConstructResult } from '../src';
+import { generateSparqlConstruct, executeSparqlRuntime, createRdfjsSparqlExecutor, InferenceEngine, loadDefaultRuleProfiles, type SparqlConstructResult } from '../src';
 const prefix = `@prefix ex: <https://example.org/> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
@@ -36,6 +36,11 @@ async function execute(result: SparqlConstructResult, data: string): Promise<Qua
 const key = (q: Quad): string => [q.subject, q.predicate, q.object].map(t => `${t.termType}:${t.value}${t.termType === 'Literal' ? ':' + t.datatype.value + ':' + t.language : ''}`).join(' ');
 async function main(): Promise<void> {
   const result = generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: consumer });
+  const sourceEngine = new InferenceEngine();
+  sourceEngine.load(loadDefaultRuleProfiles(), ontology, { shaclIn: provider, shaclOut: consumer });
+  assert.equal(result.runtime, sourceEngine.getRuntime(), 'Use the engine’s actual bundled runtime.');
+  const withoutRules = generateSparqlConstruct({ ontology, shaclIn: provider, shaclOut: consumer, profiles: [] });
+  assert.equal((await execute(withoutRules, 'ex:m a ex:Reading ; ex:temperature 1 .')).length, 0, 'Bundled rules, not hidden mappings, perform inference.');
   assert.equal(result.mappings.length, 4);
   assert.ok(!result.diagnostics.some(d => d.severity === 'error'));
   const actual = await execute(result, `ex:m a ex:Reading ; ex:temperature "18.4"^^xsd:decimal ; ex:sensor ex:s ; ex:child ex:c . ex:c ex:label "inside" .
@@ -79,6 +84,14 @@ ex:n a ex:Observation ; ex:value "20"^^xsd:decimal ; ex:time "2026-10-08T12:00:0
   const cycle = parse('ex:temperature owl:equivalentProperty ex:measurement . ex:measurement rdfs:subPropertyOf ex:temperature, ex:value .');
   assert.ok(generateSparqlConstruct({ ontology: cycle, shaclIn: provider, shaclOut: parse('ex:C sh:property [ sh:path ex:value ; sh:minCount 1 ] .') }).query);
   assert.throws(() => generateSparqlConstruct({ ontology: [], shaclIn: parse('ex:P sh:property [ sh:path <urn:a> ] .'), shaclOut: parse('ex:C sh:targetNode [] ; sh:property [ sh:path <urn:a> ] .') }), /Blank nodes/);
+  const skos = '@prefix skos: <http://www.w3.org/2004/02/skos/core#> .\n';
+  const skosOntology = parse(skos + 'ex:a skos:broader ex:b . ex:b skos:broader ex:c .');
+  const skosIn = parse(skos + 'ex:P sh:targetClass skos:Concept ; sh:property [ sh:path skos:broader ] .');
+  const skosOut = parse(skos + 'ex:C sh:targetClass skos:Concept ; sh:property [ sh:path skos:broaderTransitive ] .');
+  const skosResult = generateSparqlConstruct({ ontology: skosOntology, shaclIn: skosIn, shaclOut: skosOut });
+  const skosOutput = await execute(skosResult, skos + 'ex:item a skos:Concept ; skos:broader ex:a .');
+  assert.deepEqual(new Set(skosOutput.filter(q => q.subject.value === 'https://example.org/item' && q.predicate.value.endsWith('broaderTransitive')).map(q => q.object.value)),
+    new Set(['https://example.org/a', 'https://example.org/b', 'https://example.org/c']), 'Bundled SKOS rules supply broader/transitive entailment.');
   const context = vm.createContext({ console, AbortController, AbortSignal, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
   context.self = context;
   vm.runInContext(readFileSync('browser/rdfjs-inference-engine.min.js', 'utf8'), context);
@@ -97,7 +110,7 @@ async function testPlayground(api: any): Promise<void> {
   for (const id of [...names.flatMap(name => [`${name}Text`, `${name}Url`, `${name}Load`, `${name}Status`]),
     'queryText', 'status', 'diagnostics', 'generateButton', 'resetButton', 'copyButton', 'downloadButton',
     'exampleSelect', 'exampleDescription', 'ndeGuidance', 'dataText', 'dataUrl', 'dataLoad', 'dataLoadStatus',
-    'rulesText', 'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton']) {
+    'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton']) {
     elements.set(id, { id, value: '', textContent: '', disabled: false, handlers: {} as Record<string, (...args: any[]) => unknown>,
       appendChild: () => {}, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
   }
@@ -126,7 +139,7 @@ async function testPlayground(api: any): Promise<void> {
   sandbox.self = sandbox;
   vm.runInContext(readFileSync('browser/sparql-construct-playground.min.js', 'utf8'), sandbox);
   assert.ok(editors.get('queryText').getValue().startsWith('CONSTRUCT'));
-  assert.equal(editors.size, 9, 'Mapping inputs, rules, generated runtime, query, data and result use CodeMirror.');
+  assert.equal(editors.size, 8, 'Mapping inputs, generated runtime, query, data and result use CodeMirror.');
   assert.equal(elements.get('executionPanel').hidden, false);
   assert.equal(elements.get('exampleSelect').value, 'nde-amsterdam-photograph');
   assert.ok(editors.get('ontologyText').getValue().includes('dcterms:title rdfs:subPropertyOf schema:name'));
@@ -175,14 +188,11 @@ async function testPlayground(api: any): Promise<void> {
   elements.get('exampleSelect').value = 'qudt-museum-dimensions';
   elements.get('exampleSelect').handlers.change();
   assert.ok(editors.get('translatedText').getValue().includes('BIND'));
-  assert.ok(editors.get('rulesText').getValue().includes('math:product'));
+  assert.ok(editors.get('runtimeText').getValue().includes('# Precompiled runtime profile: rules/qudt/'));
+  assert.ok(editors.get('runtimeText').getValue().includes('math:product'));
+  assert.equal(editors.has('rulesText'), false, 'Default generation needs no separate N3 mapping editor.');
   elements.get('runQueryButton').handlers.click();
   assert.ok(workers.at(-1).request.program.rules.length);
-  editors.get('rulesText').setValue('@prefix math: <http://www.w3.org/2000/10/swap/math#>. { (1 2) math:exponentiation ?x } => { <urn:s> <urn:p> ?x }.');
-  assert.equal(workers.at(-1).terminated, true);
-  elements.get('generateButton').handlers.click();
-  assert.equal(editors.get('queryText').getValue(), '');
-  assert.match(elements.get('diagnostics').textContent, /Unsupported N3 built-in/);
   assert.ok(editors.get('ontologyText').getValue().includes('conversionMultiplier'));
   assert.ok(editors.get('dataText').getValue().includes('450'));
   elements.get('exampleSelect').value = 'sensor-reading';

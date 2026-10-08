@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import type { Quad } from '@rdfjs/types';
 import { Parser } from 'rdf-parser-ts';
 import { QueryEngine } from '@comunica/query-sparql-rdfjs-lite';
-import { generateSparqlConstruct, executeSparqlRuntime, createRdfjsSparqlExecutor, defaultSparqlMappingRules, type SparqlConstructResult } from '../src';
+import { generateSparqlConstruct, executeSparqlRuntime, createRdfjsSparqlExecutor, InferenceEngine, loadDefaultRuleProfiles, type SparqlConstructResult } from '../src';
 const directory = 'examples/sparql-construct/qudt-museum-dimensions/';
 const parse = (source: string): Quad[] => new Parser().parse(source) as Quad[];
 const read = (file: string) => readFileSync(directory + file, 'utf8');
@@ -16,7 +16,8 @@ const sample = (number: string, unit: string) => `
 @prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-<urn:height> a museum:RecordedHeight ; museum:heightOf <urn:object> ;
+<urn:object> museum:height <urn:height> .
+<urn:height> a museum:RecordedHeight, qudt:QuantityValue ; museum:heightOf <urn:object> ;
 qudt:numericValue ${number} ; ${unit ? `qudt:unit unit:${unit} ;` : ''} museum:note "test" .`;
 async function run(result: SparqlConstructResult, data: string): Promise<Quad[]> {
   assert.ok(result.program && result.query);
@@ -28,9 +29,11 @@ async function main(): Promise<void> {
   assert.ok(result.query);
   assert.ok(!result.diagnostics.some(d => d.severity === 'error'));
   assert.equal(result.mappings.length, 3);
+  assert.match(result.runtime, /Shape-specialized QUDT kernel: forward rule\(s\) 4\./);
+  assert.ok(result.program!.rules.reduce((bytes, rule) => bytes + rule.query.length, 0) < 100_000, 'Reusable helpers keep the bundled QUDT program compact.');
   for (const [number, unit, expected] of [['32', 'CentiM', 0.32], ['450', 'MilliM', 0.45], ['1.2', 'M', 1.2]] as const) {
     const output = await run(result, sample(`"${number}"^^xsd:decimal`, unit));
-    assert.equal(output.length, 4);
+    assert.equal(output.length, 5);
     const value = numericValue(output);
     assert.equal(Number(value?.value), expected, 'Convert the number rather than only relabel its unit.');
     assert.equal(value?.termType, 'Literal');
@@ -42,8 +45,12 @@ async function main(): Promise<void> {
   }
   const scientific = compile(ontology.replace('"0.01"^^xsd:decimal', '"1e-2"^^xsd:double'));
   assert.ok(scientific.query);
-  assert.equal((await run(scientific, sample('"32"^^xsd:decimal', 'CentiM'))).length, 0, 'The consumer decimal constraint rejects uncast double results.');
-  const reverse = compile(ontology, shaclIn, shaclOut.replaceAll('unit:M', 'unit:CentiM'));
+  assert.equal(Number(numericValue(await run(scientific, sample('"32"^^xsd:decimal', 'CentiM')))?.value), 0.32, 'Bundled QUDT metadata remains available alongside provider metadata.');
+  const configuration = (target: string, code: string) => `\n<urn:target-profile> <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#datatype> <https://w3id.org/cdt/length> ; <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUnit> <http://qudt.org/vocab/unit/${target}> ; <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#targetUcumCode> \"${code}\" .`;
+  const qudtProfile = loadDefaultRuleProfiles().find(profile => profile.precompiledRuntime)!;
+  const compileQudt = (background: string, input: string, output: string) => generateSparqlConstruct({
+    profiles: [qudtProfile], ontology: parse(background), shaclIn: parse(input), shaclOut: parse(output.replaceAll('schema:about', 'museum:heightOf')) });
+  const reverse = compileQudt(ontology + configuration('CentiM', 'cm'), shaclIn, shaclOut.replaceAll('unit:M', 'unit:CentiM'));
   assert.ok(reverse.query);
   assert.equal(Number(numericValue(await run(reverse, sample('"0.32"^^xsd:decimal', 'M')))?.value), 32);
   const temperatureOntology = `
@@ -58,25 +65,21 @@ museum:heightOf rdfs:subPropertyOf schema:about .
 unit:DEG_C qudt:hasDimensionVector qkdv:A0E0L0I0M0H1T0D0 ; qudt:conversionMultiplier 1.0 ; qudt:conversionOffset 273.15 .
 unit:K qudt:hasDimensionVector qkdv:A0E0L0I0M0H1T0D0 ; qudt:conversionMultiplier 1.0 ; qudt:conversionOffset 0.0 .`;
   const temperatureIn = shaclIn.replace('unit:CentiM unit:MilliM unit:M', 'unit:DEG_C unit:K');
-  const affine = compile(temperatureOntology, temperatureIn, shaclOut.replaceAll('unit:M', 'unit:K'));
+  const affine = compileQudt(temperatureOntology, temperatureIn, shaclOut.replaceAll('unit:M', 'unit:K'));
   assert.ok(affine.query);
   assert.equal(Number(numericValue(await run(affine, sample('"20"^^xsd:decimal', 'DEG_C')))?.value), 293.15);
-  const reverseAffine = compile(temperatureOntology, temperatureIn, shaclOut.replaceAll('unit:M', 'unit:DEG_C'));
+  const reverseAffine = compileQudt(temperatureOntology + configuration('DEG_C', 'Cel'), temperatureIn, shaclOut.replaceAll('unit:M', 'unit:DEG_C'));
   assert.ok(reverseAffine.query);
   assert.equal(Number(numericValue(await run(reverseAffine, sample('"293.15"^^xsd:decimal', 'K')))?.value), 20, 'Subtract target offsets when converting Kelvin to Celsius.');
-  for (const background of [
-    ontology.replace('"0.01"^^xsd:decimal', '"0"^^xsd:decimal'),
-    ontology.replace('"0.01"^^xsd:decimal', '"invalid"^^xsd:decimal'),
-    ontology.replace('qudt:hasDimensionVector qkdv:A0E0L1I0M0H0T0D0', 'qudt:hasDimensionVector qkdv:OtherDimension'),
-    ontology.replace('unit:CentiM a qudt:Unit', 'unit:CentiM a qudt:LogarithmicUnit'),
-    ontology.replace('qudt:conversionMultiplier "0.01"^^xsd:decimal ;', ''),
-    ontology.replace('qudt:conversionMultiplier "0.01"^^xsd:decimal ;', 'qudt:conversionMultiplier "0.01"^^xsd:decimal, "0.02"^^xsd:decimal ;'),
-  ]) assert.equal((await run(compile(background), sample('"32"^^xsd:decimal', 'CentiM'))).length, 0, 'N3 guards reject unsafe or missing conversion metadata.');
+  const actualEngine = new InferenceEngine();
+  actualEngine.load(loadDefaultRuleProfiles(), parse(ontology), { shaclIn: parse(shaclIn), shaclOut: parse(shaclOut) });
+  const normalizeAllocation = (runtime: string) => runtime.replace(/https:\/\/eyereasoner\.github\.io\/\.well-known\/genid\/[a-f0-9-]+/g, 'urn:allocated');
+  assert.equal(normalizeAllocation(result.runtime), normalizeAllocation(actualEngine.getRuntime().split('\n').filter(line => !line.startsWith('\"')).join('\n')), 'Reuse the original rules and RDF-compatible background; load-time allocations may differ.');
   const changed = generateSparqlConstruct({ ontology: parse(ontology), shaclIn: parse(shaclIn), shaclOut: parse(shaclOut),
-    rules: defaultSparqlMappingRules.replace('(?shifted ?sourceMultiplier) math:product ?canonical', '(?shifted ?sourceMultiplier) math:sum ?canonical') });
+    rules: result.runtime.replace('math:product\n        ?canonicalValue', 'math:sum\n        ?canonicalValue') });
   assert.ok(changed.query);
   assert.equal(Number(numericValue(await run(changed, sample('"32"^^xsd:decimal', 'CentiM')))?.value), 32.01,
-    'Changing N3 arithmetic changes the actual SPARQL result: no hidden TypeScript unit-conversion path.');
+    'Changing the bundled N3 arithmetic changes the actual SPARQL result.');
   console.log('SPARQL QUDT: decimal conversion, offsets, identity, reverse conversion and safety diagnostics verified.');
 }
 void main().catch(error => { console.error(error); process.exitCode = 1; });

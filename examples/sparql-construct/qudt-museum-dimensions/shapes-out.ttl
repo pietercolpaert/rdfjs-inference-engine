@@ -1,4 +1,5 @@
 @prefix museum: <https://example.org/museum/ontology#> .
+@prefix qcr: <https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#> .
 @prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix unit: <http://qudt.org/vocab/unit/> .
 @prefix schema: <https://schema.org/> .
@@ -8,6 +9,6 @@
 # The consumer needs heights expressed in metres, not merely relabelled units.
 museum:ConsumerShape a sh:NodeShape ;
   sh:targetClass qudt:QuantityValue ;
-  sh:property [ sh:path schema:about ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+  sh:property [ sh:path (qcr:sourceQuantity schema:about) ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
   sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:datatype xsd:decimal ; sh:unit unit:M ] ;
   sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:hasValue unit:M ] .

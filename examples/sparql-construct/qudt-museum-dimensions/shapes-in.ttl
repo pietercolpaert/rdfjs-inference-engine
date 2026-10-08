@@ -6,6 +6,8 @@
 
 museum:ProviderShape a sh:NodeShape ;
   sh:targetClass museum:RecordedHeight ;
+  sh:class qudt:QuantityValue ;
+  sh:property [ sh:path [ sh:inversePath museum:height ] ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
   sh:property [ sh:path museum:heightOf ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
   sh:property [ sh:path qudt:numericValue ; sh:minCount 1 ; sh:datatype xsd:decimal ] ;
   sh:property [ sh:path qudt:unit ; sh:minCount 1 ; sh:in (unit:CentiM unit:MilliM unit:M) ] .

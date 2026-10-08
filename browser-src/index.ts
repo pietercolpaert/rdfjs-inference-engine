@@ -1,3 +1,6 @@
+/// <reference path="./types.d.ts" />
+import { bundledRuleProfiles } from 'bundled-rules';
+import { createSparqlConstructGenerator, withRdfBackground, type SparqlConstructDiagnostic } from '../src/sparql-construct-core';
 import { PrefixedWriter } from './prefixed-writer';
 export { PrefixedWriter } from './prefixed-writer';
 import { translateN3RuntimeToSparql, type N3SparqlOptions, type N3SparqlResult } from '../src/n3-to-sparql';
@@ -1637,6 +1640,13 @@ function specializeQudtPreparedKernel(
   qudtFacts: Quad[],
 ): string {
   const inputDatatypes = shapePlanDatatypes(planning.input);
+  // Valid numeric RDF literals cannot contain the value-plus-unit lexical
+  // syntax parsed by the CDT rules. Quantity-object fields use rule 4 instead.
+  for (const datatype of ['decimal', 'double', 'float', 'integer', 'long', 'int', 'short', 'byte',
+    'nonNegativeInteger', 'positiveInteger', 'nonPositiveInteger', 'negativeInteger',
+    'unsignedLong', 'unsignedInt', 'unsignedShort', 'unsignedByte']) {
+    inputDatatypes.delete(`http://www.w3.org/2001/XMLSchema#${datatype}`);
+  }
   const hasQuantityObjectInput = planning.input?.relevantClasses.includes(QUDT_QUANTITY_VALUE) ?? false;
   if (inputDatatypes.size === 0 && !hasQuantityObjectInput) {
     return kernel;
@@ -2195,9 +2205,20 @@ export {
   toMessages,
 };
 
-export { generateSparqlConstruct } from '../src/sparql-construct';
-export type { SparqlConstructInput, SparqlConstructResult, SparqlConstructMapping, SparqlConstructDiagnostic } from '../src/sparql-construct';
+/** The same default profile bundle used by both browser playgrounds. */
+export function loadDefaultRuleProfiles(): LoadedRuleProfile[] {
+  return bundledRuleProfiles.map(profile => ({ ...profile, label: `rules/${profile.file}` }));
+}
+export const generateSparqlConstruct = createSparqlConstructGenerator((profiles, ontology, shaclIn, shaclOut) => {
+  const engine = new InferenceEngine();
+  let excluded = 0;
+  const runtime = engine.load(profiles, ontology, { shaclIn, shaclOut,
+    runtimeCompiler: withRdfBackground(defaultRuntimeCompiler, count => { excluded = count; }) });
+  const diagnostics: SparqlConstructDiagnostic[] = excluded ? [{ severity: 'warning',
+    message: `Excluded ${excluded} generalized RDF background facts with literal subjects; SPARQL uses the RDF/JS-compatible closure. Generalized datatype entailment is unavailable.` }] : [];
+  return { runtime, diagnostics };
+}, loadDefaultRuleProfiles);
+export type { SparqlConstructInput, SparqlConstructResult, SparqlConstructMapping, SparqlConstructDiagnostic } from '../src/sparql-construct-core';
 
 export { translateN3RuntimeToSparql, executeSparqlRuntime, createRdfjsSparqlExecutor } from '../src/n3-to-sparql';
 export type { RdfjsSparqlEngine, N3SparqlDiagnostic, N3SparqlResult, N3SparqlOptions, SparqlRuntimeProgram, SparqlQueryExecutor, SparqlRuntimeExecutionOptions, SparqlRuntimeExecutionResult } from '../src/n3-to-sparql';
-export { defaultSparqlMappingRules } from '../src/sparql-rule-profile';

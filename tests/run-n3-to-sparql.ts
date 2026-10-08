@@ -94,6 +94,26 @@ ex:factor ex:amount 2.0.
     assert.equal(compiled.program, null, runtime);
     assert.ok(compiled.diagnostics.some(d => d.severity === 'error'));
   }
+  const cached = await run(`
+ex:value log:memoize true .
+{ ?s ex:value ?v } <= { ?s ex:input ?v }.
+{ ?s ex:value ?v } => { ?s ex:result ?v }.
+{ ?s ?p ?o } => { ?s ex:seen ?p }.
+`, 'ex:s ex:input 1.');
+  assert.ok(!cached.closure.some(q => q.predicate.value === 'urn:ex:value'), 'Private helper facts stay outside the visible RDF graph.');
+  assert.ok(!cached.output.some(q => q.object.value === 'urn:ex:value'), 'Variable predicate rules cannot see private helper triples.');
+  assert.ok(cached.output.some(q => q.predicate.value === 'urn:ex:result'), 'Explicit helper calls see their relation.');
+  const skolem = await run('{ ?s ex:input ?v. (?s ?v) log:skolem ?node } => { ?s ex:node ?node }.', 'ex:s ex:input "same"; ex:input "same"@nl.');
+  assert.equal(new Set(skolem.output.map(q => q.object.value)).size, 2, 'Skolem identities include literal language/datatype.');
+  assert.equal(skolem.rounds, 2, 'Skolem identities remain stable during fixed-point execution.');
+  await assert.rejects(() => run('{ ?s ex:input ?v. (?s ?v) log:skolem ?node } => { ?s ex:node ?node }.', '_:s ex:input 1.'), /blank-node arguments/);
+  const membership = await run('{ ?s ex:items ?list. ?list <http://www.w3.org/2000/10/swap/list#member> ?member } => { ?s ex:result ?member }.', 'ex:s ex:items (ex:a ex:b).');
+  assert.equal(membership.output.length, 2, 'RDF list membership uses rdf:rest/rdf:first paths.');
+  const scrape = await run('{ ?s ex:input ?v. (?v "^([0-9]+) ") string:scrape ?number } => { ?s ex:result ?number }.', 'ex:s ex:input "32 cm".');
+  assert.equal(scrape.output[0].object.value, '32', 'Regex extraction keeps the first capture, excluding unmatched trailing text.');
+  const unused = translateN3RuntimeToSparql(prefixes + '{ (?a ?b) ex:unused ?c } <= { (?a ?b) math:exponentiation ?c }. { ?s ex:input ?o } => { ?s ex:result ?o }.');
+  assert.ok(unused.program);
+  assert.ok(unused.diagnostics.some(d => d.message.includes('unreachable')));
   const engine = new InferenceEngine({ runtime: prefixes + rules });
   assert.deepEqual(engine.getSparqlRuntime(), translateN3RuntimeToSparql(engine.getRuntime()), 'Engine convenience method translates its actual runtime.');
   const loaded = new InferenceEngine();

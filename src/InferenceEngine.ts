@@ -1670,6 +1670,13 @@ function specializeQudtPreparedKernel(
   qudtFacts: Quad[],
 ): string {
   const inputDatatypes = shapePlanDatatypes(planning.input);
+  // Valid numeric RDF literals cannot contain the value-plus-unit lexical
+  // syntax parsed by the CDT rules. Quantity-object fields use rule 4 instead.
+  for (const datatype of ['decimal', 'double', 'float', 'integer', 'long', 'int', 'short', 'byte',
+    'nonNegativeInteger', 'positiveInteger', 'nonPositiveInteger', 'negativeInteger',
+    'unsignedLong', 'unsignedInt', 'unsignedShort', 'unsignedByte']) {
+    inputDatatypes.delete(`http://www.w3.org/2001/XMLSchema#${datatype}`);
+  }
   const hasQuantityObjectInput = planning.input?.relevantClasses.includes(QUDT_QUANTITY_VALUE) ?? false;
   if (inputDatatypes.size === 0 && !hasQuantityObjectInput) {
     return kernel;

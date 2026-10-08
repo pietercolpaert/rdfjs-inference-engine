@@ -13,7 +13,7 @@ export const constructExamples = [
     description: 'Illustrative Amsterdam canal photographs: Dublin Core collection metadata → Schema.org for a heritage discovery portal. The ontology explicitly aligns the photograph class and all five fields. Dutch titles and linked identifiers are preserved; photographer and date can be unknown. These are fictional records and example mappings, not an official NDE profile.',
     ontology, shaclIn, shaclOut, data },
   { id: 'qudt-museum-dimensions', label: 'Museum object heights (QUDT: cm/mm → m)',
-    description: 'Fictional museum measurements: a Delftware vase (32 cm → 0.32 m), a display case (450 mm → 0.45 m), and a cabinet already measured in metres. The editable N3 rules use QUDT metadata from the ontology and are translated into SPARQL arithmetic. Comunica converts the values and writes unit:M while preserving identifiers and message boundaries.',
+    description: 'Fictional museum measurements: a Delftware vase (32 cm → 0.32 m), a display case (450 mm → 0.45 m), and a cabinet already measured in metres. The engine’s bundled QUDT profile is specialized to length units and translated into SPARQL arithmetic. Comunica creates normalized quantity nodes in metres, retaining source provenance and message boundaries.',
     ontology: qudtOntology, shaclIn: qudtIn, shaclOut: qudtOut, data: qudtData },
   { id: 'sensor-reading', label: 'Sensor readings',
     description: 'Map temperature readings to an observation contract, preserving optional timestamps.',

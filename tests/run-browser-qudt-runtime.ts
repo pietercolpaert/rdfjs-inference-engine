@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { readFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildSync } from 'esbuild';
 
 const QCR_NORMALIZED_QUANTITY = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#normalizedQuantity';
 const QCR_NORMALIZED_UCUM_LITERAL = 'https://www.pieter.pm/rdfjs-inference-engine/ns/qudt-inference#normalizedUcumLiteral';
 const CDT_UCUM = 'https://w3id.org/cdt/ucum';
+const profilesPath = `/tmp/rdfjs-browser-engine-profiles-${process.pid}.cjs`;
+writeFileSync(profilesPath, `exports.bundledRuleProfiles = ${JSON.stringify(require('../src').loadDefaultRuleProfiles().map((profile: any) => ({ ...profile, file: profile.label.slice(6) })))};`);
 const bundlePath = `/tmp/rdfjs-browser-engine-qudt-${process.pid}.cjs`;
 
 buildSync({
@@ -15,6 +17,7 @@ buildSync({
   platform: 'node',
   format: 'cjs',
   logLevel: 'silent',
+  alias: { 'bundled-rules': profilesPath },
 });
 
 try {
@@ -67,4 +70,5 @@ try {
   console.log(`Browser QUDT runtime test: ${(runtime.length / 1024).toFixed(1)} KiB and ${input.messages.length}/4 messages normalized.`);
 } finally {
   unlinkSync(bundlePath);
+  unlinkSync(profilesPath);
 }

@@ -6,15 +6,20 @@ const LOG = 'http://www.w3.org/2000/10/swap/log#';
 const MATH = 'http://www.w3.org/2000/10/swap/math#';
 const STRING = 'http://www.w3.org/2000/10/swap/string#';
 const DT = 'https://eyereasoner.github.io/eyeling/datatype#';
+const LIST = 'http://www.w3.org/2000/10/swap/list#';
 type Value = Term | { kind: 'list'; items: Value[] } | { kind: 'formula'; atoms: Atom[] };
-type Atom = { s: Value; p: Value; o: Value };
-type Rule = { body: Atom[]; head: Atom[]; index: number };
+type Atom = { s: Value; p: Value; o: Value; auxiliaryGraph?: string };
+type Rule = { body: Atom[]; head: Atom[]; index: number; auxiliaryGraph?: string };
 export interface N3SparqlDiagnostic { severity: 'error' | 'warning'; message: string; rule?: number; builtin?: string }
 export interface SparqlRuntimeProgram {
+  /** Consumer projections can retain identity fields from the input graph. */
+  projectionSource?: 'closure';
+  /** Private helper relations; ordinary rule patterns only see the default graph. */
+  auxiliaryGraphs?: string[];
   /** Execute once, before the rules. Static facts are not output facts. */
   seedQuery: string | null;
   /** Execute in source order until no new facts are added. */
-  rules: { rule: number; query: string }[];
+  rules: { rule: number; query: string; graph?: string; checks?: string[] }[];
 }
 export interface N3SparqlResult { program: SparqlRuntimeProgram | null; diagnostics: N3SparqlDiagnostic[] }
 export interface N3SparqlOptions { baseIRI?: string }
@@ -25,7 +30,7 @@ export interface N3SparqlOptions { baseIRI?: string }
  */
 export function translateN3RuntimeToSparql(runtime: string, options: N3SparqlOptions = {}): N3SparqlResult {
   const diagnostics: N3SparqlDiagnostic[] = [];
-  const rules: { rule: number; query: string }[] = [];
+  const rules: SparqlRuntimeProgram['rules'] = [];
   try {
     const quads = new Parser({ format: 'N3', baseIRI: options.baseIRI, isImpliedBy: true }).parse(runtime);
     const graphs = new Map<string, Quad[]>();
@@ -52,7 +57,7 @@ export function translateN3RuntimeToSparql(runtime: string, options: N3SparqlOpt
       return { kind: 'list', items: [value(first.object, graph, next), ...tail.items] };
     };
     const atoms = (graph: Quad[], visiting = new Set<string>()): Atom[] => graph
-      .filter(q => q.predicate.value !== RDF + 'first' && q.predicate.value !== RDF + 'rest')
+      .filter(q => q.subject.termType !== 'BlankNode' || (q.predicate.value !== RDF + 'first' && q.predicate.value !== RDF + 'rest'))
       .map(q => ({ s: value(q.subject, graph, visiting), p: value(q.predicate, graph, visiting), o: value(q.object, graph, visiting) }));
     const forward: Rule[] = [], backward: Rule[] = [], seeds: Quad[] = [];
     for (const q of graphs.get('') ?? []) {
@@ -76,6 +81,43 @@ export function translateN3RuntimeToSparql(runtime: string, options: N3SparqlOpt
       const key = rule.head[0].p.value;
       helpers.set(key, [...helpers.get(key) ?? [], rule]);
     }
+    const reachable = new Set<string>();
+    const visit = (atoms: Atom[], stack: string[] = []) => {
+      for (const atom of atoms) {
+        if (!isTerm(atom.o) && atom.o.kind === 'formula') visit(atom.o.atoms, stack);
+        const predicate = isTerm(atom.p) ? atom.p.value : '';
+        if (!helpers.has(predicate)) continue;
+        if (stack.includes(predicate)) throw new Error(`Recursive backward helper cannot be inlined: ${predicate}`);
+        if (reachable.has(predicate)) continue;
+        reachable.add(predicate);
+        for (const helper of helpers.get(predicate)!) visit(helper.body, [...stack, predicate]);
+      }
+    };
+    forward.forEach(rule => visit(rule.body));
+    const materialized = new Map<string, string>();
+    // Safe RDF-valued helpers can be evaluated as relations, once per round,
+    // instead of distributing all their alternatives across each calling rule.
+    for (const [predicate, definitions] of helpers) {
+      if (!reachable.has(predicate)) continue;
+      const safe = definitions.every(rule => {
+        if (!isTerm(rule.head[0].s) || !isTerm(rule.head[0].o)) return false;
+        try {
+          const compiled = compileBody(rule.body, [], rule.index);
+          return variables(rule.head[0]).every(v => compiled.bound.has(v));
+        } catch { return false; }
+      });
+      if (safe) materialized.set(predicate, `urn:rdfjs:sparql:helper:${encodeURIComponent(predicate)}`);
+    }
+    // A relation must not depend on an input-bound helper that needs inlining.
+    let removed = true;
+    while (removed) {
+      removed = false;
+      for (const [predicate] of materialized) {
+        if (helpers.get(predicate)!.some(rule => rule.body.some(atom => isTerm(atom.p) && helpers.has(atom.p.value) && !materialized.has(atom.p.value)))) {
+          materialized.delete(predicate); removed = true;
+        }
+      }
+    }
     let fresh = 0;
     const usedVariables = new Set([...forward, ...backward].flatMap(rule => [...rule.head, ...rule.body].flatMap(a => variables(a))));
     const expand = (body: Atom[], stack: string[] = []): Atom[][] => {
@@ -84,6 +126,10 @@ export function translateN3RuntimeToSparql(runtime: string, options: N3SparqlOpt
         const predicate = isTerm(atom.p) ? atom.p.value : '';
         const definitions = helpers.get(predicate);
         if (!definitions) { branches.forEach(branch => branch.push(atom)); continue; }
+        if (materialized.has(predicate)) {
+          branches.forEach(branch => branch.push({ ...atom, auxiliaryGraph: materialized.get(predicate) }));
+          continue;
+        }
         if (stack.includes(predicate)) throw new Error(`Recursive backward helper cannot be inlined: ${predicate}`);
         // Backward relations can also be satisfied by ordinary RDF facts or
         // by forward-derived heads. List/formula arguments cannot be RDF triples.
@@ -100,15 +146,17 @@ export function translateN3RuntimeToSparql(runtime: string, options: N3SparqlOpt
           alternatives.push(...expand([...renamed.body.map(a => mapAtom(a, substitute)), ...bindings], [...stack, predicate]));
         }
         branches = branches.flatMap(prefix => alternatives.map(alternative => [...prefix, ...alternative]));
+        if (branches.length > 1024) throw new Error('Backward helper expansion exceeds 1024 branches; simplify input-bound helper alternatives.');
       }
       return branches;
     };
-    // Validate even unused helpers: unsupported source must never disappear silently.
-    for (const helper of backward) {
-      try { for (const branch of expand(helper.body, [isTerm(helper.head[0]?.p) ? helper.head[0].p.value : ''])) compileBody(branch, diagnostics, helper.index, true); }
-      catch (error) { diagnostics.push({ severity: 'error', rule: helper.index, message: errorMessage(error) }); }
-    }
-    for (const rule of forward) {
+    // Backward clauses only execute when called. Eliminate unreachable helpers
+    // after shape specialization, while checking every reachable branch below.
+    const unused = backward.filter(rule => !reachable.has((rule.head[0]?.p as Term)?.value));
+    if (unused.length) diagnostics.push({ severity: 'warning', message: `Omitted ${unused.length} unreachable backward helper clauses; all reachable clauses are translated.` });
+    const helperRules = backward.filter(rule => materialized.has((rule.head[0]?.p as Term)?.value))
+      .map(rule => ({ ...rule, auxiliaryGraph: materialized.get((rule.head[0].p as Term).value) }));
+    for (const rule of [...helperRules, ...forward]) {
       try {
         const bodyBlanks = new Set(rule.body.flatMap(atom => variables(atom, true)).filter(v => v.startsWith('_')));
         const blankNames = new Map<string, string>();
@@ -127,29 +175,42 @@ export function translateN3RuntimeToSparql(runtime: string, options: N3SparqlOpt
         const branches = expand(normalized.body);
         const template = normalized.head.map(a => triple(a)).join('\n  ');
         if (!template) throw new Error('Empty rule heads are not supported.');
+        const checks: string[] = [];
         const patterns = branches.map(branch => {
           const compiled = compileBody(branch, diagnostics, rule.index);
+          checks.push(...compiled.checks.map(pattern => `CONSTRUCT { <urn:rdfjs:sparql:error> <urn:rdfjs:sparql:unsupportedSkolemInput> true } WHERE { ${pattern} }`));
           for (const variable of normalized.head.flatMap(a => variables(a))) if (!compiled.bound.has(variable)) throw new Error(`Head variable ?${variable} is not bound by the rule body.`);
           return `{\n    ${compiled.text.join('\n    ')}\n  }`;
         });
-        rules.push({ rule: rule.index, query: `# N3 rule ${rule.index}\nCONSTRUCT {\n  ${template}\n}\nWHERE {\n  ${patterns.length ? patterns.join('\n  UNION\n  ') : 'FILTER(false)'}\n}\n` });
+        rules.push({ rule: rule.index, ...(rule.auxiliaryGraph ? { graph: rule.auxiliaryGraph } : {}), ...(checks.length ? { checks: [...new Set(checks)] } : {}), query: `# N3 rule ${rule.index}\nCONSTRUCT {\n  ${template}\n}\nWHERE {\n  ${patterns.length ? patterns.join('\n  UNION\n  ') : 'FILTER(false)'}\n}\n` });
       } catch (error) { diagnostics.push({ severity: 'error', rule: rule.index, message: errorMessage(error) }); }
     }
     // Static lists remain RDF lists. Reject variables and executable predicates among facts.
-    for (const q of seeds) {
+    const facts = seeds.filter(q => {
+      if (q.predicate.value !== LOG + 'memoize') return true;
+      if (q.object.termType !== 'Literal' || q.object.datatype.value !== 'http://www.w3.org/2001/XMLSchema#boolean' || !['true', '1', 'false', '0'].includes(q.object.value)) throw new Error('log:memoize requires a boolean optimization hint.');
+      return false;
+    });
+    if (facts.length !== seeds.length) diagnostics.push({ severity: 'warning', builtin: LOG + 'memoize', message: 'log:memoize is an optimization hint; SPARQL evaluates helpers without memoization.' });
+    for (const q of facts) {
+      if ((q.subject as Term).termType === 'Literal') throw new Error('Literal-subject background facts are generalized RDF and cannot be materialized by SPARQL. Use an RDF/JS-compatible runtime.');
       if ([q.subject, q.predicate, q.object].some(t => t.termType === 'Variable')) throw new Error('Variables in top-level runtime facts are unsupported.');
       if (isBuiltin(q.predicate.value)) throw new Error(`Executable built-in outside a rule: ${q.predicate.value}`);
     }
-    const seedQuery = seeds.length ? `CONSTRUCT {\n  ${seeds.map(q => `${render(q.subject)} ${render(q.predicate)} ${render(q.object)} .`).join('\n  ')}\n} WHERE {}\n` : null;
-    return { program: diagnostics.some(d => d.severity === 'error') ? null : { seedQuery, rules }, diagnostics };
+    const seedQuery = facts.length ? `CONSTRUCT {\n  ${facts.map(q => `${render(q.subject)} ${render(q.predicate)} ${render(q.object)} .`).join('\n  ')}\n} WHERE {}\n` : null;
+    return { program: diagnostics.some(d => d.severity === 'error') ? null : { seedQuery, rules, ...(materialized.size ? { auxiliaryGraphs: Array.from(materialized.values()) } : {}) }, diagnostics };
   } catch (error) { return { program: null, diagnostics: [...diagnostics, { severity: 'error', message: errorMessage(error) }] }; }
 }
 
-function compileBody(atoms: Atom[], diagnostics: N3SparqlDiagnostic[], rule: number, validateOnly = false, outer = new Set<string>()): { text: string[]; bound: Set<string> } {
-  const text: string[] = [], bound = new Set<string>(outer), pending: Atom[] = [];
+function compileBody(atoms: Atom[], diagnostics: N3SparqlDiagnostic[], rule: number, validateOnly = false, outer = new Set<string>()): { text: string[]; bound: Set<string>; checks: string[] } {
+  const text: string[] = [], checks: string[] = [], bound = new Set<string>(outer), pending: Atom[] = [];
   for (const atom of atoms) {
     if (isTerm(atom.p) && isBuiltin(atom.p.value)) pending.push(atom);
-    else { text.push(triple(atom)); variables(atom).forEach(v => bound.add(v)); }
+    else {
+      const pattern = triple(atom);
+      text.push(atom.auxiliaryGraph ? `{ { ${pattern} } UNION { GRAPH <${atom.auxiliaryGraph}> { ${pattern} } } }` : pattern);
+      variables(atom).forEach(v => bound.add(v));
+    }
   }
   if (validateOnly) atoms.flatMap(a => variables(a)).forEach(v => bound.add(v));
   while (pending.length) {
@@ -158,6 +219,7 @@ function compileBody(atoms: Atom[], diagnostics: N3SparqlDiagnostic[], rule: num
       const atom = pending[i], predicate = (atom.p as Term).value;
       const expression = builtin(atom, bound);
       if (!expression) continue;
+      if (expression.check) checks.push(`${text.join(' ')} FILTER (${expression.check})`);
       if (expression.warning && !diagnostics.some(d => d.rule === rule && d.builtin === predicate)) diagnostics.push({ severity: 'warning', rule, builtin: predicate, message: expression.warning });
       text.push(expression.text);
       if (expression.bind) bound.add(expression.bind);
@@ -165,9 +227,9 @@ function compileBody(atoms: Atom[], diagnostics: N3SparqlDiagnostic[], rule: num
     }
     if (!progress) throw new Error(`Unbound inputs or unsupported binding direction for built-in ${render(pending[0].p)}.`);
   }
-  return { text, bound };
+  return { text, bound, checks };
 }
-function builtin(atom: Atom, bound: Set<string>): { text: string; bind?: string; warning?: string } | undefined {
+function builtin(atom: Atom, bound: Set<string>): { text: string; bind?: string; warning?: string; check?: string } | undefined {
   const p = (atom.p as Term).value, s = atom.s, o = atom.o;
   const ready = (v: Value) => valueVariables(v).every(x => bound.has(x));
   const filter = (expression: string) => ({ text: `FILTER (${expression})` });
@@ -198,6 +260,18 @@ function builtin(atom: Atom, bound: Set<string>): { text: string; bind?: string;
     const args = list(2), lexical = render(args[0]), datatype = render(args[1]);
     return ready(s) ? assign(`IF(isLiteral(${lexical}) && DATATYPE(${lexical}) = <http://www.w3.org/2001/XMLSchema#string> && isIRI(${datatype}), STRDT(STR(${lexical}), ${datatype}), (1 / 0))`) : undefined;
   }
+  if (p === LOG + 'skolem') {
+    if (!ready(s)) return undefined;
+    const expression = assign(`IRI(CONCAT("urn:rdfjs:sparql:skolem:", SHA256(${skolemKey(s)})))`);
+    const argumentsToCheck = valueVariables(s);
+    return expression && { ...expression, ...(argumentsToCheck.length ? { check: argumentsToCheck.map(v => `isBlank(?${v})`).join(' || ') } : {}), warning: 'log:skolem emits deterministic SHA256 IRIs for named nodes and literals; blank-node arguments cause an execution error. Generated IRIs differ from Eyeling’s allocation scheme.' };
+  }
+  if (p === LIST + 'member' && isTerm(s)) {
+    // RDF lists are already represented by rdf:first/rdf:rest in the dataset.
+    if (!ready(s)) return undefined;
+    if (!isTerm(o)) throw new Error('list:member requires an RDF term as its member.');
+    return { text: `${render(s)} <${RDF}rest>*/<${RDF}first> ${render(o)} .`, ...isVariable(o) ? { bind: o.value } : {} };
+  }
   if (p === LOG + 'notIncludes' || p === LOG + 'includes') {
     if (!('kind' in o) || o.kind !== 'formula' || !isTerm(s) || !((s.termType === 'BlankNode') || (s.termType === 'Variable' && !bound.has(s.value)) || (s.termType === 'Literal' && s.value === '1'))) throw new Error('log:includes/notIncludes only support 1 or an unbound current-store scope and a quoted graph pattern.');
     // Outer variables are correlated; local formula variables are existential.
@@ -206,7 +280,17 @@ function builtin(atom: Atom, bound: Set<string>): { text: string; bind?: string;
   }
   if (p === DT + 'datatype') return ready(s) ? assign(`DATATYPE(${render(s)})`) : undefined;
   if (p === DT + 'lexicalForm') return ready(s) ? assign(`IF(isLiteral(${render(s)}), STR(${render(s)}), (1 / 0))`) : undefined;
+  if (p === DT + 'sameValueAs' || p === DT + 'differentValueFrom') return ready(s) && ready(o)
+    ? filter(`isLiteral(${render(s)}) && isLiteral(${render(o)}) && (${render(s)} ${p.endsWith('sameValueAs') ? '=' : '!='} ${render(o)})`) : undefined;
   if (p === STRING + 'concatenation') { const args = list(); return ready(s) ? assign(`CONCAT(${args.map(v => `STR(${render(v)})`).join(', ')})`) : undefined; }
+  if (p === STRING + 'scrape') {
+    const args = list(2);
+    if (!isTerm(args[1]) || args[1].termType !== 'Literal') throw new Error('string:scrape requires a constant regex with a capturing group.');
+    if (new RegExp(`(?:${args[1].value})|`).exec('')!.length < 2) throw new Error('string:scrape requires a capturing group.');
+    if (!ready(s)) return undefined;
+    const text = `STR(${render(args[0])})`, pattern = `STR(${render(args[1])})`;
+    return assign(`IF(REGEX(${text}, ${pattern}), REPLACE(${text}, CONCAT(${JSON.stringify('^[\\s\\S]*?(?:')}, ${pattern}, ${JSON.stringify(')[\\s\\S]*$')}), "$1"), (1 / 0))`);
+  }
   const strings: Record<string, string> = { contains: 'CONTAINS', startsWith: 'STRSTARTS', endsWith: 'STRENDS', matches: 'REGEX' };
   if (p.startsWith(STRING) && strings[p.slice(STRING.length)]) return ready(s) && ready(o) ? filter(`${strings[p.slice(STRING.length)]}(STR(${render(s)}), STR(${render(o)}))`) : undefined;
   throw new Error(`Unsupported N3 built-in: ${p}`);
@@ -241,7 +325,7 @@ function mapValue(v: Value, f: (v: Value) => Value): Value {
   if (isTerm(result)) return result;
   return result.kind === 'list' ? { kind: 'list', items: result.items.map(x => mapValue(x, f)) } : { kind: 'formula', atoms: result.atoms.map(a => mapAtom(a, f)) };
 }
-function mapAtom(a: Atom, f: (v: Value) => Value): Atom { return { s: mapValue(a.s, f), p: mapValue(a.p, f), o: mapValue(a.o, f) }; }
+function mapAtom(a: Atom, f: (v: Value) => Value): Atom { return { ...a, s: mapValue(a.s, f), p: mapValue(a.p, f), o: mapValue(a.o, f) }; }
 function mapRule(r: Rule, f: (v: Value) => Value): Rule { return { ...r, body: r.body.map(a => mapAtom(a, f)), head: r.head.map(a => mapAtom(a, f)) }; }
 function unify(pattern: Value, actual: Value, substitutions: Map<string, Value>, bindings: Atom[]): boolean {
   if (isVariable(pattern)) {
@@ -259,6 +343,22 @@ function unify(pattern: Value, actual: Value, substitutions: Map<string, Value>,
   return false;
 }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
+
+/** Length-delimited, typed encoding prevents tuple/lexical/datatype collisions.
+ * Lists preserve ordering and nesting; quoted graph terms are not supported.
+ */
+function skolemKey(value: Value): string {
+  if (!isTerm(value)) {
+    if (value.kind !== 'list') throw new Error('log:skolem does not support quoted formulas.');
+    return `CONCAT("[", ${value.items.map(skolemKey).join(', ') || '""'}, "]")`;
+  }
+  const term = render(value);
+  const segment = (expression: string) => `CONCAT(STR(STRLEN(${expression})), ":", ${expression})`;
+  if (value.termType === 'BlankNode') throw new Error('log:skolem requires RDF terms bound by graph patterns, not anonymous scope nodes.');
+  // STR on blank nodes is not defined by SPARQL 1.1. Fail that solution rather
+  // than creating a fresh identity on every iteration.
+  return `IF(isIRI(${term}), CONCAT("I", ${segment(`STR(${term})`)}), IF(isLiteral(${term}), CONCAT("L", ${segment(`STR(${term})`)}, ${segment(`STR(DATATYPE(${term}))`)}, ${segment(`LANG(${term})`)}), (1 / 0)))`;
+}
 
 export type SparqlQueryExecutor = (query: string, dataset: readonly Quad[]) => Promise<Iterable<Quad>>;
 export interface RdfjsSparqlEngine {
@@ -281,19 +381,21 @@ export function createRdfjsSparqlExecutor(engine: RdfjsSparqlEngine, options: { 
 export interface SparqlRuntimeExecutionOptions { maxRounds?: number; maxFacts?: number }
 export interface SparqlRuntimeExecutionResult { closure: Quad[]; derived: Quad[]; rounds: number; output: Quad[] }
 /** Execute a translated runtime with any SPARQL 1.1 CONSTRUCT engine, e.g. Comunica.
- * The optional projection runs on rule heads only, excluding source and static facts.
+ * The optional projection runs on heads, or on the closure when requested by the program.
  */
 export async function executeSparqlRuntime(program: SparqlRuntimeProgram, input: Iterable<Quad>, executeQuery: SparqlQueryExecutor,
   options: SparqlRuntimeExecutionOptions & { outputQuery?: string } = {}): Promise<SparqlRuntimeExecutionResult> {
   const closure = new Map<string, Quad>(), derived = new Map<string, Quad>();
+  const helperGraphs = new Set(program.auxiliaryGraphs ?? []);
   const key = (q: Quad) => JSON.stringify([q.subject, q.predicate, q.object, q.graph].map(t => t.termType === 'Literal' ? [t.termType, t.value, t.language, t.datatype.value] : [t.termType, t.value]));
   const maxRounds = options.maxRounds ?? 100, maxFacts = options.maxFacts ?? 100000;
   if (!Number.isSafeInteger(maxRounds) || maxRounds < 1 || !Number.isSafeInteger(maxFacts) || maxFacts < 1) throw new Error('Runtime limits must be positive safe integers.');
-  const add = (quads: Iterable<Quad>, heads: boolean) => {
+  const add = (quads: Iterable<Quad>, heads: boolean, allowHelpers = false) => {
     let changed = false;
     for (const q of quads) {
-      if (q.graph.termType !== 'DefaultGraph') throw new Error('SPARQL runtime execution requires default-graph triples; flatten each message first.');
-      const id = key(q); if (heads) derived.set(id, q);
+      const helper = q.graph.termType === 'NamedNode' && helperGraphs.has(q.graph.value);
+      if (q.graph.termType !== 'DefaultGraph' && !(allowHelpers && helper)) throw new Error('SPARQL runtime execution requires default-graph triples; flatten each message first.');
+      const id = key(q); if (heads && !helper) derived.set(id, q);
       if (!closure.has(id)) { closure.set(id, q); changed = true; }
       if (closure.size > maxFacts) throw new Error(`SPARQL runtime exceeded ${maxFacts} facts; no complete result is available.`);
     }
@@ -303,11 +405,24 @@ export async function executeSparqlRuntime(program: SparqlRuntimeProgram, input:
   if (program.seedQuery) add(await executeQuery(program.seedQuery, []), false);
   for (let rounds = 1; rounds <= maxRounds; rounds++) {
     let changed = false;
-    for (const rule of program.rules) if (add(await executeQuery(rule.query, Array.from(closure.values())), true)) changed = true;
+    for (const rule of program.rules) {
+      for (const check of rule.checks ?? []) {
+        if (Array.from(await executeQuery(check, Array.from(closure.values()))).length) throw new Error(`N3 rule ${rule.rule}: log:skolem with blank-node arguments is unsupported; use named identifiers. No complete result is available.`);
+      }
+      let result = await executeQuery(rule.query, Array.from(closure.values()));
+      if (rule.graph) {
+        if (!helperGraphs.has(rule.graph)) throw new Error(`Unknown private helper graph: ${rule.graph}`);
+        const { DataFactory } = require('n3');
+        result = Array.from(result, q => DataFactory.quad(q.subject, q.predicate, q.object, DataFactory.namedNode(rule.graph)));
+      }
+      if (add(result, true, true)) changed = true;
+    }
     if (!changed) {
       const heads = Array.from(derived.values());
-      const output = options.outputQuery ? Array.from(new Map(Array.from(await executeQuery(options.outputQuery, heads), q => [key(q), q])).values()) : heads;
-      return { closure: Array.from(closure.values()), derived: heads, rounds, output };
+      const publicClosure = Array.from(closure.values()).filter(q => q.graph.termType === 'DefaultGraph');
+      const projectionInput = program.projectionSource === 'closure' ? publicClosure : heads;
+      const output = options.outputQuery ? Array.from(new Map(Array.from(await executeQuery(options.outputQuery, projectionInput), q => [key(q), q])).values()) : heads;
+      return { closure: publicClosure, derived: heads, rounds, output };
     }
   }
   throw new Error(`SPARQL runtime did not converge within ${maxRounds} rounds; no complete result is available.`);

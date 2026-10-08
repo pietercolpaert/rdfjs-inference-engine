@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const qudtResult = await execute(qudtQuery, qudtRead('input.messages.trig'), qudtCompiled.program!);
   if (qudtResult.type !== 'result') throw new Error(JSON.stringify(qudtResult));
   assert.equal(qudtResult.processedMessages, 3);
-  assert.equal(qudtResult.outputQuads, 12);
+  assert.equal(qudtResult.outputQuads, 15);
   const qudtActual = api.parseRdfOrMessages(qudtResult.output);
   const qudtExpected = api.parseRdfOrMessages(qudtRead('expected-output.messages.trig'));
   assert.equal(qudtActual.messages.length, 3);

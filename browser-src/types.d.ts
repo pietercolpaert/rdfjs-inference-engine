@@ -3,6 +3,7 @@ declare module 'bundled-rules' {
   export const bundledRuleProfiles: Array<{
     file: string;
     n3: string;
+    precompiledRuntime?: string;
   }>;
   export const bundledRules: string;
 }

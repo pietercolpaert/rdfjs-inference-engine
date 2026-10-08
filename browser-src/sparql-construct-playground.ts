@@ -1,4 +1,4 @@
-import { generateSparqlConstruct, type SparqlConstructResult } from '../src/sparql-construct';
+import type { SparqlConstructResult } from '../src/sparql-construct-core';
 import { constructExamples } from './sparql-construct-examples';
 import { createRdfUrlLoader } from './rdf-url-loader';
 import type { ConstructWorkerMessage, ConstructWorkerRequest } from './sparql-construct-worker';
@@ -13,7 +13,6 @@ const exampleSelect = get('exampleSelect') as HTMLSelectElement;
 const initialExample = constructExamples[0];
 const editors = Object.fromEntries(names.map(name => [name, editor(`${name}Text`, initialExample[name])])) as Record<typeof names[number], any>;
 const output = editor('queryText', '', true, 'application/sparql-query');
-const rulesEditor = editor('rulesText', api.defaultSparqlMappingRules);
 const runtimeEditor = editor('runtimeText', '', true);
 const translatedEditor = editor('translatedText', '', true, 'application/sparql-query');
 const dataEditor = editor('dataText', initialExample.data);
@@ -74,7 +73,6 @@ const urlLoaders = Object.fromEntries([...names, 'data' as const].map(name => [n
   onPendingChange: pending => { pendingLoads += pending ? 1 : -1; updateRunControls(); },
 })]));
 for (const name of names) editors[name].on('change', invalidate);
-rulesEditor.on('change', invalidate);
 dataEditor.on('change', invalidateExecution);
 
 for (const example of constructExamples) {
@@ -88,7 +86,6 @@ function loadExample(): void {
   const example = constructExamples.find(example => example.id === exampleSelect.value) ?? initialExample;
   for (const loader of Object.values(urlLoaders)) loader.reset();
   for (const name of names) editors[name].setValue(example[name]);
-  rulesEditor.setValue(api.defaultSparqlMappingRules);
   dataEditor.setValue(example.data);
   get('exampleDescription').textContent = example.description;
   get('ndeGuidance').hidden = example.id !== 'nde-amsterdam-photograph';
@@ -103,9 +100,12 @@ function generate(): void {
         return [name, api.parseRdfOrMessages(editors[name].getValue(), { baseIRI: document.baseURI }).quads as Quad[]];
       } catch (error) { throw new Error(`${name}: ${error instanceof Error ? error.message : String(error)}`); }
     })) as { ontology: Quad[]; shaclIn: Quad[]; shaclOut: Quad[] };
-    const result = generateSparqlConstruct({ ...inputs, rules: rulesEditor.getValue() });
+    const result = api.generateSparqlConstruct(inputs);
     runtimeEditor.setValue(result.runtime);
-    translatedEditor.setValue(result.program ? [result.program.seedQuery ?? '', ...result.program.rules.map(rule => rule.query)].filter(Boolean).join('\n') : '');
+    translatedEditor.setValue(result.program ? [result.program.seedQuery ?? '', ...result.program.rules.flatMap(rule => [
+      ...(rule.checks ?? []).map(check => `# Runtime input check for N3 rule ${rule.rule}\n${check}`),
+      `${rule.graph ? `# Store results in private helper graph <${rule.graph}>\n` : ''}${rule.query}`,
+    ])].filter(Boolean).join('\n') : '');
     diagnostics.textContent = result.diagnostics.map(d => `${d.severity.toUpperCase()}: ${d.message}${d.path ? `\nPath: ${d.path}` : ''}${d.shape ? `\nShape: ${d.shape}` : ''}`).join('\n\n');
     if (result.query) {
       generated = result;

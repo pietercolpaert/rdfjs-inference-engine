@@ -180,7 +180,7 @@ await build({
   outfile: 'browser/rdfjs-inference-engine.min.js',
   format: 'iife',
   globalName: 'RdfjsInferenceEngine',
-  plugins: [browserNodePolyfillsPlugin],
+  plugins: [browserNodePolyfillsPlugin, bundledRulesPlugin],
 });
 
 await build({

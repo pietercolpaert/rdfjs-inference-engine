@@ -1,4 +1,4 @@
-# Fictional museum measurements. Each quantity keeps its own identifier.
+# Fictional museum measurements. Normalized quantities retain source provenance.
 VERSION "1.2-messages"
 PREFIX museum: <https://example.org/museum/ontology#>
 PREFIX measurement: <https://example.org/museum/measurements/>
@@ -8,18 +8,21 @@ PREFIX unit: <http://qudt.org/vocab/unit/>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 
 # A Delftware vase: 32 centimetres → 0.32 metres.
-measurement:vase-height a museum:RecordedHeight ;
+object:delftware-vase museum:height measurement:vase-height .
+measurement:vase-height a museum:RecordedHeight, qudt:QuantityValue ;
   museum:heightOf object:delftware-vase ;
   qudt:numericValue "32"^^xsd:decimal ; qudt:unit unit:CentiM .
 
 MESSAGE
 # A display case: 450 millimetres → 0.45 metres.
-measurement:case-height a museum:RecordedHeight ;
+object:display-case museum:height measurement:case-height .
+measurement:case-height a museum:RecordedHeight, qudt:QuantityValue ;
   museum:heightOf object:display-case ;
   qudt:numericValue "450"^^xsd:decimal ; qudt:unit unit:MilliM .
 
 MESSAGE
 # An already-normalized cabinet: 1.2 metres → 1.2 metres.
-measurement:cabinet-height a museum:RecordedHeight ;
+object:cabinet museum:height measurement:cabinet-height .
+measurement:cabinet-height a museum:RecordedHeight, qudt:QuantityValue ;
   museum:heightOf object:cabinet ;
   qudt:numericValue "1.2"^^xsd:decimal ; qudt:unit unit:M .

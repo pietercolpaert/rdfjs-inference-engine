@@ -1,8 +1,11 @@
 import { createRdfUrlLoader } from './rdf-url-loader';
-import { bundledRuleFiles, bundledRuleProfiles } from 'bundled-rules';
 import { bundledExamples } from 'bundled-examples';
 
 declare const CodeMirror: any;
+
+const bundledRuleProfiles: BundledRuleProfile[] = (globalThis as any).RdfjsInferenceEngine.loadDefaultRuleProfiles()
+  .map((profile: { n3: string; label: string; precompiledRuntime?: string }) => ({ ...profile, file: profile.label.replace(/^rules\//, '') }));
+const bundledRuleFiles = bundledRuleProfiles.map(profile => profile.file);
 
 type InputMode = 'text' | 'url';
 
