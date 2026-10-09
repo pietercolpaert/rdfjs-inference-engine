@@ -378,7 +378,17 @@ export function createRdfjsSparqlExecutor(engine: RdfjsSparqlEngine, options: { 
     // lose the `skolemized` marker. Restore only known source-scoped labels;
     // freshly constructed blank nodes have independent identifiers.
     const restore = (t: Term) => t.termType === 'BlankNode' ? blanks.get(t.value) ?? t : t;
-    return result.map(q => DataFactory.quad(restore(q.subject), q.predicate, restore(q.object), q.graph));
+    // Comunica streams one constructed triple per solution. A CONSTRUCT result
+    // is an RDF graph, so collapse repeated triples even when this adapter is
+    // used directly, without the fixed-point controller (standalone queries).
+    const unique = new Map<string, Quad>();
+    for (const q of result) {
+      const quad: Quad = DataFactory.quad(restore(q.subject), q.predicate, restore(q.object), q.graph);
+      const key = JSON.stringify([quad.subject, quad.predicate, quad.object, quad.graph].map(t =>
+        t.termType === 'Literal' ? [t.termType, t.value, t.language, t.datatype.value] : [t.termType, t.value]));
+      unique.set(key, quad);
+    }
+    return Array.from(unique.values());
   };
 }
 export interface SparqlRuntimeExecutionOptions { maxRounds?: number; maxFacts?: number }

@@ -56,6 +56,9 @@
     .CodeMirror { border: 1px solid var(--border); border-radius: 0.75rem; font-size: 0.82rem; line-height: 1.5; }
     .construct-inputs .CodeMirror { height: 360px; }
     .construct-output .CodeMirror { height: 420px; }
+    .plan-query { margin: 1rem 0; }
+    .plan-query .CodeMirror { height: 300px; }
+    .plan-query .hint { overflow-wrap: anywhere; }
     main { display: flex; flex-direction: column; gap: 1rem; }
     [hidden] { display: none !important; }
     .example-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
@@ -123,34 +126,33 @@
           <textarea id="shaclOutText" spellcheck="false"></textarea>
         </section>
       </div>
-      <p class="hint">Uses the engine’s bundled OWL 2 RL, SKOS and QUDT rules. The ontology and both SHACL contracts specialize the N3 runtime before translation. Expand the runtime below to inspect the selected rules and generated SPARQL.</p>
+      <p class="hint">Uses the engine’s bundled OWL 2 RL, SKOS and QUDT rules. The ontology and both SHACL contracts specialize the N3 runtime before translation. All generated SPARQL queries are shown below, including unit-conversion arithmetic.</p>
       <div class="uri-input-row">
         <button id="generateButton" type="button">Generate SPARQL CONSTRUCT</button>
         <button id="resetButton" class="secondary" type="button">Reset example</button>
         <span id="status" class="status" role="status" aria-live="polite"></span>
       </div>
       <section class="card construct-output">
-        <h2 class="section-title">SPARQL CONSTRUCT output query</h2>
-        <p class="hint">When the mapping can be unfolded into one query, this CONSTRUCT runs directly on the input RDF. Otherwise, Comunica executes the optimized rule queries in order until no new quads are added, then runs this output query. All runtime calculations happen in SPARQL. The consumer shape guides best-effort field selection: all values are retained, even when cardinality or other constraints fail. Validate the result with SHACL afterwards when conformance is required.</p>
+        <h2 class="section-title">SPARQL CONSTRUCT execution plan</h2>
+        <p class="hint">Comunica executes the queries shown here. Static facts load once; inference queries run in order and repeat until no new quads appear; the final query selects the output. A self-contained mapping needs just one query. QUDT conversion calculations are in the inference queries. Consumer constraints guide field selection; validate the output with SHACL when conformance is required.</p>
         <div class="uri-input-row">
-          <button id="copyButton" class="secondary" type="button" disabled>Copy query</button>
+          <button id="copyButton" class="secondary" type="button" disabled>Copy queries</button>
           <button id="downloadButton" class="secondary" type="button" disabled>Download runtime .json</button>
         </div>
-        <label for="queryText">Generated query</label>
+        <div id="planQueries"></div>
+        <label id="outputQueryLabel" for="queryText">Final output query</label>
         <textarea id="queryText" spellcheck="false"></textarea>
         <details id="runtimePanel">
-          <summary>N3 runtime and translated SPARQL rule queries</summary>
-          <p class="hint">N3 is used only during generation. Small helper views are unfolded and compatible rule queries are combined. Static facts are loaded once; remaining rule queries run in order until the graph stops growing. The downloaded JSON contains the SPARQL execution plan and final output query.</p>
+          <summary>N3 generation source</summary>
+          <p class="hint">N3 is used only to generate the SPARQL execution plan above.</p>
           <label for="runtimeText">Complete N3 runtime</label>
           <textarea id="runtimeText" spellcheck="false" readonly></textarea>
-          <label for="translatedText">Generated seed and rule queries</label>
-          <textarea id="translatedText" spellcheck="false" readonly></textarea>
         </details>
         <p id="diagnostics" class="status" role="status" aria-live="polite"></p>
       </section>
       <section id="executionPanel" class="card execution-panel" hidden>
         <h2 class="section-title">Execute with Comunica</h2>
-        <p class="hint">Execute the translated N3 runtime and the exact output query shown above on your input data. RDF Message Logs are processed one message at a time as the default RDF graph; ordinary RDF is processed as one message.</p>
+        <p class="hint">Execute the complete SPARQL plan shown above on your input data. RDF Message Logs are processed one message at a time as the default RDF graph; ordinary RDF is processed as one message.</p>
         <div class="message-flow">
           <div class="editor-pane">
             <h3 class="section-title">MESSAGES IN</h3>

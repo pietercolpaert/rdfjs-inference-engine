@@ -14,7 +14,9 @@ const initialExample = constructExamples.find(example => example.id === 'nde-ams
 const editors = Object.fromEntries(names.map(name => [name, editor(`${name}Text`, initialExample[name])])) as Record<typeof names[number], any>;
 const output = editor('queryText', '', true, 'application/sparql-query');
 const runtimeEditor = editor('runtimeText', '', true);
-const translatedEditor = editor('translatedText', '', true, 'application/sparql-query');
+const planQueries = get('planQueries');
+let planEditors: any[] = [];
+let displayedQueries: { title: string; query: string; note: string }[] = [];
 const dataEditor = editor('dataText', initialExample.data);
 const resultEditor = editor('resultText', '', true);
 const status = get('status');
@@ -33,6 +35,43 @@ function editor(id: string, value: string, readOnly = false, mode = 'text/turtle
   const textarea = get(id) as HTMLTextAreaElement;
   textarea.value = value;
   return CodeMirror.fromTextArea(textarea, { mode, lineNumbers: true, lineWrapping: true, tabSize: 2, readOnly });
+}
+function clearPlan(): void {
+  for (const item of planEditors) item.toTextArea();
+  planEditors = [];
+  displayedQueries = [];
+  planQueries.replaceChildren();
+  get('outputQueryLabel').textContent = 'Final output query';
+}
+function showPlan(result: SparqlConstructResult): void {
+  clearPlan();
+  const program = result.program;
+  const add = (title: string, query: string, note: string) => displayedQueries.push({ title, query, note });
+  if (program?.seedQuery) add('Static facts', program.seedQuery, 'Run once and add the results to the working graph.');
+  for (const [index, rule] of (program?.rules ?? []).entries()) {
+    for (const check of rule.checks ?? []) add(`Input check for inference step ${index + 1}`, check,
+      'Run before this inference step on each iteration. A nonempty result stops execution.');
+    add(`Inference step ${index + 1}`, rule.query, rule.graph
+      ? `Run on each iteration. Add results to the private graph <${rule.graph}>.`
+      : 'Run on each iteration. Add results to the working graph.');
+  }
+  for (const [index, item] of displayedQueries.entries()) {
+    const section = document.createElement('section');
+    section.className = 'plan-query';
+    const label = document.createElement('label');
+    label.htmlFor = `planQuery${index}`;
+    label.textContent = `Query ${index + 1} — ${item.title}`;
+    const note = document.createElement('p');
+    note.className = 'hint'; note.textContent = item.note;
+    const textarea = document.createElement('textarea');
+    textarea.id = label.htmlFor; textarea.value = item.query; textarea.spellcheck = false;
+    section.append(label, note, textarea);
+    planQueries.appendChild(section);
+    planEditors.push(CodeMirror.fromTextArea(textarea, { mode: 'application/sparql-query', lineNumbers: true, lineWrapping: true, tabSize: 2, readOnly: true }));
+  }
+  get('outputQueryLabel').textContent = result.standalone
+    ? 'Query 1 — Self-contained mapping'
+    : `Query ${displayedQueries.length + 1} — Final output (after convergence)`;
 }
 function updateRunControls(): void {
   run.disabled = !output.getValue() || Boolean(activeWorker) || pendingLoads > 0;
@@ -56,7 +95,7 @@ function invalidate(): void {
   stopExecution('Mapping inputs changed. Generate a query again.');
   output.setValue('');
   runtimeEditor.setValue('');
-  translatedEditor.setValue('');
+  clearPlan();
   resultEditor.setValue('');
   executionPanel.hidden = true;
   copy.disabled = download.disabled = true;
@@ -102,10 +141,7 @@ function generate(): void {
     })) as { ontology: Quad[]; shaclIn: Quad[]; shaclOut: Quad[] };
     const result = api.generateSparqlConstruct(inputs);
     runtimeEditor.setValue(result.runtime);
-    translatedEditor.setValue(result.program ? [result.program.seedQuery ?? '', ...result.program.rules.flatMap(rule => [
-      ...(rule.checks ?? []).map(check => `# Runtime input check for N3 rule ${rule.rule}\n${check}`),
-      `${rule.graph ? `# Store results in private helper graph <${rule.graph}>\n` : ''}${rule.query}`,
-    ])].filter(Boolean).join('\n') : '');
+    showPlan(result);
     diagnostics.textContent = result.diagnostics.map(d => `${d.severity.toUpperCase()}: ${d.message}${d.path ? `\nPath: ${d.path}` : ''}${d.shape ? `\nShape: ${d.shape}` : ''}`).join('\n\n');
     if (result.query) {
       generated = result;
@@ -116,7 +152,7 @@ function generate(): void {
         : `Optimized ${result.originalRuleCount ?? result.program!.rules.length} translated rules to ${result.program!.rules.length} rule queries, followed by the output query.`;
       executionPanel.hidden = false;
       invalidateExecution();
-      setTimeout(() => { dataEditor.refresh(); resultEditor.refresh(); }, 0);
+      setTimeout(() => { dataEditor.refresh(); resultEditor.refresh(); planEditors.forEach(item => item.refresh()); }, 0);
     } else status.textContent = 'Could not generate a complete mapping. See the diagnostics below.';
   } catch (error) { status.textContent = `Could not generate query: ${error instanceof Error ? error.message : String(error)}`; }
   updateRunControls();
@@ -164,9 +200,14 @@ get('resetButton').addEventListener('click', loadExample);
 exampleSelect.addEventListener('change', loadExample);
 run.addEventListener('click', executeQuery);
 stop.addEventListener('click', () => stopExecution());
-get('runtimePanel').addEventListener('toggle', () => { setTimeout(() => { runtimeEditor.refresh(); translatedEditor.refresh(); }, 0); });
+get('runtimePanel').addEventListener('toggle', () => { setTimeout(() => { runtimeEditor.refresh(); }, 0); });
 copy.addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(output.getValue()); status.textContent = 'Query copied.'; }
+  try {
+    const queries = displayedQueries.map((item, i) => `# Query ${i + 1}: ${item.title}\n# ${item.note}\n${item.query}`);
+    queries.push(`# Query ${queries.length + 1}: ${generated?.standalone ? 'Self-contained mapping' : 'Final output'}\n${output.getValue()}`);
+    await navigator.clipboard.writeText(queries.join('\n\n'));
+    status.textContent = 'Queries copied.';
+  }
   catch { status.textContent = 'Clipboard access is unavailable. Select and copy the query from the editor.'; }
 });
 download.addEventListener('click', () => {

@@ -110,12 +110,13 @@ async function testPlayground(api: any): Promise<void> {
   for (const id of [...names.flatMap(name => [`${name}Text`, `${name}Url`, `${name}Load`, `${name}Status`]),
     'queryText', 'status', 'diagnostics', 'generateButton', 'resetButton', 'copyButton', 'downloadButton',
     'exampleSelect', 'exampleDescription', 'ndeGuidance', 'dataText', 'dataUrl', 'dataLoad', 'dataLoadStatus',
-    'runtimeText', 'translatedText', 'runtimePanel', 'resultText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton']) {
+    'runtimeText', 'planQueries', 'outputQueryLabel', 'runtimePanel', 'resultText', 'executionPanel', 'executionStatus', 'runQueryButton', 'stopQueryButton']) {
     elements.set(id, { id, value: '', textContent: '', disabled: false, handlers: {} as Record<string, (...args: any[]) => unknown>,
-      options: [] as any[], appendChild(option: any) { this.options.push(option); }, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
+      options: [] as any[], appendChild(option: any) { this.options.push(option); }, replaceChildren() { this.options = []; }, reportValidity: () => true, addEventListener(event: string, handler: (...args: any[]) => unknown) { this.handlers[event] = handler; } });
   }
   let resolveLoad: (result: any) => void = () => {};
   const workers: any[] = [];
+  let clipboard = '';
   class FakeWorker {
     request: any;
     terminated = false;
@@ -124,14 +125,14 @@ async function testPlayground(api: any): Promise<void> {
     terminate() { this.terminated = true; }
   }
   const sandbox = vm.createContext({ AbortController, AbortSignal, URL, Blob, setTimeout, clearTimeout, Worker: FakeWorker,
-    navigator: { clipboard: { writeText: async () => {} } },
-    document: { baseURI: 'https://example.org/sparql-construct.html', getElementById: (id: string) => elements.get(id), createElement: () => ({}) },
+    navigator: { clipboard: { writeText: async (text: string) => { clipboard = text; } } },
+    document: { baseURI: 'https://example.org/sparql-construct.html', getElementById: (id: string) => elements.get(id), createElement: () => ({ children: [] as any[], append(...children: any[]) { this.children.push(...children); } }) },
     RdfjsInferenceEngine: { ...api, dereferenceRdfUrl: () => new Promise(resolve => { resolveLoad = resolve; }) },
     CodeMirror: { fromTextArea: (element: any) => {
       let text = element.value;
       const listeners: (() => void)[] = [];
       const editor = { refresh: () => {}, getValue: () => text, setValue: (value: string) => { text = value; listeners.forEach(listener => listener()); },
-        on: (_event: string, listener: () => void) => listeners.push(listener) };
+        on: (_event: string, listener: () => void) => listeners.push(listener), toTextArea: () => editors.delete(element.id) };
       editors.set(element.id, editor);
       return editor;
     } },
@@ -139,7 +140,9 @@ async function testPlayground(api: any): Promise<void> {
   sandbox.self = sandbox;
   vm.runInContext(readFileSync('browser/sparql-construct-playground.min.js', 'utf8'), sandbox);
   assert.ok(editors.get('queryText').getValue().startsWith('CONSTRUCT'));
-  assert.equal(editors.size, 8, 'Mapping inputs, generated runtime, query, data and result use CodeMirror.');
+  assert.equal(editors.size, 7, 'A standalone mapping has one visible SPARQL editor, without redundant inference queries.');
+  assert.equal(elements.get('planQueries').options.length, 0);
+  assert.match(elements.get('outputQueryLabel').textContent, /Self-contained/);
   assert.equal(elements.get('executionPanel').hidden, false);
   assert.equal(elements.get('exampleSelect').value, 'nde-amsterdam-photograph');
   const exampleIds = elements.get('exampleSelect').options.map((option: any) => option.value);
@@ -192,12 +195,21 @@ async function testPlayground(api: any): Promise<void> {
   assert.ok(editors.get('ontologyText').getValue().includes('subClassOf'), 'Failed loading preserves editor contents.');
   elements.get('exampleSelect').value = 'qudt-museum-dimensions';
   elements.get('exampleSelect').handlers.change();
-  assert.ok(editors.get('translatedText').getValue().includes('BIND'));
+  const planSections = elements.get('planQueries').options;
+  assert.ok(planSections.length > 1, 'QUDT inference queries are immediately visible as separate editors.');
+  assert.ok(planSections.some((section: any) => section.children[2].value.includes('BIND')));
   assert.ok(editors.get('runtimeText').getValue().includes('# Precompiled runtime profile: rules/qudt/'));
   assert.ok(editors.get('runtimeText').getValue().includes('math:product'));
   assert.equal(editors.has('rulesText'), false, 'Default generation needs no separate N3 mapping editor.');
   elements.get('runQueryButton').handlers.click();
   assert.ok(workers.at(-1).request.program.rules.length);
+  const program = workers.at(-1).request.program;
+  assert.deepEqual(planSections.map((section: any) => section.children[2].value),
+    [program.seedQuery, ...program.rules.flatMap((rule: any) => [...rule.checks ?? [], rule.query])].filter(Boolean),
+    'Every displayed query matches its execution order, including input checks.');
+  await elements.get('copyButton').handlers.click();
+  for (const section of planSections) assert.ok(clipboard.includes(section.children[2].value));
+  assert.ok(clipboard.includes(editors.get('queryText').getValue()), 'Copy includes the full plan and final output query.');
   assert.ok(editors.get('ontologyText').getValue().includes('conversionMultiplier'));
   assert.ok(editors.get('dataText').getValue().includes('450'));
   elements.get('exampleSelect').value = 'sensor-reading';

@@ -41,6 +41,12 @@ async function main(): Promise<void> {
   if (result.type !== 'result') throw new Error(JSON.stringify(result));
   assert.equal(result.processedMessages, 2);
   assert.equal(result.outputQuads, 10);
+  assert.equal(compiled.standalone, true);
+  const direct = await execute(compiled.query, read('input.messages.trig'));
+  assert.equal(direct.type, 'result');
+  if (direct.type !== 'result') throw new Error(JSON.stringify(direct));
+  assert.equal(direct.outputQuads, 10, 'Standalone CONSTRUCT deduplicates type triples repeated across field solutions.');
+  assert.equal(direct.output, result.output, 'Direct query and controller produce the same RDF graph.');
   const apiContext = vm.createContext({ AbortController, AbortSignal, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, setInterval, clearInterval });
   apiContext.self = apiContext;
   vm.runInContext(apiSource, apiContext);

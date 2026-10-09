@@ -2,7 +2,7 @@
 
 An illustrative example inspired by [Netwerk Digitaal Erfgoed's guidance on publishing collection information with Schema.org](https://netwerkdigitaalerfgoed.nl/wegwijzer/verspreiden/). It describes fictional photographs of Amsterdam's canals; it is not a real archive export or an official NDE SHACL profile. Photographer, photograph, and subject identifiers use example URIs.
 
-Select **Amsterdam archival photographs (NDE-inspired)** in the SPARQL CONSTRUCT playground. The ontology, provider shape, consumer shape, and input messages load together. The engine’s bundled OWL 2 RL rules express the ontology entailment. Generate the SPARQL runtime and use **Run SPARQL CONSTRUCT** to execute its translated rule queries to a fixed point, followed by the displayed consumer output query, with the locally bundled Comunica engine. The expected output fixture is available in this example directory.
+Select **Amsterdam archival photographs (NDE-inspired)** in the SPARQL CONSTRUCT playground. The ontology, provider shape, consumer shape, and input messages load together. The engine’s bundled OWL 2 RL rules express the ontology entailment. Generation unfolds this example into one self-contained CONSTRUCT. Use **Run SPARQL CONSTRUCT** to execute the displayed query with the locally bundled Comunica engine. Constructed triples are deduplicated, including types repeated across matching field rows. The expected output fixture is available in this example directory.
 
 The ontology explicitly provides these directional relationships:
 

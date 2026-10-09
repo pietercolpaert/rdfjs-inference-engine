@@ -2,6 +2,8 @@
 
 Select **Museum object heights (QUDT: cm/mm → m)** in the SPARQL CONSTRUCT playground. Generate the query, then run it with Comunica on the bundled messages.
 
+The execution plan shows all queries in numbered editors. The inference query contains the conversion `BIND` expressions; the final query selects the normalized measurements. **Copy queries** includes the complete plan.
+
 The fictional collection records describe a Delftware vase, a display case, and a cabinet. Measurements are represented as QUDT quantity-value nodes, with a numeric value and a unit. The consumer needs all heights in metres:
 
 | Input | Constructed output |
