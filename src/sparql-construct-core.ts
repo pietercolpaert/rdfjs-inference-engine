@@ -2,6 +2,7 @@ import type { Quad, Term } from '@rdfjs/types';
 import type { RuleProfile } from './InferenceEngine';
 import { compileOutputProjection, type SparqlConstructMapping } from './sparql-output-projection';
 import { translateN3RuntimeToSparql, type N3SparqlDiagnostic, type SparqlRuntimeProgram } from './n3-to-sparql';
+import { optimizeSparqlPlan } from './sparql-plan';
 const { Writer, DataFactory } = require('n3');
 export type { SparqlConstructMapping } from './sparql-output-projection';
 export interface SparqlConstructInput {
@@ -12,6 +13,8 @@ export interface SparqlConstructInput {
   rules?: string;
   /** Defaults to the engine's bundled OWL 2 RL, SKOS and prepared QUDT profiles. */
   profiles?: RuleProfile[];
+  /** Unfold views and consolidate queries where safe. Defaults to true. */
+  optimize?: boolean;
 }
 export interface SparqlConstructDiagnostic extends N3SparqlDiagnostic { shape?: string; path?: string }
 export interface SparqlConstructResult {
@@ -22,6 +25,10 @@ export interface SparqlConstructResult {
   runtime: string;
   mappings: SparqlConstructMapping[];
   diagnostics: SparqlConstructDiagnostic[];
+  /** The output query can run directly against input RDF without a controller. */
+  standalone?: boolean;
+  /** Number of translated rule queries before optimization. */
+  originalRuleCount?: number;
 }
 type RuntimeBuilder = (profiles: RuleProfile[], ontology: Quad[], provider: Quad[], consumer: Quad[]) => { runtime: string; diagnostics: SparqlConstructDiagnostic[] };
 /** Eyeling also tracks generalized RDF datatype facts with literal subjects.
@@ -61,7 +68,16 @@ export function createSparqlConstructGenerator(buildRuntime: RuntimeBuilder, def
       }
     }
     const failed = diagnostics.some(d => d.severity === 'error');
-    return { query: failed ? null : projection.query, program: failed ? null : program, runtime, mappings: projection.mappings, diagnostics };
+    if (!failed && program && projection.query && input.optimize !== false) {
+      try {
+        const optimized = optimizeSparqlPlan(program, projection.query);
+        return { program: optimized.program, query: optimized.query, standalone: optimized.standalone,
+          originalRuleCount: optimized.originalRules, runtime, mappings: projection.mappings, diagnostics };
+      } catch (error) {
+        diagnostics.push({ severity: 'warning', message: `Retained the unoptimized SPARQL plan: ${error instanceof Error ? error.message : String(error)}` });
+      }
+    }
+    return { query: failed ? null : projection.query, program: failed ? null : program, runtime, mappings: projection.mappings, diagnostics, standalone: false, originalRuleCount: program?.rules.length };
   };
 }
 function serialize(quads: Quad[], prefix: string): string {

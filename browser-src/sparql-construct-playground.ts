@@ -111,7 +111,9 @@ function generate(): void {
       generated = result;
       output.setValue(result.query);
       copy.disabled = download.disabled = false;
-      status.textContent = `Translated ${result.program!.rules.length} N3 rules and generated the output projection.`;
+      status.textContent = result.standalone
+        ? 'Generated one self-contained SPARQL CONSTRUCT query.'
+        : `Optimized ${result.originalRuleCount ?? result.program!.rules.length} translated rules to ${result.program!.rules.length} rule queries, followed by the output query.`;
       executionPanel.hidden = false;
       invalidateExecution();
       setTimeout(() => { dataEditor.refresh(); resultEditor.refresh(); }, 0);
@@ -149,7 +151,7 @@ function executeQuery(): void {
     const request: ConstructWorkerRequest = {
       apiScriptUrl: new URL('browser/rdfjs-inference-engine.min.js', document.baseURI).href,
       query: output.getValue(), dataSource: dataEditor.getValue(), baseIRI: document.baseURI,
-      program: generated?.program ?? undefined,
+      program: generated?.standalone ? undefined : generated?.program ?? undefined,
     };
     worker.postMessage(request);
   } catch (error) {

@@ -131,7 +131,7 @@
       </div>
       <section class="card construct-output">
         <h2 class="section-title">SPARQL CONSTRUCT output query</h2>
-        <p class="hint">The output query runs on the input graph and facts inferred by the translated N3 rules. Comunica first executes the rule queries until no new facts are added, then executes this exact output query. The consumer shape guides best-effort field selection: all values are retained, even when cardinality or other constraints fail. Validate the result with SHACL afterwards when conformance is required.</p>
+        <p class="hint">When the mapping can be unfolded into one query, this CONSTRUCT runs directly on the input RDF. Otherwise, Comunica executes the optimized rule queries in order until no new quads are added, then runs this output query. All runtime calculations happen in SPARQL. The consumer shape guides best-effort field selection: all values are retained, even when cardinality or other constraints fail. Validate the result with SHACL afterwards when conformance is required.</p>
         <div class="uri-input-row">
           <button id="copyButton" class="secondary" type="button" disabled>Copy query</button>
           <button id="downloadButton" class="secondary" type="button" disabled>Download runtime .json</button>
@@ -140,7 +140,7 @@
         <textarea id="queryText" spellcheck="false"></textarea>
         <details id="runtimePanel">
           <summary>N3 runtime and translated SPARQL rule queries</summary>
-          <p class="hint">Static facts are loaded once. Rule queries run in source order until the graph stops growing. The downloaded JSON contains this program and the final output query.</p>
+          <p class="hint">N3 is used only during generation. Small helper views are unfolded and compatible rule queries are combined. Static facts are loaded once; remaining rule queries run in order until the graph stops growing. The downloaded JSON contains the SPARQL execution plan and final output query.</p>
           <label for="runtimeText">Complete N3 runtime</label>
           <textarea id="runtimeText" spellcheck="false" readonly></textarea>
           <label for="translatedText">Generated seed and rule queries</label>

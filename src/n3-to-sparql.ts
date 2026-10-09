@@ -374,7 +374,10 @@ export function createRdfjsSparqlExecutor(engine: RdfjsSparqlEngine, options: { 
     const blanks = new Map<string, Term>();
     for (const q of dataset) for (const t of [q.subject, q.object]) if (t.termType === 'BlankNode') blanks.set(`bc_0_${t.value}`, t);
     const result = await (await engine.queryQuads(query, { sources: [new Store(dataset)], ...options })).toArray();
-    const restore = (t: Term) => t.termType === 'BlankNode' && 'skolemized' in t ? blanks.get(t.value) ?? t : t;
+    // SELECT scopes can reconstruct Comunica's source-scoped blank nodes and
+    // lose the `skolemized` marker. Restore only known source-scoped labels;
+    // freshly constructed blank nodes have independent identifiers.
+    const restore = (t: Term) => t.termType === 'BlankNode' ? blanks.get(t.value) ?? t : t;
     return result.map(q => DataFactory.quad(restore(q.subject), q.predicate, restore(q.object), q.graph));
   };
 }
