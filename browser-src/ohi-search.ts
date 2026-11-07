@@ -1,11 +1,8 @@
-import type { Artifact, Format, Publication, SearchHit, SearchRequest, SearchResult } from '@neverblink/ohi' with { 'resolution-mode': 'import' };
+import type { Artifact, CatalogClient, Format, SearchHit } from '@neverblink/ohi' with { 'resolution-mode': 'import' };
 
 export interface OhiSearchOptions {
   /** A `CatalogClient` from `@neverblink/ohi`, or a stand-in with the same methods. */
-  client: {
-    search(request: SearchRequest): Promise<SearchResult>;
-    inspect(baseUrl: string): Promise<Publication>;
-  };
+  client: Pick<CatalogClient, 'search' | 'inspect'>;
   input: HTMLInputElement;
   results: HTMLElement;
   status: HTMLElement;
@@ -16,6 +13,8 @@ export interface OhiSearchOptions {
 
 /** Formats the playground can load, in order of preference. */
 const rdfFormats: Format[] = ['owl-turtle', 'rdfs-turtle', 'owl-rdfxml'];
+/** Search filter that keeps only ontologies with at least one of `rdfFormats`. */
+const rdfFormatFilter = `formats:=[${rdfFormats.join(',')}]`;
 const searchDelayMs = 300;
 const externalLinkIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
 
@@ -56,12 +55,11 @@ export function createOhiSearch(options: OhiSearchOptions): { search(): Promise<
     }
     status.textContent = 'Searching ohi.dev…';
     try {
-      const page = await client.search({ q: query, per_page: 10 });
+      const page = await client.search({ q: query, per_page: 10, filter_by: rdfFormatFilter });
       if (generation !== currentGeneration) return;
-      const hits = page.hits.filter(hit => hit.formats.some(format => rdfFormats.includes(format)));
-      results.replaceChildren(...hits.map(hit => resultItem(hit, () => void select(hit))));
-      results.hidden = hits.length === 0;
-      status.textContent = hits.length === 0
+      results.replaceChildren(...page.hits.map(hit => resultItem(hit, () => void select(hit))));
+      results.hidden = page.hits.length === 0;
+      status.textContent = page.hits.length === 0
         ? `No ontologies with an RDF file found for “${query}”.`
         : `${page.total}${page.search_cutoff ? '+' : ''} ${page.total === 1 ? 'result' : 'results'} on ohi.dev. Choose one to load it.`;
     } catch (error) {
