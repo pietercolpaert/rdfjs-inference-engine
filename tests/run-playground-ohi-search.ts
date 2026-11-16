@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createOhiSearch, ohiReleasePage, pickRdfArtifact } from '../browser-src/ohi-search';
+import { createOhiSearch, pickRdfArtifact } from '../browser-src/ohi-search';
 import type { OhiSearchOptions } from '../browser-src/ohi-search';
 
 type FakeElement = {
@@ -41,7 +41,7 @@ const ssn = {
   description: 'Sensors and observations.', licenses: ['W3C-20150513'], published_at: '2026-10-23T13:01:09.869Z',
   formats: ['linkml-yaml', 'owl-rdfxml', 'owl-turtle', 'rdfs-turtle'],
 };
-const linkmlOnly = { ...ssn, base_url: 'https://api.ohi.dev/files/packages/x/y/1/', name: 'y', title: 'LinkML only', formats: ['linkml-yaml'] };
+const otherHit = { ...ssn, base_url: 'https://api.ohi.dev/files/packages/x/y/1/', name: 'y', title: 'Other ontology' };
 const artifact = (format: string, origin: string, file: string) => ({
   format, origin, roots: [file], sha256: '0'.repeat(64), size_bytes: 22714, url: `https://api.ohi.dev/files/packages/w3c/ssn/2017/${file}`,
 });
@@ -63,10 +63,10 @@ async function main(): Promise<void> {
   assert.equal(pickRdfArtifact([artifact('owl-rdfxml', 'UPSTREAM', 'x.owl')] as any)?.format, 'owl-rdfxml');
   assert.equal(pickRdfArtifact([artifact('linkml-yaml', 'GENERATED', 'x.yaml')] as any), undefined);
 
-  const searches: { q: string; resolve: (value: any) => void; reject: (error: Error) => void }[] = [];
+  const searches: { q: string; filter_by?: string; resolve: (value: any) => void; reject: (error: Error) => void }[] = [];
   let inspected = '';
   const client = {
-    search: (request: { q: string }) => new Promise((resolve, reject) => { searches.push({ q: request.q, resolve, reject }); }),
+    search: (request: { q: string; filter_by?: string }) => new Promise((resolve, reject) => { searches.push({ ...request, resolve, reject }); }),
     inspect: async (baseUrl: string) => { inspected = baseUrl; return ssnPublication; },
   };
   const input = element('input');
@@ -84,11 +84,12 @@ async function main(): Promise<void> {
   input.value = 'sensor';
   pressEnter();
   assert.deepEqual(searches.map(s => s.q), ['sens', 'sensor']);
+  assert.equal(searches[1].filter_by, 'formats:=[owl-turtle,rdfs-turtle,owl-rdfxml]', 'Only ontologies with an RDF file are searched.');
   assert.match(status.textContent, /Searching ohi\.dev/);
-  searches[1].resolve({ hits: [ssn, linkmlOnly], total: 2, page: 1, per_page: 10, search_cutoff: false });
-  searches[0].resolve({ hits: [linkmlOnly], total: 1, page: 1, per_page: 10, search_cutoff: false });
+  searches[1].resolve({ hits: [ssn], total: 1, page: 1, per_page: 10, search_cutoff: false });
+  searches[0].resolve({ hits: [otherHit], total: 1, page: 1, per_page: 10, search_cutoff: false });
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(results.children.length, 1, 'Hits without an RDF file are left out, and a stale response is ignored.');
+  assert.equal(results.children.length, 1, 'A stale response is ignored.');
   assert.equal(results.hidden, false);
   const hitButton = child(child(results, 0), 0);
   assert.equal(child(hitButton, 0).textContent, 'Semantic Sensor Network Ontology');
@@ -97,8 +98,7 @@ async function main(): Promise<void> {
   assert.equal(hitPage.tagName, 'a', 'Each result links to its page on ohi.dev, outside the select button.');
   assert.equal(hitPage.href, 'https://ohi.dev/o/w3c/ssn@2017');
   assert.match(hitPage.attributes['aria-label'], /View Semantic Sensor Network Ontology 2017 on ohi\.dev/);
-  assert.match(status.textContent, /2 results on ohi\.dev/);
-  assert.equal(ohiReleasePage({ namespace: 'saref', name: 'saref-core', version: 'v3.2.1' }), 'https://ohi.dev/o/saref/saref-core@v3.2.1');
+  assert.match(status.textContent, /1 result on ohi\.dev/);
 
   hitButton.listeners.click.forEach(listener => listener({}));
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
 
   input.value = 'nothing';
   pressEnter();
-  searches[2].resolve({ hits: [linkmlOnly], total: 1, page: 1, per_page: 10, search_cutoff: false });
+  searches[2].resolve({ hits: [], total: 0, page: 1, per_page: 10, search_cutoff: false });
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.match(status.textContent, /No ontologies with an RDF file/);
   assert.equal(results.hidden, true);
@@ -138,6 +138,6 @@ async function main(): Promise<void> {
   input.listeners.input.forEach(listener => listener({}));
   await new Promise(resolve => setTimeout(resolve, 350));
   assert.deepEqual(searches.slice(5).map(s => s.q), ['typed'], 'Typing searches once after a short pause.');
-  console.log('Playground ohi.dev search: hit filtering, artifact choice, loading, stale responses, errors and resets verified.');
+  console.log('Playground ohi.dev search: format filter, artifact choice, loading, stale responses, errors and resets verified.');
 }
 void main().catch(error => { console.error(error); process.exitCode = 1; });
