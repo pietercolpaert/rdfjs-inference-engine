@@ -36,6 +36,10 @@ const RDFS_SUB_PROPERTY_OF = 'http://www.w3.org/2000/01/rdf-schema#subPropertyOf
 const OWL_EQUIVALENT_CLASS = 'http://www.w3.org/2002/07/owl#equivalentClass';
 const OWL_EQUIVALENT_PROPERTY = 'http://www.w3.org/2002/07/owl#equivalentProperty';
 const OWL_INVERSE_OF = 'http://www.w3.org/2002/07/owl#inverseOf';
+const OWL_PROPERTY_CHAIN_AXIOM = 'http://www.w3.org/2002/07/owl#propertyChainAxiom';
+const RDF_FIRST = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#first';
+const RDF_REST = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#rest';
+const RDF_NIL = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#nil';
 const OWL_SAME_AS = 'http://www.w3.org/2002/07/owl#sameAs';
 const LOG_SKOLEM = 'http://www.w3.org/2000/10/swap/log#skolem';
 const SKOLEM_BASE_IRI = 'https://eyereasoner.github.io/.well-known/genid/';
@@ -571,9 +575,10 @@ export async function writeMessages(messages: Iterable<Iterable<Quad>>, prefixes
 
 export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
   const sections = ['# Generated inference runtime. Do not edit by hand.'];
-  const runtimeProfileN3 = input.options.selectRuntimeRules === false
-    ? input.profileN3.trimEnd()
-    : compileSelectedRuntimeProfiles(input).trimEnd();
+  const selection = input.options.selectRuntimeRules === false
+    ? undefined
+    : compileSelectedRuntimeProfiles(input);
+  const runtimeProfileN3 = selection ? selection.n3.trimEnd() : input.profileN3.trimEnd();
   const includeStaticClosure = shouldIncludeStaticClosure(input, runtimeProfileN3);
 
   if (input.shapePlanning) {
@@ -589,9 +594,66 @@ export function defaultRuntimeCompiler(input: RuntimeCompilerInput): string {
     if (backgroundClosure.length > 0) {
       sections.push('', '# Precomputed background facts and closure', serializeQuadsAsN3(backgroundClosure).trimEnd());
     }
+  } else if (selection && input.options.includeStaticClosure === undefined) {
+    const joinBackground = partialJoinBackgroundFacts(selection.entries, [...input.vocabulary, ...input.closure]);
+    if (joinBackground.length > 0) {
+      sections.push('', '# Precomputed background facts for partial-evaluated join rules', serializeQuadsAsN3(joinBackground).trimEnd());
+    }
   }
 
   return `${sections.join('\n')}\n`;
+}
+
+// Partial-evaluated join rules, such as specialized property chains, may join
+// message facts with background facts (e.g. a message point's tss:field with the
+// background field's tss:unit). Without the full static closure, embed the
+// background facts those joins can read, plus the static consequences the
+// selected rules derive from them, so they are neither missed nor re-emitted.
+function partialJoinBackgroundFacts(entries: RuntimeRuleEntry[], staticQuads: Quad[]): Quad[] {
+  const predicates = new Set<string>();
+  const classes = new Set<string>();
+  for (const entry of entries) {
+    if (entry.partialEvaluation && runtimeRuleBodyPatternCount(entry.rule) > 1) {
+      addAll(predicates, entry.metadata.bodyPredicates);
+      addAll(classes, entry.metadata.bodyClasses);
+    }
+  }
+  predicates.delete(RDF_TYPE);
+  if (predicates.size === 0 && classes.size === 0) {
+    return [];
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const entry of entries) {
+      const { bodyPredicates, bodyClasses, headPredicates, headClasses } = entry.metadata;
+      if (![...bodyPredicates].some((predicate) => predicates.has(predicate))
+        && ![...bodyClasses].some((classValue) => classes.has(classValue))) {
+        continue;
+      }
+      for (const predicate of headPredicates) {
+        if (predicate !== RDF_TYPE && !predicates.has(predicate)) {
+          predicates.add(predicate);
+          changed = true;
+        }
+      }
+      for (const classValue of headClasses) {
+        if (!classes.has(classValue)) {
+          classes.add(classValue);
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return uniqueQuads(staticQuads.filter((quad) => quad.predicate.value === RDF_TYPE
+    ? classes.has(quad.object.value)
+    : predicates.has(quad.predicate.value)));
+}
+
+function runtimeRuleBodyPatternCount(rule: string): number {
+  return runtimeRuleBody(rule).match(/\s\.(?=\s)/g)?.length ?? 0;
 }
 
 function runtimeBackgroundClosure(input: RuntimeCompilerInput): Quad[] {
@@ -678,13 +740,25 @@ type Owl2RlPartialRuleKind =
   | 'inverseBackward'
   | 'subClass'
   | 'equivalentClassForward'
-  | 'equivalentClassBackward';
+  | 'equivalentClassBackward'
+  | PropertyChainRuleKind;
+
+type PropertyChainRuleKind = 'propertyChain1' | 'propertyChain2' | 'propertyChain3';
+
+const PROPERTY_CHAIN_RULE_LENGTHS: Record<PropertyChainRuleKind, number> = {
+  propertyChain1: 1,
+  propertyChain2: 2,
+  propertyChain3: 3,
+};
 
 type StaticOwl2RlFactKind = 'domain' | 'range' | 'subProperty' | 'equivalentProperty' | 'inverse' | 'subClass' | 'equivalentClass';
 
 interface StaticOwl2RlFacts {
   facts: Record<StaticOwl2RlFactKind, Array<[string, string]>>;
   hasNonSpecializableFacts: Set<StaticOwl2RlFactKind>;
+  // Each chain is [property, chain member 1, ..., chain member n].
+  propertyChains: string[][];
+  hasNonSpecializablePropertyChains: boolean;
 }
 
 interface Owl2RlPartialEvaluationResult {
@@ -797,9 +871,12 @@ const OWL2RL_PARTIAL_RULE_SIGNATURES: Record<Owl2RlPartialRuleKind, string> = {
   subClass: '{?c1rdfs:subClassOf?c2.?xrdf:type?c1.}=>{?xrdf:type?c2.}.',
   equivalentClassForward: '{?c1owl:equivalentClass?c2.?xrdf:type?c1.}=>{?xrdf:type?c2.}.',
   equivalentClassBackward: '{?c1owl:equivalentClass?c2.?xrdf:type?c2.}=>{?xrdf:type?c1.}.',
+  propertyChain1: '{?powl:propertyChainAxiom?chain.?chainrdf:first?p1.?chainrdf:restrdf:nil.?x?p1?y.}=>{?x?p?y.}.',
+  propertyChain2: '{?powl:propertyChainAxiom?chain.?chainrdf:first?p1.?chainrdf:rest?tail1.?tail1rdf:first?p2.?tail1rdf:restrdf:nil.?x?p1?z.?z?p2?y.}=>{?x?p?y.}.',
+  propertyChain3: '{?powl:propertyChainAxiom?chain.?chainrdf:first?p1.?chainrdf:rest?tail1.?tail1rdf:first?p2.?tail1rdf:rest?tail2.?tail2rdf:first?p3.?tail2rdf:restrdf:nil.?x?p1?z1.?z1?p2?z2.?z2?p3?y.}=>{?x?p?y.}.',
 };
 
-function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
+function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): { n3: string; entries: RuntimeRuleEntry[] } {
   const context = runtimeRuleSelectionContext(input.vocabulary, [...input.vocabulary, ...input.closure], input.shapePlanning);
   const entries: RuntimeRuleEntry[] = [];
   let totalRules = 0;
@@ -834,13 +911,14 @@ function compileSelectedRuntimeProfiles(input: RuntimeCompilerInput): string {
   const sections = formatRuntimeRuleEntries(selectedEntries);
 
   if (sections.length === 0) {
-    return '';
+    return { n3: '', entries: selectedEntries };
   }
 
-  return [
+  const n3 = [
     `# Selected ${selectedEntries.length}/${totalRules} top-level runtime rules for the load-time vocabulary${input.shapePlanning ? ' and SHACL shape hints' : ''}${partialEvaluation.generatedRuleCount > 0 ? `; partial-evaluated ${partialEvaluation.replacedRuleCount} OWL 2 RL schema rules into ${partialEvaluation.generatedRuleCount} direct data rules` : ''}.`,
     ...sections,
   ].join('\n');
+  return { n3, entries: selectedEntries };
 }
 
 function runtimeRuleSelectionContext(inputQuads: Iterable<Quad>, staticQuads: Iterable<Quad>, shapePlanning?: ShapePlanning): RuntimeRuleSelectionContext {
@@ -889,7 +967,7 @@ function partialEvaluateOwl2RlRuntimeRules(entries: RuntimeRuleEntry[], context:
     }
 
     const replacements = specializedOwl2RlEntries(kind, staticFacts);
-    if (replacements.length === 0) {
+    if (!replacements) {
       specializedEntries.push(entry);
       continue;
     }
@@ -914,9 +992,15 @@ function collectStaticOwl2RlFacts(staticQuads: Quad[], loadTimeTerms: Set<string
   };
   const seen = new Set<string>();
   const hasNonSpecializableFacts = new Set<StaticOwl2RlFactKind>();
+  const chainAxioms: Quad[] = [];
 
   for (const quad of staticQuads) {
     if (quad.graph.termType !== 'DefaultGraph' || quad.predicate.termType !== 'NamedNode') {
+      continue;
+    }
+
+    if (quad.predicate.value === OWL_PROPERTY_CHAIN_AXIOM) {
+      chainAxioms.push(quad);
       continue;
     }
 
@@ -949,7 +1033,64 @@ function collectStaticOwl2RlFacts(staticQuads: Quad[], loadTimeTerms: Set<string
     values.sort(([leftSubject, leftObject], [rightSubject, rightObject]) => leftSubject.localeCompare(rightSubject) || leftObject.localeCompare(rightObject));
   }
 
-  return { facts, hasNonSpecializableFacts };
+  const { propertyChains, hasNonSpecializablePropertyChains } = collectStaticPropertyChains(chainAxioms, staticQuads);
+  return { facts, hasNonSpecializableFacts, propertyChains, hasNonSpecializablePropertyChains };
+}
+
+// Read owl:propertyChainAxiom lists of named properties from the static
+// ontology so the generic OWL 2 RL prp-spo2 rules can become direct join rules.
+function collectStaticPropertyChains(chainAxioms: Quad[], staticQuads: Quad[]): Pick<StaticOwl2RlFacts, 'propertyChains' | 'hasNonSpecializablePropertyChains'> {
+  const propertyChains: string[][] = [];
+  let hasNonSpecializablePropertyChains = false;
+  if (chainAxioms.length === 0) {
+    return { propertyChains, hasNonSpecializablePropertyChains };
+  }
+
+  const firsts = new Map<string, Term[]>();
+  const rests = new Map<string, Term[]>();
+  for (const quad of uniqueQuads(staticQuads.filter((quad) => quad.predicate.value === RDF_FIRST || quad.predicate.value === RDF_REST))) {
+    pushMapValue(quad.predicate.value === RDF_FIRST ? firsts : rests, termKey(quad.subject), quad.object);
+  }
+
+  const seen = new Set<string>();
+  for (const axiom of chainAxioms) {
+    const members: string[] = [];
+    let current: Term = axiom.object;
+    let wellFormed = axiom.subject.termType === 'NamedNode';
+    while (wellFormed && !(current.termType === 'NamedNode' && current.value === RDF_NIL)) {
+      const first: Term[] = firsts.get(termKey(current)) ?? [];
+      const rest: Term[] = rests.get(termKey(current)) ?? [];
+      if (first.length !== 1 || rest.length !== 1 || first[0].termType !== 'NamedNode' || members.length >= 3) {
+        wellFormed = false;
+        break;
+      }
+      members.push(first[0].value);
+      current = rest[0];
+    }
+
+    // Longer chains keep using the generic recursive helper rules.
+    if (!wellFormed || members.length === 0) {
+      if (members.length < 3) {
+        hasNonSpecializablePropertyChains = true;
+      }
+      continue;
+    }
+    const chain = [axiom.subject.value, ...members];
+    const key = chain.join('\t');
+    if (!seen.has(key)) {
+      seen.add(key);
+      propertyChains.push(chain);
+    }
+  }
+
+  propertyChains.sort((left, right) => left.join('\t').localeCompare(right.join('\t')));
+  return { propertyChains, hasNonSpecializablePropertyChains };
+}
+
+function pushMapValue<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const values = map.get(key) ?? [];
+  values.push(value);
+  map.set(key, values);
 }
 
 function staticOwl2RlFactKind(predicate: string): StaticOwl2RlFactKind | undefined {
@@ -983,16 +1124,37 @@ function partialOwl2RlRuleKind(rule: string): Owl2RlPartialRuleKind | undefined 
   return undefined;
 }
 
-function specializedOwl2RlEntries(kind: Owl2RlPartialRuleKind, staticFacts: StaticOwl2RlFacts): RuntimeRuleEntry[] {
+// Returns undefined when the generic rule must be kept.
+function specializedOwl2RlEntries(kind: Owl2RlPartialRuleKind, staticFacts: StaticOwl2RlFacts): RuntimeRuleEntry[] | undefined {
+  if (isPropertyChainRuleKind(kind)) {
+    // Each generic rule only matches chains of its own length, so it can be
+    // replaced by zero or more direct join rules once all chains are known.
+    return staticFacts.hasNonSpecializablePropertyChains
+      ? undefined
+      : staticFacts.propertyChains
+        .filter((chain) => chain.length === PROPERTY_CHAIN_RULE_LENGTHS[kind] + 1)
+        .map((chain) => partialEvaluatedRuleEntry(specializedPropertyChainRule(chain)));
+  }
+
   const factKind = partialRuleFactKind(kind);
-  if (staticFacts.hasNonSpecializableFacts.has(factKind)) {
-    return [];
+  if (staticFacts.hasNonSpecializableFacts.has(factKind) || staticFacts.facts[factKind].length === 0) {
+    return undefined;
   }
 
   return staticFacts.facts[factKind].map((fact) => partialEvaluatedRuleEntry(specializedOwl2RlRule(kind, fact)));
 }
 
-function partialRuleFactKind(kind: Owl2RlPartialRuleKind): StaticOwl2RlFactKind {
+function isPropertyChainRuleKind(kind: Owl2RlPartialRuleKind): kind is PropertyChainRuleKind {
+  return kind in PROPERTY_CHAIN_RULE_LENGTHS;
+}
+
+function specializedPropertyChainRule([property, ...members]: string[]): string {
+  const variables = ['?x', ...members.slice(1).map((_member, index) => `?z${index + 1}`), '?y'];
+  const body = members.map((member, index) => `${variables[index]} ${iri(member)} ${variables[index + 1]} .`).join(' ');
+  return `{ ${body} }\n=> { ?x ${iri(property)} ?y . } .`;
+}
+
+function partialRuleFactKind(kind: Exclude<Owl2RlPartialRuleKind, PropertyChainRuleKind>): StaticOwl2RlFactKind {
   switch (kind) {
     case 'equivalentPropertyForward':
     case 'equivalentPropertyBackward':
@@ -1008,7 +1170,7 @@ function partialRuleFactKind(kind: Owl2RlPartialRuleKind): StaticOwl2RlFactKind 
   }
 }
 
-function specializedOwl2RlRule(kind: Owl2RlPartialRuleKind, [left, right]: [string, string]): string {
+function specializedOwl2RlRule(kind: Exclude<Owl2RlPartialRuleKind, PropertyChainRuleKind>, [left, right]: [string, string]): string {
   switch (kind) {
     case 'domain':
       return `{ ?x ${iri(left)} ?y . }\n=> { ?x ${iri(RDF_TYPE)} ${iri(right)} . } .`;
@@ -1108,7 +1270,10 @@ function selectShapeGuidedRuntimeRules(entries: RuntimeRuleEntry[], context: Run
     return entries;
   }
 
-  const reachable = reachableRuleEntries(entries, context, planning);
+  // Without shaclIn, infer() input is unconstrained, so every rule may become reachable.
+  const reachable = planning.input
+    ? reachableRuleEntries(entries, context, planning)
+    : new Set(entries.keys());
   if (!planning.output) {
     return orderRuntimeRulesForShapeHints(entries.filter((_entry, index) => reachable.has(index)), planning);
   }

@@ -999,12 +999,27 @@ owl:Nothing rdf:type owl:Class .
 # dt-not-type
 { ?litNode internal:term ?lt .
   ?lt rdf:type ?datatype .
+  ?datatype log:notEqualTo rdfs:Literal .
   ?lt dt:invalidForDatatype ?datatype .
   (inconsistencies:dt-not-type ?lt ?datatype) log:skolem ?err . }
 => { ?err a inconsistencies:Inconsistency ;
           inconsistencies:rule inconsistencies:dt-not-type ;
           inconsistencies:term1 ?lt ;
           inconsistencies:term2 ?datatype . } .
+
+# Every literal is typed rdfs:Literal above. dt:invalidForDatatype rdfs:Literal
+# also succeeds when Eyeling does not support the literal's own datatype (e.g.
+# xsd:date or a custom datatype), so only report it for a literal that is
+# invalid for its own, supported datatype, such as "abc"^^xsd:integer.
+{ ?litNode internal:term ?lt .
+  ?lt rdf:type rdfs:Literal .
+  ?lt dt:datatype ?own .
+  ?lt dt:invalidForDatatype ?own .
+  (inconsistencies:dt-not-type ?lt rdfs:Literal) log:skolem ?err . }
+=> { ?err a inconsistencies:Inconsistency ;
+          inconsistencies:rule inconsistencies:dt-not-type ;
+          inconsistencies:term1 ?lt ;
+          inconsistencies:term2 rdfs:Literal . } .
 
 # dt-eq. The log:notEqualTo guard avoids deriving reflexive literal equality for
 # the exact same RDF term while still allowing value equality for different
